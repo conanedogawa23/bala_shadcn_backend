@@ -2,54 +2,87 @@ import { Schema, model, Document } from 'mongoose';
 
 export interface IInsurance {
   type: '1st' | '2nd' | '3rd';
-  policyHolder: string;
-  policyHolderName?: string;
-  company: string;
-  companyAddress?: string;
-  groupNumber?: string;
-  certificateNumber?: string;
-  coverage: {
-    orthotics?: number;
-    physiotherapy?: number;
-    massage?: number;
-    orthopedicShoes?: number;
-    compressionStockings?: number;
-    other?: number;
-    numberOfOrthotics?: string;
-    totalAmountPerOrthotic?: number;
-    totalAmountPerYear?: number;
-    frequency?: string;
-    numOrthoticsPerYear?: string;
-  };
-  birthday?: {
+  dpa: boolean; // Direct Payment Authorization
+  policyHolder: string; // 'self', 'spouse', 'none'
+  cob: string; // Coordination of Benefits
+  policyHolderName: string;
+  birthday: {
     day?: string;
     month?: string;
     year?: string;
   };
+  company: string;
+  companyAddress: string;
+  city: string;
+  province: string;
+  postalCode: {
+    first3: string;
+    last3: string;
+  };
+  groupNumber: string;
+  certificateNumber: string;
+  coverage: {
+    numberOfOrthotics: string;
+    totalAmountPerOrthotic: number;
+    totalAmountPerYear: number;
+    frequency: string;
+    numOrthoticsPerYear: string;
+    orthopedicShoes: number;
+    compressionStockings: number;
+    physiotherapy: number;
+    massage: number;
+    other: number;
+  };
 }
 
 export interface IClient extends Document {
-  clientId: string;
+  clientId: string; // sb_clients_id from MSSQL
+  clientKey?: number; // sb_clients_key from MSSQL
   personalInfo: {
     firstName: string;
     lastName: string;
     fullName: string;
+    fullNameForAutocomplete: string;
     dateOfBirth?: Date;
+    birthday: {
+      day: string;
+      month: string;
+      year: string;
+    };
     gender: 'Male' | 'Female' | 'Other';
   };
   contact: {
     address: {
-      street?: string;
+      street: string;
       apartment?: string;
       city: string;
       province: string;
-      postalCode?: string;
+      postalCode: {
+        first3: string;
+        last3: string;
+        full: string; // computed field
+      };
     };
     phones: {
-      home?: string;
-      cell?: string;
-      work?: string;
-      workExtension?: string;
+      home?: {
+        countryCode: string;
+        areaCode: string;
+        number: string;
+        full: string; // computed field
+      };
+      cell?: {
+        countryCode: string;
+        areaCode: string;
+        number: string;
+        full: string; // computed field
+      };
+      work?: {
+        countryCode: string;
+        areaCode: string;
+        number: string;
+        extension?: string;
+        full: string; // computed field
+      };
     };
     email?: string;
     company?: string;
@@ -58,28 +91,29 @@ export interface IClient extends Document {
   medical: {
     familyMD?: string;
     referringMD?: string;
-    csrName?: string;
-    location?: string;
-    dpa1st?: string;
-    dpa2nd?: string;
-    dpa3rd?: string;
+    csrName?: string; // Customer Service Representative
+    location?: string; // sb_clients_location
   };
-  insurance: IInsurance[];
-  clinics: string[];
-  defaultClinic: string;
+  insurance: IInsurance[]; // Up to 3 insurance plans
+  clinics: string[]; // Associated clinic names
+  defaultClinic: string; // sb_default_clinic
   isActive: boolean;
-  dateCreated: Date;
+  dateCreated: Date; // sb_clients_date_created
   dateModified: Date;
+  
+  // Referral tracking
+  referralType?: number;
+  referralSubtype?: number;
   
   // Instance methods
   getFullName(): string;
   getAge(): number | null;
   getPrimaryInsurance(): IInsurance | null;
+  getSecondaryInsurance(): IInsurance | null;
+  getTertiaryInsurance(): IInsurance | null;
   hasInsurance(): boolean;
-  
-  // Static methods
-  static findByClinic(clinicName: string): Promise<IClient[]>;
-  static searchClients(searchTerm: string, clinicName?: string): Promise<IClient[]>;
+  hasDPA(): boolean;
+  getFormattedPhone(type: 'home' | 'cell' | 'work'): string | null;
 }
 
 const InsuranceSchema = new Schema<IInsurance>({
@@ -88,14 +122,28 @@ const InsuranceSchema = new Schema<IInsurance>({
     enum: ['1st', '2nd', '3rd'],
     required: true
   },
+  dpa: {
+    type: Boolean,
+    default: false
+  },
   policyHolder: {
     type: String,
     required: true,
     trim: true
   },
+  cob: {
+    type: String,
+    trim: true,
+    default: 'NO'
+  },
   policyHolderName: {
     type: String,
     trim: true
+  },
+  birthday: {
+    day: String,
+    month: String,
+    year: String
   },
   company: {
     type: String,
@@ -106,6 +154,18 @@ const InsuranceSchema = new Schema<IInsurance>({
     type: String,
     trim: true
   },
+  city: {
+    type: String,
+    trim: true
+  },
+  province: {
+    type: String,
+    trim: true
+  },
+  postalCode: {
+    first3: String,
+    last3: String
+  },
   groupNumber: {
     type: String,
     trim: true
@@ -115,22 +175,16 @@ const InsuranceSchema = new Schema<IInsurance>({
     trim: true
   },
   coverage: {
-    orthotics: Number,
-    physiotherapy: Number,
-    massage: Number,
-    orthopedicShoes: Number,
-    compressionStockings: Number,
-    other: Number,
     numberOfOrthotics: String,
-    totalAmountPerOrthotic: Number,
-    totalAmountPerYear: Number,
+    totalAmountPerOrthotic: { type: Number, default: 0 },
+    totalAmountPerYear: { type: Number, default: 0 },
     frequency: String,
-    numOrthoticsPerYear: String
-  },
-  birthday: {
-    day: String,
-    month: String,
-    year: String
+    numOrthoticsPerYear: String,
+    orthopedicShoes: { type: Number, default: 0 },
+    compressionStockings: { type: Number, default: 0 },
+    physiotherapy: { type: Number, default: 0 },
+    massage: { type: Number, default: 0 },
+    other: { type: Number, default: 0 }
   }
 });
 
@@ -140,6 +194,10 @@ const ClientSchema = new Schema<IClient>({
     required: true,
     unique: true,
     trim: true,
+    index: true
+  },
+  clientKey: {
+    type: Number,
     index: true
   },
   personalInfo: {
@@ -161,8 +219,18 @@ const ClientSchema = new Schema<IClient>({
       trim: true,
       maxlength: 200
     },
+    fullNameForAutocomplete: {
+      type: String,
+      trim: true,
+      maxlength: 200
+    },
     dateOfBirth: {
       type: Date
+    },
+    birthday: {
+      day: { type: String, trim: true },
+      month: { type: String, trim: true },
+      year: { type: String, trim: true }
     },
     gender: {
       type: String,
@@ -195,32 +263,30 @@ const ClientSchema = new Schema<IClient>({
         maxlength: 100
       },
       postalCode: {
-        type: String,
-        trim: true,
-        uppercase: true,
-        maxlength: 10
+        first3: { type: String, trim: true, uppercase: true },
+        last3: { type: String, trim: true, uppercase: true },
+        full: { type: String, trim: true, uppercase: true } // computed
       }
     },
     phones: {
       home: {
-        type: String,
-        trim: true,
-        maxlength: 20
+        countryCode: String,
+        areaCode: String,
+        number: String,
+        full: String // computed
       },
       cell: {
-        type: String,
-        trim: true,
-        maxlength: 20
+        countryCode: String,
+        areaCode: String,
+        number: String,
+        full: String // computed
       },
       work: {
-        type: String,
-        trim: true,
-        maxlength: 20
-      },
-      workExtension: {
-        type: String,
-        trim: true,
-        maxlength: 10
+        countryCode: String,
+        areaCode: String,
+        number: String,
+        extension: String,
+        full: String // computed
       }
     },
     email: {
@@ -261,21 +327,6 @@ const ClientSchema = new Schema<IClient>({
       type: String,
       trim: true,
       maxlength: 200
-    },
-    dpa1st: {
-      type: String,
-      trim: true,
-      maxlength: 20
-    },
-    dpa2nd: {
-      type: String,
-      trim: true,
-      maxlength: 20
-    },
-    dpa3rd: {
-      type: String,
-      trim: true,
-      maxlength: 20
     }
   },
   insurance: [InsuranceSchema],
@@ -302,11 +353,17 @@ const ClientSchema = new Schema<IClient>({
   dateModified: {
     type: Date,
     default: Date.now
+  },
+  referralType: {
+    type: Number
+  },
+  referralSubtype: {
+    type: Number
   }
 }, {
   timestamps: { createdAt: 'dateCreated', updatedAt: 'dateModified' },
   toJSON: {
-    transform: function(doc, ret) {
+    transform: function(doc, ret: any) {
       delete ret.__v;
       return ret;
     }
@@ -315,8 +372,10 @@ const ClientSchema = new Schema<IClient>({
 
 // Indexes for performance
 ClientSchema.index({ clientId: 1 }, { unique: true });
+ClientSchema.index({ clientKey: 1 });
 ClientSchema.index({ defaultClinic: 1 });
 ClientSchema.index({ 'personalInfo.lastName': 1, 'personalInfo.firstName': 1 });
+ClientSchema.index({ 'personalInfo.fullNameForAutocomplete': 1 });
 ClientSchema.index({ 'contact.email': 1 });
 ClientSchema.index({ isActive: 1 });
 ClientSchema.index({ dateCreated: -1 });
@@ -326,12 +385,13 @@ ClientSchema.index({
   'personalInfo.firstName': 'text',
   'personalInfo.lastName': 'text',
   'personalInfo.fullName': 'text',
+  'personalInfo.fullNameForAutocomplete': 'text',
   'contact.email': 'text'
 });
 
 // Instance methods
 ClientSchema.methods.getFullName = function(): string {
-  return `${this.personalInfo.lastName}, ${this.personalInfo.firstName}`;
+  return this.personalInfo.fullName || `${this.personalInfo.lastName}, ${this.personalInfo.firstName}`;
 };
 
 ClientSchema.methods.getAge = function(): number | null {
@@ -352,8 +412,34 @@ ClientSchema.methods.getPrimaryInsurance = function(): IInsurance | null {
   return this.insurance.find((ins: IInsurance) => ins.type === '1st') || null;
 };
 
+ClientSchema.methods.getSecondaryInsurance = function(): IInsurance | null {
+  return this.insurance.find((ins: IInsurance) => ins.type === '2nd') || null;
+};
+
+ClientSchema.methods.getTertiaryInsurance = function(): IInsurance | null {
+  return this.insurance.find((ins: IInsurance) => ins.type === '3rd') || null;
+};
+
 ClientSchema.methods.hasInsurance = function(): boolean {
   return this.insurance.length > 0;
+};
+
+ClientSchema.methods.hasDPA = function(): boolean {
+  return this.insurance.some((ins: IInsurance) => ins.dpa === true);
+};
+
+ClientSchema.methods.getFormattedPhone = function(type: 'home' | 'cell' | 'work'): string | null {
+  const phone = this.contact.phones[type];
+  if (!phone) return null;
+  
+  if (phone.full) return phone.full;
+  
+  if (phone.countryCode && phone.areaCode && phone.number) {
+    const formatted = `(${phone.areaCode}) ${phone.number}`;
+    return phone.extension ? `${formatted} ext. ${phone.extension}` : formatted;
+  }
+  
+  return null;
 };
 
 // Static methods
@@ -378,6 +464,19 @@ ClientSchema.statics.searchClients = function(searchTerm: string, clinicName?: s
     .sort({ score: { $meta: 'textScore' } });
 };
 
+ClientSchema.statics.findWithInsurance = function(clinicName?: string) {
+  const query: any = {
+    isActive: true,
+    'insurance.0': { $exists: true }
+  };
+  
+  if (clinicName) {
+    query.defaultClinic = clinicName;
+  }
+  
+  return this.find(query).sort({ 'personalInfo.lastName': 1 });
+};
+
 // Pre-save middleware
 ClientSchema.pre('save', function(next) {
   this.dateModified = new Date();
@@ -385,6 +484,40 @@ ClientSchema.pre('save', function(next) {
   // Auto-generate fullName if not provided
   if (!this.personalInfo.fullName) {
     this.personalInfo.fullName = `${this.personalInfo.lastName}, ${this.personalInfo.firstName}`;
+  }
+  
+  // Auto-generate fullNameForAutocomplete
+  if (!this.personalInfo.fullNameForAutocomplete) {
+    this.personalInfo.fullNameForAutocomplete = this.personalInfo.fullName;
+  }
+  
+  // Generate computed fields for postal code
+  if (this.contact.address.postalCode.first3 && this.contact.address.postalCode.last3) {
+    this.contact.address.postalCode.full = `${this.contact.address.postalCode.first3} ${this.contact.address.postalCode.last3}`;
+  }
+  
+  // Generate computed fields for phone numbers
+  const phoneTypes: Array<keyof IClient['contact']['phones']> = ['home', 'cell', 'work'];
+  phoneTypes.forEach(type => {
+    const phone = this.contact.phones[type];
+    if (phone && phone.countryCode && phone.areaCode && phone.number) {
+      phone.full = `(${phone.areaCode}) ${phone.number}`;
+      if (type === 'work' && 'extension' in phone && phone.extension) {
+        phone.full += ` ext. ${phone.extension}`;
+      }
+    }
+  });
+  
+  // Parse birthday to dateOfBirth if available
+  if (this.personalInfo.birthday.day && this.personalInfo.birthday.month && this.personalInfo.birthday.year) {
+    const day = parseInt(this.personalInfo.birthday.day);
+    const month = parseInt(this.personalInfo.birthday.month);
+    const year = parseInt(this.personalInfo.birthday.year);
+    
+    if (!isNaN(day) && !isNaN(month) && !isNaN(year) && 
+        day > 0 && day <= 31 && month > 0 && month <= 12 && year > 1900 && year < 2030) {
+      this.personalInfo.dateOfBirth = new Date(year, month - 1, day);
+    }
   }
   
   next();
