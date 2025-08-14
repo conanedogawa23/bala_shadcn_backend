@@ -1,0 +1,44 @@
+---
+alwaysApply: true
+---
+
+# Bala Visio Backend Project Structure
+
+## Core Architecture
+This is a **Node.js/Express/MongoDB** backend for the Bala Visio clinic management system, designed to replace mock APIs with real-time functionality.
+
+## Directory Structure
+```
+bala_visio_backend/
+├── src/
+│   ├── models/             # Data models (Mongoose schemas) - MODEL LAYER
+│   ├── views/              # Response formatters and serializers - VIEW LAYER  
+│   ├── controllers/        # Thin route handlers - CONTROLLER LAYER
+│   ├── routes/             # Express route definitions only
+│   ├── services/           # Business logic (called by controllers)
+│   ├── middleware/         # Custom middleware (auth, validation, etc.)
+│   ├── validators/         # Input validation schemas
+│   ├── utils/              # Helper functions and utilities
+│   ├── config/             # Configuration files (database, auth, etc.)
+│   └── migrations/         # Database migration scripts from MSSQL
+├── tests/                  # Test files (unit, integration, e2e)
+├── scripts/                # Build and deployment scripts
+├── docs/                   # API documentation
+└── docker/                 # Docker configuration files
+```
+
+## Key Technologies & MVC Architecture
+- **Runtime**: Node.js 18+ with TypeScript
+- **Framework**: Express.js with helmet, cors, morgan
+- **Database**: MongoDB with Mongoose ODM (MODEL)
+- **Response Formatting**: Custom serializers (VIEW)
+- **Route Handling**: Thin controllers (CONTROLLER)
+- **Authentication**: JWT with refresh tokens
+- **Testing**: Jest with Supertest
+- **Validation**: Joi for request validation
+
+## Entry Points & MVC Flow
+- **Application**: `src/app.ts` - Main Express app setup
+- **Database**: `src/config/database.ts` - MongoDB connection
+- **Routes**: `src/routes/index.ts` - Route aggregation
+- **MVC Flow**: Route → Controller → Service → Model → View → Response

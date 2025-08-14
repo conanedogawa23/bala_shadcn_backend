@@ -1,0 +1,377 @@
+---
+globs: "**/*error*.ts,**/controllers*.ts"
+---
+
+# Error Handling Patterns
+
+## Centralized Error Management
+Consistent error handling across all API endpoints and services.
+
+## Custom Error Classes
+```typescript
+// src/utils/errors.ts
+export class AppError extends Error {
+  public statusCode: number;
+  public isOperational: boolean;
+  public code?: string;
+
+  constructor(message: string, statusCode: number, code?: string, isOperational = true) {
+    super(message);
+    this.statusCode = statusCode;
+    this.isOperational = isOperational;
+    this.code = code;
+
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+export class ValidationError extends AppError {
+  constructor(message: string, details?: any) {
+    super(message, 400, 'VALIDATION_ERROR');
+    this.details = details;
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(resource: string, id?: string) {
+    const message = id ? `${resource} with id ${id} not found` : `${resource} not found`;
+    super(message, 404, 'NOT_FOUND');
+  }
+}
+
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Unauthorized access') {
+    super(message, 401, 'UNAUTHORIZED');
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = 'Forbidden access') {
+    super(message, 403, 'FORBIDDEN');
+  }
+}
+
+export class ConflictError extends AppError {
+  constructor(message: string) {
+    super(message, 409, 'CONFLICT');
+  }
+}
+
+export class DatabaseError extends AppError {
+  constructor(message: string, originalError?: Error) {
+    super(message, 500, 'DATABASE_ERROR', false);
+    this.originalError = originalError;
+  }
+}
+```
+
+## Global Error Handler Middleware
+```typescript
+// src/middleware/errorHandler.ts
+import { Request, Response, NextFunction } from 'express';
+import { AppError } from '../utils/errors';
+import { logger } from '../utils/logger';
+
+export const errorHandler = (error: Error, req: Request, res: Response, next: NextFunction) => {
+  let err = error;
+
+  // Convert non-AppError instances to AppError
+  if (!(error instanceof AppError)) {
+    err = handleSpecificErrors(error);
+  }
+
+  const appError = err as AppError;
+
+  // Log error
+  logError(appError, req);
+
+  // Send error response
+  res.status(appError.statusCode || 500).json({
+    success: false,
+    error: {
+      code: appError.code || 'INTERNAL_ERROR',
+      message: appError.isOperational ? appError.message : 'Something went wrong',
+      ...(process.env.NODE_ENV === 'development' && { stack: appError.stack })
+    },
+    timestamp: new Date().toISOString(),
+    path: req.originalUrl,
+    method: req.method
+  });
+};
+
+function handleSpecificErrors(error: Error): AppError {
+  // MongoDB validation errors
+  if (error.name === 'ValidationError') {
+    return new ValidationError('Validation failed', (error as any).errors);
+  }
+
+  // MongoDB duplicate key error
+  if ((error as any).code === 11000) {
+    const field = Object.keys((error as any).keyValue)[0];
+    return new ConflictError(`${field} already exists`);
+  }
+
+  // MongoDB cast error
+  if (error.name === 'CastError') {
+    return new ValidationError('Invalid ID format');
+  }
+
+  // JWT errors
+  if (error.name === 'JsonWebTokenError') {
+    return new UnauthorizedError('Invalid token');
+  }
+
+  if (error.name === 'TokenExpiredError') {
+    return new UnauthorizedError('Token has expired');
+  }
+
+  // Default to internal server error
+  return new AppError('Internal server error', 500, 'INTERNAL_ERROR', false);
+}
+
+function logError(error: AppError, req: Request) {
+  const errorInfo = {
+    message: error.message,
+    statusCode: error.statusCode,
+    code: error.code,
+    stack: error.stack,
+    path: req.originalUrl,
+    method: req.method,
+    userId: (req as any).user?.id,
+    timestamp: new Date().toISOString()
+  };
+
+  if (error.statusCode >= 500) {
+    logger.error('Server Error:', errorInfo);
+  } else {
+    logger.warn('Client Error:', errorInfo);
+  }
+}
+```
+
+## Async Error Wrapper
+```typescript
+// src/utils/asyncHandler.ts
+import { Request, Response, NextFunction } from 'express';
+
+export const asyncHandler = (fn: Function) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+
+// Usage in controllers
+export const getClientById = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  
+  const client = await ClientService.getById(id);
+  if (!client) {
+    throw new NotFoundError('Client', id);
+  }
+
+  res.json({
+    success: true,
+    data: client
+  });
+});
+```
+
+## Service Layer Error Handling
+```typescript
+// src/services/clientService.ts
+import { NotFoundError, ValidationError, DatabaseError } from '../utils/errors';
+
+export class ClientService {
+  static async getById(clientId: string) {
+    try {
+      const client = await ClientModel.findOne({ clientId });
+      
+      if (!client) {
+        throw new NotFoundError('Client', clientId);
+      }
+
+      return client;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error; // Re-throw application errors
+      }
+      
+      // Wrap database errors
+      throw new DatabaseError('Failed to retrieve client', error as Error);
+    }
+  }
+
+  static async create(clientData: any) {
+    try {
+      // Validate required fields
+      if (!clientData.personalInfo?.firstName) {
+        throw new ValidationError('First name is required');
+      }
+
+      // Check for duplicate
+      const existing = await ClientModel.findOne({ clientId: clientData.clientId });
+      if (existing) {
+        throw new ConflictError('Client with this ID already exists');
+      }
+
+      const client = await ClientModel.create(clientData);
+      return client;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new DatabaseError('Failed to create client', error as Error);
+    }
+  }
+
+  static async updateById(clientId: string, updateData: any) {
+    try {
+      const client = await ClientModel.findOneAndUpdate(
+        { clientId },
+        updateData,
+        { new: true, runValidators: true }
+      );
+
+      if (!client) {
+        throw new NotFoundError('Client', clientId);
+      }
+
+      return client;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new DatabaseError('Failed to update client', error as Error);
+    }
+  }
+}
+```
+
+## Validation Error Handling
+```typescript
+// src/controllers/clientController.ts
+import { validationResult } from 'express-validator';
+import { ValidationError } from '../utils/errors';
+
+export class ClientController {
+  static createClient = asyncHandler(async (req: Request, res: Response) => {
+    // Check validation results
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', {
+        fields: errors.array()
+      });
+    }
+
+    const client = await ClientService.create(req.body);
+    
+    res.status(201).json({
+      success: true,
+      data: client,
+      message: 'Client created successfully'
+    });
+  });
+}
+```
+
+## Database Connection Error Handling
+```typescript
+// src/config/database.ts
+import mongoose from 'mongoose';
+import { logger } from '../utils/logger';
+
+export const connectDatabase = async () => {
+  try {
+    const conn = await mongoose.connect(process.env.MONGODB_URI!);
+    
+    logger.info(`MongoDB Connected: ${conn.connection.host}`);
+    
+    // Handle connection events
+    mongoose.connection.on('error', (error) => {
+      logger.error('MongoDB connection error:', error);
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      logger.warn('MongoDB disconnected');
+    });
+
+    process.on('SIGINT', async () => {
+      await mongoose.connection.close();
+      logger.info('MongoDB connection closed due to application termination');
+      process.exit(0);
+    });
+
+  } catch (error) {
+    logger.error('Database connection failed:', error);
+    process.exit(1);
+  }
+};
+```
+
+## Error Response Format
+```typescript
+// Standard error response format
+{
+  "success": false,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Client with id 12345 not found",
+    "details": {} // Optional additional error details
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "path": "/api/v1/clients/12345",
+  "method": "GET"
+}
+
+// Validation error response
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Validation failed",
+    "details": {
+      "fields": [
+        {
+          "field": "personalInfo.firstName",
+          "message": "First name is required"
+        }
+      ]
+    }
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "path": "/api/v1/clients",
+  "method": "POST"
+}
+```
+
+## Unhandled Rejection Handler
+```typescript
+// src/app.ts
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  
+  // Close server gracefully
+  server.close(() => {
+    process.exit(1);
+  });
+});
+
+process.on('uncaughtException', (error: Error) => {
+  logger.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+```
+
+## Error Monitoring Integration
+```typescript
+// src/utils/errorReporting.ts
+export class ErrorReporting {
+  static reportError(error: AppError, context?: any) {
+    // Integrate with error monitoring service (Sentry, Bugsnag, etc.)
+    if (process.env.NODE_ENV === 'production' && !error.isOperational) {
+      // Report to external service
+      console.error('Critical error reported:', error, context);
+         }
+   }
+ }
+ ```

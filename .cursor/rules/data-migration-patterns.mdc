@@ -1,0 +1,183 @@
+---
+globs: "**/migrations*.ts,**/scripts*.ts"
+---
+
+# Data Migration Patterns
+
+## MSSQL to MongoDB Migration Strategy
+Based on VISIO_10 database analysis: 31,213 clients, 13 clinics, primarily client management system.
+
+## Migration Architecture
+```typescript
+interface MigrationConfig {
+  mssqlConnection: {
+    server: string;
+    database: 'VISIO_10';
+    user: string;
+    password: string;
+  };
+  mongoConnection: {
+    uri: string;
+    database: string;
+  };
+  batchSize: number; // Recommended: 1000
+  nameOnly: true; // MongoDB MCP requirement
+}
+```
+
+## Core Migration Scripts
+
+### 1. Clinic Migration
+```typescript
+// src/migrations/001_migrate_clinics.ts
+export class ClinicMigration {
+  async migrate() {
+    const mssqlClinics = await this.fetchFromMSSQL(`
+      SELECT ClinicId, ClinicName, CompleteName, ClinicAddress,
+             City, Province, PostalCode, DateCreated, DateModified
+      FROM sb_clinic 
+      ORDER BY ClinicId
+    `);
+
+    for (const clinic of mssqlClinics) {
+      const mongoClinic = {
+        clinicId: clinic.ClinicId,
+        name: clinic.ClinicName?.trim(),
+        displayName: clinic.ClinicName?.trim(),
+        completeName: clinic.CompleteName?.trim(),
+        address: {
+          street: clinic.ClinicAddress?.trim() || '',
+          city: clinic.City?.trim() || '',
+          province: clinic.Province?.trim() || '',
+          postalCode: clinic.PostalCode?.trim() || ''
+        },
+        status: 'active', // Default status
+        dateCreated: clinic.DateCreated || new Date(),
+        dateModified: clinic.DateModified || new Date()
+      };
+
+      await this.insertToMongo('clinics', mongoClinic);
+    }
+  }
+}
+```
+
+### 2. Client Migration
+```typescript
+// src/migrations/002_migrate_clients.ts
+export class ClientMigration {
+  async migrate() {
+    const query = `
+      SELECT TOP 1000 
+        sb_clients_id, sb_clients_first_name, sb_clients_last_name,
+        sb_clients_birthday_day, sb_clients_birthday_month, sb_clients_birthday_year,
+        sb_clients_gender, sb_clients_city, sb_clients_province,
+        sb_clients_postal_code_first3Digits + sb_clients_postal_code_last3Digits as postal_code,
+        sb_clients_home_phone_areaCode + sb_clients_home_phone_number as home_phone,
+        sb_clients_cell_phone_areaCode + sb_clients_cell_phone_number as cell_phone,
+        sb_clients_email_address, sb_default_clinic, sb_clients_date_created,
+        -- Insurance fields
+        sb_clients_1st_insurance_insurance_company, sb_clients_1st_insurance_group_number,
+        sb_clients_1st_coverage_totalAmountPerOrthotic, sb_clients_1st_coverage_physiotherapy
+      FROM sb_clients 
+      WHERE OFFSET ${offset} ROWS FETCH NEXT ${batchSize} ROWS ONLY
+    `;
+
+    const clients = await this.fetchFromMSSQL(query);
+    const transformedClients = clients.map(this.transformClient);
+    await this.batchInsertToMongo('clients', transformedClients);
+  }
+
+  private transformClient(mssqlClient: any) {
+    return {
+      clientId: mssqlClient.sb_clients_id?.trim(),
+      personalInfo: {
+        firstName: mssqlClient.sb_clients_first_name?.trim() || '',
+        lastName: mssqlClient.sb_clients_last_name?.trim() || '',
+        fullName: `${mssqlClient.sb_clients_last_name?.trim()}, ${mssqlClient.sb_clients_first_name?.trim()}`,
+        dateOfBirth: this.parseBirthDate(
+          mssqlClient.sb_clients_birthday_day?.trim(),
+          mssqlClient.sb_clients_birthday_month?.trim(),
+          mssqlClient.sb_clients_birthday_year?.trim()
+        ),
+        gender: this.normalizeGender(mssqlClient.sb_clients_gender?.trim())
+      },
+      contact: {
+        address: {
+          city: mssqlClient.sb_clients_city?.trim() || '',
+          province: mssqlClient.sb_clients_province?.trim() || '',
+          postalCode: mssqlClient.postal_code?.trim() || ''
+        },
+        phones: {
+          home: this.formatPhone(mssqlClient.home_phone),
+          cell: this.formatPhone(mssqlClient.cell_phone)
+        },
+        email: mssqlClient.sb_clients_email_address?.trim() || null
+      },
+      insurance: this.extractInsurance(mssqlClient),
+      defaultClinic: mssqlClient.sb_default_clinic?.trim(),
+      isActive: true,
+      dateCreated: mssqlClient.sb_clients_date_created || new Date()
+    };
+  }
+}
+```
+
+## Data Transformation Utilities
+```typescript
+// src/utils/migrationHelpers.ts
+export class MigrationHelpers {
+  static parseBirthDate(day: string, month: string, year: string): Date | null {
+    if (!day || !month || !year) return null;
+    
+    const d = parseInt(day.trim());
+    const m = parseInt(month.trim());
+    const y = parseInt(year.trim());
+    
+    if (d > 0 && d <= 31 && m > 0 && m <= 12 && y > 1900 && y < 2030) {
+      return new Date(y, m - 1, d);
+    }
+    return null;
+  }
+
+  static normalizeGender(gender: string): 'Male' | 'Female' | 'Other' {
+    const g = gender?.toLowerCase();
+    if (g === 'male' || g === 'm') return 'Male';
+    if (g === 'female' || g === 'f') return 'Female';
+    return 'Other';
+  }
+
+  static formatPhone(phone: string): string | null {
+    if (!phone) return null;
+    // Clean and format phone number
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+    }
+    return cleaned || null;
+  }
+}
+```
+
+## Migration Best Practices
+1. **Batch Processing**: Use OFFSET/FETCH for large datasets
+2. **Data Validation**: Validate each record before insertion
+3. **Error Handling**: Log failed records for manual review
+4. **Progress Tracking**: Implement progress logging and resumption
+5. **Rollback Strategy**: Create backup before migration
+6. **Testing**: Test with small batches first
+
+## Synthetic Data Generation
+For missing transactional data (orders/payments):
+```typescript
+// src/migrations/003_generate_synthetic_data.ts
+export class SyntheticDataGenerator {
+  async generateOrdersForClinic(clinicName: string, clientCount: number) {
+    const services = this.getServicesForClinic(clinicName);
+    const orderCount = Math.min(35, clientCount); // Active clinics get more orders
+    
+         // Generate realistic orders based on clinic type and client demographics
+     // Use patterns from existing mock data but with real client associations
+   }
+ }
+ ```

@@ -1,0 +1,126 @@
+---
+globs: "**/*models*.ts,**/*schema*.ts"
+---
+
+# Mongoose Schema and Model Patterns
+
+## Schema Design Principles
+Based on MSSQL analysis of VISIO_10 database with 31,213 clients across 13 clinics.
+
+## Core Entities
+
+### Client Schema Pattern
+```typescript
+import { Schema, model, Document } from 'mongoose';
+
+interface IClient extends Document {
+  clientId: string; // sb_clients_id from MSSQL
+  personalInfo: {
+    firstName: string;
+    lastName: string;
+    fullName: string;
+    dateOfBirth: Date;
+    gender: 'Male' | 'Female' | 'Other';
+  };
+  contact: {
+    address: {
+      street: string;
+      apartment?: string;
+      city: string;
+      province: string;
+      postalCode: string;
+    };
+    phones: {
+      home?: string;
+      cell?: string;
+      work?: string;
+    };
+    email?: string;
+  };
+  medical: {
+    familyMD?: string;
+    referringMD?: string;
+    csrName?: string;
+  };
+  insurance: [{
+    type: '1st' | '2nd' | '3rd';
+    policyHolder: string;
+    company: string;
+    groupNumber?: string;
+    certificateNumber?: string;
+    coverage: {
+      orthotics?: number;
+      physiotherapy?: number;
+      massage?: number;
+      orthopedicShoes?: number;
+      compressionStockings?: number;
+      other?: number;
+    };
+  }];
+  clinics: [string]; // Associated clinic names
+  defaultClinic: string;
+  isActive: boolean;
+  dateCreated: Date;
+  dateModified: Date;
+}
+```
+
+### Clinic Schema Pattern
+```typescript
+interface IClinic extends Document {
+  clinicId: number; // From MSSQL sb_clinic.ClinicId
+  name: string;
+  displayName: string;
+  completeName?: string;
+  address: {
+    street: string;
+    city: string;
+    province: string;
+    postalCode: string;
+  };
+  contact: {
+    phone?: string;
+    fax?: string;
+    email?: string;
+  };
+  services: [string]; // Inferred from clinic type
+  status: 'active' | 'inactive' | 'historical' | 'no-data';
+  clientCount: number;
+  stats: {
+    totalOrders: number;
+    totalRevenue: number;
+    lastActivity?: Date;
+  };
+  dateCreated: Date;
+  dateModified: Date;
+}
+```
+
+## Schema Best Practices
+1. **Always use TypeScript interfaces** for type safety
+2. **Include indexes** for frequently queried fields
+3. **Use virtuals** for computed fields (e.g., fullName)
+4. **Implement pre/post hooks** for data validation and cleanup
+5. **Use subdocuments** for complex nested objects (insurance, address)
+6. **Include audit fields** (dateCreated, dateModified, createdBy)
+
+## Index Strategy
+```typescript
+// Client indexes for performance
+ClientSchema.index({ clientId: 1 }, { unique: true });
+ClientSchema.index({ defaultClinic: 1 });
+ClientSchema.index({ 'personalInfo.lastName': 1, 'personalInfo.firstName': 1 });
+ClientSchema.index({ 'contact.email': 1 });
+ClientSchema.index({ dateCreated: -1 });
+
+// Clinic indexes
+ClinicSchema.index({ clinicId: 1 }, { unique: true });
+ClinicSchema.index({ name: 1 }, { unique: true });
+ClinicSchema.index({ status: 1 });
+```
+
+## Migration Considerations
+- **nameOnly: true** for MongoDB MCP integration
+- **Data cleaning**: Trim whitespace from MSSQL char fields
+- **Date conversion**: Handle MSSQL datetime to MongoDB Date
+- **Validation**: Ensure data integrity during migration

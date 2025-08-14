@@ -1,0 +1,3 @@
+---
+globs: "**/controllers*.ts,**/models*.ts,**/views*.ts,**/services*.ts"
+---

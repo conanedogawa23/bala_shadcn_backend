@@ -1,0 +1,136 @@
+---
+globs: "**/routes*.ts,**/controllers*.ts,**/views*.ts"
+---
+
+# API Design Standards
+
+## RESTful API Patterns
+Follow consistent patterns for clinic management system APIs.
+
+## Route Structure
+```
+/api/v1/clinics                    # List all clinics
+/api/v1/clinics/:id               # Get clinic details
+/api/v1/clinics/:id/clients       # List clients for clinic
+/api/v1/clinics/:id/orders        # List orders for clinic
+/api/v1/clinics/:id/payments      # List payments for clinic
+/api/v1/clinics/:id/stats         # Get clinic statistics
+
+/api/v1/clients                   # Search clients across clinics
+/api/v1/clients/:id               # Get client details
+/api/v1/clients/:id/orders        # Get client orders
+/api/v1/clients/:id/payments      # Get client payments
+
+/api/v1/orders                    # Create/search orders
+/api/v1/orders/:id                # Get/update/delete order
+/api/v1/orders/:id/payments       # Get order payments
+
+/api/v1/payments                  # Create/search payments
+/api/v1/payments/:id              # Get/update payment
+/api/v1/payments/:id/invoice      # Generate invoice PDF
+/api/v1/payments/:id/refund       # Process refund
+```
+
+## Strict MVC Controller Pattern
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import { validationResult } from 'express-validator';
+import { ClientService } from '../services/ClientService';
+import { ClientView } from '../views/ClientView';
+import { asyncHandler } from '../utils/asyncHandler';
+
+export class ClientController {
+  // THIN CONTROLLER - only coordinates between service and view
+  static getClientsByClinic = asyncHandler(async (req: Request, res: Response) => {
+    // 1. Validate request (handled by middleware)
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const response = ClientView.formatError('Validation failed', 'VALIDATION_ERROR');
+      return res.status(400).json(response);
+    }
+
+    // 2. Extract parameters
+    const { clinicId } = req.params;
+    const { page = 1, limit = 20, search, status } = req.query;
+
+    // 3. Call SERVICE layer (business logic)
+    const result = await ClientService.getClientsByClinic({
+      clinicId,
+      page: Number(page),
+      limit: Number(limit),
+      search: search as string,
+      status: status as string
+    });
+
+    // 4. Format response using VIEW layer
+    const response = ClientView.formatClientList(
+      result.clients,
+      result.page,
+      result.limit,
+      result.total
+    );
+
+    res.status(200).json(response);
+  });
+}
+```
+
+## Response Format Standards
+```typescript
+// Success Response
+{
+  success: true,
+  data: T,
+  pagination?: {
+    page: number,
+    limit: number,
+    total: number,
+    pages: number
+  },
+  message?: string
+}
+
+// Error Response
+{
+  success: false,
+  error: {
+    code: string,
+    message: string,
+    details?: any
+  },
+  timestamp: string,
+  path: string
+}
+```
+
+## Validation Patterns
+```typescript
+import { body, param, query } from 'express-validator';
+
+// Client validation
+export const createClientValidation = [
+  body('personalInfo.firstName').isLength({ min: 1 }).trim(),
+  body('personalInfo.lastName').isLength({ min: 1 }).trim(),
+  body('personalInfo.dateOfBirth').isISO8601(),
+  body('contact.email').optional().isEmail(),
+  body('defaultClinic').isLength({ min: 1 }),
+];
+
+// Pagination validation
+export const paginationValidation = [
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 100 }),
+];
+```
+
+## Authentication Requirements
+- **JWT tokens** required for all protected routes
+- **Clinic-specific permissions** for data access
+- **Rate limiting** on public endpoints
+- **Audit logging** for all data modifications
+
+## Error Handling
+- **Always use try-catch** in async controllers
+- **Pass errors to middleware** using `next(error)`
+- **Provide meaningful error messages** for client debugging
+- **Log errors** with appropriate severity levels

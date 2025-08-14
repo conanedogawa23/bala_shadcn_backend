@@ -1,0 +1,283 @@
+---
+globs: "**/*auth*.ts,**/middleware*.ts,**/security*.ts"
+---
+
+# Authentication and Security Patterns
+
+## JWT-based Authentication System
+Clinic-specific permissions and role-based access control.
+
+## Authentication Flow
+```typescript
+// src/middleware/auth.ts
+import jwt from 'jsonwebtoken';
+import { UserModel } from '../models/User';
+
+export interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    clinics: string[];
+    role: 'admin' | 'staff' | 'readonly';
+  };
+}
+
+export const authenticate = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Access denied. No token provided.' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    const user = await UserModel.findById(decoded.id).select('-password');
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid token.' });
+    }
+
+    req.user = {
+      id: user._id.toString(),
+      email: user.email,
+      clinics: user.clinics,
+      role: user.role
+    };
+    
+    next();
+  } catch (error) {
+    res.status(401).json({ error: 'Invalid token.' });
+  }
+};
+```
+
+## Clinic-Specific Authorization
+```typescript
+// src/middleware/clinicAuth.ts
+export const authorizeClinic = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const { clinicId } = req.params;
+  const user = req.user!;
+
+  // Admin has access to all clinics
+  if (user.role === 'admin') {
+    return next();
+  }
+
+  // Check if user has access to this clinic
+  if (!user.clinics.includes(clinicId)) {
+    return res.status(403).json({ 
+      error: 'Access denied. You do not have permission to access this clinic.' 
+    });
+  }
+
+  next();
+};
+
+// Usage in routes
+router.get('/clinics/:clinicId/clients', authenticate, authorizeClinic, ClientController.getClientsByClinic);
+```
+
+## Role-Based Permissions
+```typescript
+// src/middleware/permissions.ts
+type Permission = 'read' | 'write' | 'delete' | 'admin';
+
+export const requirePermission = (permission: Permission) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const user = req.user!;
+    
+    const permissions: Record<string, Permission[]> = {
+      'admin': ['read', 'write', 'delete', 'admin'],
+      'staff': ['read', 'write'],
+      'readonly': ['read']
+    };
+
+    if (!permissions[user.role].includes(permission)) {
+      return res.status(403).json({ 
+        error: `Access denied. Required permission: ${permission}` 
+      });
+    }
+
+    next();
+  };
+};
+
+// Usage examples
+router.post('/clients', authenticate, authorizeClinic, requirePermission('write'), ClientController.createClient);
+router.delete('/clients/:id', authenticate, authorizeClinic, requirePermission('delete'), ClientController.deleteClient);
+```
+
+## Password Security
+```typescript
+// src/utils/security.ts
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+
+export class SecurityUtils {
+  static async hashPassword(password: string): Promise<string> {
+    const salt = await bcrypt.genSalt(12);
+    return bcrypt.hash(password, salt);
+  }
+
+  static async comparePassword(password: string, hash: string): Promise<boolean> {
+    return bcrypt.compare(password, hash);
+  }
+
+  static generateRefreshToken(): string {
+    return crypto.randomBytes(64).toString('hex');
+  }
+
+  static generateResetToken(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+}
+```
+
+## JWT Token Management
+```typescript
+// src/services/authService.ts
+export class AuthService {
+  static generateTokens(user: any) {
+    const payload = {
+      id: user._id,
+      email: user.email,
+      clinics: user.clinics,
+      role: user.role
+    };
+
+    const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, {
+      expiresIn: '15m'
+    });
+
+    const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET!, {
+      expiresIn: '7d'
+    });
+
+    return { accessToken, refreshToken };
+  }
+
+  static async refreshAccessToken(refreshToken: string) {
+    try {
+      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as any;
+      const user = await UserModel.findById(decoded.id);
+      
+      if (!user || user.refreshToken !== refreshToken) {
+        throw new Error('Invalid refresh token');
+      }
+
+      return this.generateTokens(user);
+    } catch (error) {
+      throw new Error('Invalid refresh token');
+    }
+  }
+}
+```
+
+## Rate Limiting
+```typescript
+// src/middleware/rateLimiter.ts
+import rateLimit from 'express-rate-limit';
+
+export const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per window
+  message: {
+    error: 'Too many authentication attempts. Please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per window
+  message: {
+    error: 'Too many requests. Please try again later.'
+  }
+});
+```
+
+## Input Validation and Sanitization
+```typescript
+// src/middleware/validation.ts
+import { body, validationResult } from 'express-validator';
+import mongoSanitize from 'express-mongo-sanitize';
+
+export const validateLogin = [
+  body('email').isEmail().normalizeEmail(),
+  body('password').isLength({ min: 8 }).trim(),
+  (req: Request, res: Response, next: NextFunction) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    next();
+  }
+];
+
+// Apply sanitization globally
+app.use(mongoSanitize()); // Prevent NoSQL injection
+```
+
+## Security Headers
+```typescript
+// src/app.ts
+import helmet from 'helmet';
+import cors from 'cors';
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
+
+// CORS configuration
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
+```
+
+## Audit Logging
+```typescript
+// src/middleware/auditLog.ts
+export const auditLog = (action: string) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const originalSend = res.send;
+    
+    res.send = function(data) {
+      // Log the action after successful response
+      if (res.statusCode < 400) {
+        logAuditEvent({
+          userId: req.user?.id,
+          action,
+          resource: req.originalUrl,
+          timestamp: new Date(),
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+      }
+      
+      return originalSend.call(this, data);
+    };
+    
+    next();
+  };
+};
+```
+
+## Security Best Practices
+1. **Always use HTTPS** in production
+2. **Implement rate limiting** on all endpoints
+3. **Validate and sanitize** all input data
+4. **Use parameterized queries** to prevent injection
+5. **Implement proper session management** with secure tokens
+6. **Log security events** for monitoring and compliance
+7. **Regular security audits** and dependency updates
