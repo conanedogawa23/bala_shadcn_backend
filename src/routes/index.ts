@@ -3,6 +3,7 @@ import clinicRoutes from './clinicRoutes';
 import clientRoutes from './clientRoutes';
 import appointmentRoutes from './appointmentRoutes';
 import resourceRoutes from './resourceRoutes';
+import contactHistoryRoutes from './contactHistoryRoutes';
 
 const router = Router();
 
@@ -224,5 +225,6 @@ router.use('/clinics', clinicRoutes);
 router.use('/clients', clientRoutes);
 router.use('/appointments', appointmentRoutes);
 router.use('/resources', resourceRoutes);
+router.use('/contact-history', contactHistoryRoutes);
 
 export default router;
