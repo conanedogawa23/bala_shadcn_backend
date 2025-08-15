@@ -307,18 +307,18 @@ ClientClinicRelationshipSchema.methods.updateStats = function(appointmentData: {
   this.stats.lastAppointmentDate = appointmentData.date;
   
   switch (appointmentData.type) {
-    case 'completed':
-      this.stats.completedAppointments += 1;
-      if (appointmentData.amount) {
-        this.stats.totalAmountBilled += appointmentData.amount;
-      }
-      break;
-    case 'cancelled':
-      this.stats.cancelledAppointments += 1;
-      break;
-    case 'noshow':
-      this.stats.noShowAppointments += 1;
-      break;
+  case 'completed':
+    this.stats.completedAppointments += 1;
+    if (appointmentData.amount) {
+      this.stats.totalAmountBilled += appointmentData.amount;
+    }
+    break;
+  case 'cancelled':
+    this.stats.cancelledAppointments += 1;
+    break;
+  case 'noshow':
+    this.stats.noShowAppointments += 1;
+    break;
   }
   
   // Update average duration

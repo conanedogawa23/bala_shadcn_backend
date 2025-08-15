@@ -30,10 +30,6 @@ export interface IClinic extends Document {
   // Instance methods
   isActive(): boolean;
   getFullAddress(): string;
-  
-  // Static methods
-  static findActiveClinic(): Promise<IClinic[]>;
-  static findByStatus(status: string): Promise<IClinic[]>;
 }
 
 const ClinicSchema = new Schema<IClinic>({

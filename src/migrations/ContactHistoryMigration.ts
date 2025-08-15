@@ -259,39 +259,39 @@ export class ContactHistoryMigration extends BaseMigration {
    * Utility functions for data normalization
    */
   private normalizeContactType(type?: string): 'call' | 'email' | 'sms' | 'visit' | 'note' | 'appointment' | 'other' {
-    if (!type) return 'other';
+    if (!type) {return 'other';}
     
     const normalized = type.toLowerCase().trim();
     
-    if (normalized.includes('call') || normalized.includes('phone')) return 'call';
-    if (normalized.includes('email') || normalized.includes('mail')) return 'email';
-    if (normalized.includes('sms') || normalized.includes('text')) return 'sms';
-    if (normalized.includes('visit') || normalized.includes('in-person')) return 'visit';
-    if (normalized.includes('note') || normalized.includes('memo')) return 'note';
-    if (normalized.includes('appointment') || normalized.includes('appt')) return 'appointment';
+    if (normalized.includes('call') || normalized.includes('phone')) {return 'call';}
+    if (normalized.includes('email') || normalized.includes('mail')) {return 'email';}
+    if (normalized.includes('sms') || normalized.includes('text')) {return 'sms';}
+    if (normalized.includes('visit') || normalized.includes('in-person')) {return 'visit';}
+    if (normalized.includes('note') || normalized.includes('memo')) {return 'note';}
+    if (normalized.includes('appointment') || normalized.includes('appt')) {return 'appointment';}
     
     return 'other';
   }
 
   private normalizeDirection(direction?: string): 'inbound' | 'outbound' | 'internal' {
-    if (!direction) return 'internal';
+    if (!direction) {return 'internal';}
     
     const normalized = direction.toLowerCase().trim();
     
-    if (normalized.includes('in') || normalized.includes('incoming')) return 'inbound';
-    if (normalized.includes('out') || normalized.includes('outgoing')) return 'outbound';
+    if (normalized.includes('in') || normalized.includes('incoming')) {return 'inbound';}
+    if (normalized.includes('out') || normalized.includes('outgoing')) {return 'outbound';}
     
     return 'internal';
   }
 
   private normalizePriority(priority?: string): 'low' | 'medium' | 'high' | 'urgent' {
-    if (!priority) return 'medium';
+    if (!priority) {return 'medium';}
     
     const normalized = priority.toLowerCase().trim();
     
-    if (normalized.includes('low')) return 'low';
-    if (normalized.includes('high')) return 'high';
-    if (normalized.includes('urgent') || normalized.includes('critical')) return 'urgent';
+    if (normalized.includes('low')) {return 'low';}
+    if (normalized.includes('high')) {return 'high';}
+    if (normalized.includes('urgent') || normalized.includes('critical')) {return 'urgent';}
     
     return 'medium';
   }

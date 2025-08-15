@@ -321,7 +321,7 @@ export class ResourceView {
    * Format duration in minutes to human-readable format (private helper)
    */
   private static formatDuration(minutes: number): string {
-    if (!minutes) return '0m';
+    if (!minutes) {return '0m';}
     
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
@@ -346,12 +346,13 @@ export class ResourceView {
   private static groupPractitionersBySpecialty(practitioners: any[]): any {
     const specialtyGroups: { [key: string]: number } = {};
     
-    practitioners.forEach(practitioner => {
+    // Using for...of to avoid forEach (per coding standards)
+    for (const practitioner of practitioners) {
       const specialties = practitioner.practitioner?.specialties || [];
-      specialties.forEach((specialty: string) => {
+      for (const specialty of specialties) {
         specialtyGroups[specialty] = (specialtyGroups[specialty] || 0) + 1;
-      });
-    });
+      }
+    }
     
     return Object.entries(specialtyGroups).map(([specialty, count]) => ({
       specialty,
@@ -365,12 +366,13 @@ export class ResourceView {
   private static groupByClinic(resources: any[]): any {
     const clinicGroups: { [key: string]: number } = {};
     
-    resources.forEach(resource => {
+    // Using for...of to avoid forEach (per coding standards)
+    for (const resource of resources) {
       const clinics = resource.clinics || [];
-      clinics.forEach((clinic: string) => {
+      for (const clinic of clinics) {
         clinicGroups[clinic] = (clinicGroups[clinic] || 0) + 1;
-      });
-    });
+      }
+    }
     
     return Object.entries(clinicGroups).map(([clinic, count]) => ({
       clinic,

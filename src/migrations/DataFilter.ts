@@ -86,7 +86,7 @@ export class DataFilter {
    * Uses efficient Set operations instead of forEach
    */
   static shouldRetainClinic(clinicName?: string): boolean {
-    if (!clinicName) return false;
+    if (!clinicName) {return false;}
     
     // Normalize clinic name for comparison
     const normalizedName = clinicName.trim();
@@ -122,7 +122,7 @@ export class DataFilter {
    * Filter product codes based on VISIO business rules
    */
   static shouldRetainProduct(productCode?: string): boolean {
-    if (!productCode) return false;
+    if (!productCode) {return false;}
     
     const normalizedCode = productCode.trim().toUpperCase();
     
@@ -139,7 +139,7 @@ export class DataFilter {
    * Filter client fields based on VISIO business rules
    */
   static shouldRetainClientField(fieldName?: string): boolean {
-    if (!fieldName) return false;
+    if (!fieldName) {return false;}
     
     const normalizedField = fieldName.trim();
     
@@ -154,7 +154,7 @@ export class DataFilter {
    * Filter insurance fields based on VISIO business rules
    */
   static shouldRetainInsuranceField(fieldName?: string): boolean {
-    if (!fieldName) return false;
+    if (!fieldName) {return false;}
     
     const normalizedField = fieldName.trim();
     
@@ -169,7 +169,7 @@ export class DataFilter {
    * Filter order status based on VISIO business rules
    */
   static shouldRetainOrderStatus(status?: string): boolean {
-    if (!status) return false;
+    if (!status) {return false;}
     
     return this.RETAINED_ORDER_STATUSES.has(status.trim());
   }
@@ -178,7 +178,7 @@ export class DataFilter {
    * Filter date types based on VISIO business rules
    */
   static shouldRetainDateType(dateType?: string): boolean {
-    if (!dateType) return false;
+    if (!dateType) {return false;}
     
     return this.RETAINED_DATE_TYPES.has(dateType.trim());
   }
@@ -221,7 +221,7 @@ export class DataFilter {
     excludedClinics: number;
     excludedProducts: number;
     excludedModules: string[];
-  } {
+    } {
     return {
       retainedClinics: this.RETAINED_CLINICS.size,
       excludedClinics: this.EXCLUDED_CLINICS.size,

@@ -469,19 +469,19 @@ InsuranceCompanySchema.methods.updateStats = function(claimData: {
   this.stats.lastClaimDate = claimData.date;
   
   switch (claimData.type) {
-    case 'approved':
-      this.stats.approvedClaims += 1;
-      if (claimData.amount) {
-        this.stats.totalClaimAmount += claimData.amount;
-        this.stats.averageClaimAmount = this.stats.totalClaimAmount / this.stats.approvedClaims;
-      }
-      break;
-    case 'denied':
-      this.stats.deniedClaims += 1;
-      break;
-    case 'pending':
-      this.stats.pendingClaims += 1;
-      break;
+  case 'approved':
+    this.stats.approvedClaims += 1;
+    if (claimData.amount) {
+      this.stats.totalClaimAmount += claimData.amount;
+      this.stats.averageClaimAmount = this.stats.totalClaimAmount / this.stats.approvedClaims;
+    }
+    break;
+  case 'denied':
+    this.stats.deniedClaims += 1;
+    break;
+  case 'pending':
+    this.stats.pendingClaims += 1;
+    break;
   }
   
   // Update average processing days

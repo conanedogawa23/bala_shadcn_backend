@@ -222,14 +222,14 @@ ContactHistorySchema.methods.isOverdue = function(): boolean {
 };
 
 // Static methods
-ContactHistorySchema.statics.findByClient = function(clientId: string, limit: number = 50) {
+ContactHistorySchema.statics.findByClient = function(clientId: string, limit = 50) {
   return this.find({ clientId, isActive: true })
     .sort({ contactDate: -1 })
     .limit(limit)
     .lean();
 };
 
-ContactHistorySchema.statics.findByClinic = function(clinicName: string, limit: number = 100) {
+ContactHistorySchema.statics.findByClinic = function(clinicName: string, limit = 100) {
   return this.find({ clinicName, isActive: true })
     .sort({ contactDate: -1 })
     .limit(limit)
@@ -253,7 +253,7 @@ ContactHistorySchema.statics.findFollowUpsRequired = function(clinicName?: strin
 
 ContactHistorySchema.statics.getRecentActivity = function(
   clinicName?: string, 
-  days: number = 7
+  days = 7
 ) {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);

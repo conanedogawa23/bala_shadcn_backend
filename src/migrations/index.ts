@@ -4,6 +4,11 @@ import { logger } from '@/utils/logger';
 import { ClientMigration } from './ClientMigration';
 import { ContactHistoryMigration } from './ContactHistoryMigration';
 import { ClientClinicRelationshipMigration } from './ClientClinicRelationshipMigration';
+import { AppointmentMigration } from './AppointmentMigration';
+import { InsuranceCompanyAddressMigration } from './InsuranceCompanyAddressMigration';
+import { EventMigration } from './EventMigration';
+import { AdvancedBillingMigration } from './AdvancedBillingMigration';
+import { InsuranceReferenceMigration } from './InsuranceReferenceMigration';
 import { DataFilter } from './DataFilter';
 import { BaseMigration, MigrationResult, MigrationOptions } from './BaseMigration';
 
@@ -56,6 +61,50 @@ export class MigrationManager {
       dependencies: ['clients', 'client_clinic_relationships']
     });
 
+    // ✅ NEWLY IMPLEMENTED CRITICAL MIGRATIONS
+
+    // PHASE 5: Massive Appointments Data (149,477 records - HIGHEST VOLUME)
+    this.migrations.set('appointments', {
+      name: 'Appointments Migration (149,477 records)',
+      migration: () => new AppointmentMigration(this.options),
+      priority: 5,
+      dependencies: ['clients']
+    });
+
+    // PHASE 6: Insurance Company Addresses (184 records)
+    this.migrations.set('insurance_company_addresses', {
+      name: 'Insurance Company Addresses Migration (184 records)',
+      migration: () => new InsuranceCompanyAddressMigration(this.options),
+      priority: 1,
+      dependencies: []
+    });
+
+    // PHASE 7: Events (110 records)
+    this.migrations.set('events', {
+      name: 'Events Migration (110 records)',
+      migration: () => new EventMigration(this.options),
+      priority: 3,
+      dependencies: ['clients']
+    });
+
+    // ✅ PHASE 1, 2, 5 IMPLEMENTATION - Advanced Billing & Insurance Reference
+    
+    // PHASE 2: Advanced Billing (7 records)
+    this.migrations.set('advanced_billing', {
+      name: 'Advanced Billing Migration (7 records)',
+      migration: () => new AdvancedBillingMigration(this.options),
+      priority: 3,
+      dependencies: ['clients']
+    });
+
+    // PHASE 5: Insurance Reference Data (9 records total)
+    this.migrations.set('insurance_reference', {
+      name: 'Insurance Reference Data Migration (9 records)',
+      migration: () => new InsuranceReferenceMigration(this.options),
+      priority: 1,
+      dependencies: []
+    });
+
     // 🚧 TODO: REMAINING MIGRATIONS TO BE IMPLEMENTED
     // Temporarily commented out until migration classes are created
 
@@ -101,9 +150,10 @@ export class MigrationManager {
     logger.info(`   📦 Modules to Skip: ${filterSummary.excludedModules.join(', ')}`);
     
     logger.info('✅ Retained Clinics:');
-    DataFilter.getRetainedClinics().forEach(clinic => 
-      logger.info(`   - ${clinic}`)
-    );
+    // Using for...of to avoid forEach (per coding standards)
+    for (const clinic of DataFilter.getRetainedClinics()) {
+      logger.info(`   - ${clinic}`);
+    }
     
     logger.info(`❌ Excluding ${filterSummary.excludedProducts} product codes from orders`);
     logger.info('🎯 Data-driven migration will filter records based on these rules');
@@ -216,9 +266,9 @@ export class MigrationManager {
       this.results.set(name, result);
       return result;
       
-         } finally {
-       await mongoose.connection.close();
-     }
+    } finally {
+      await mongoose.connection.close();
+    }
   }
 
   /**
@@ -230,7 +280,7 @@ export class MigrationManager {
     const order: string[] = [];
 
     const visit = (name: string): void => {
-      if (visited.has(name)) return;
+      if (visited.has(name)) {return;}
       if (visiting.has(name)) {
         throw new Error(`Circular dependency detected: ${name}`);
       }

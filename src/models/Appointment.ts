@@ -228,7 +228,7 @@ AppointmentSchema.index({
 
 // Instance methods
 AppointmentSchema.methods.getDurationMinutes = function(): number {
-  if (this.duration > 0) return this.duration;
+  if (this.duration > 0) {return this.duration;}
   
   // Calculate from start/end dates if duration is not set
   const start = new Date(this.startDate);

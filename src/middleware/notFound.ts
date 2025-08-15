@@ -5,7 +5,7 @@ export const notFound = (req: Request, res: Response) => {
     success: false,
     error: {
       code: 'NOT_FOUND',
-      message: `Route ${req.originalUrl} not found`,
+      message: `Route ${req.originalUrl} not found`
     },
     timestamp: new Date().toISOString(),
     path: req.originalUrl,

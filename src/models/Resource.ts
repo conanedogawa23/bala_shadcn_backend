@@ -293,7 +293,7 @@ ResourceSchema.methods.isAvailableOnDay = function(day: string): boolean {
   const dayLower = day.toLowerCase();
   const validDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
   
-  if (!validDays.includes(dayLower)) return false;
+  if (!validDays.includes(dayLower)) {return false;}
   
   return this.availability[dayLower as keyof typeof this.availability]?.available || false;
 };
@@ -302,7 +302,7 @@ ResourceSchema.methods.getAvailabilityForDay = function(day: string) {
   const dayLower = day.toLowerCase();
   const validDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
   
-  if (!validDays.includes(dayLower)) return null;
+  if (!validDays.includes(dayLower)) {return null;}
   
   return this.availability[dayLower as keyof typeof this.availability] || null;
 };
@@ -321,7 +321,7 @@ ResourceSchema.methods.getFullName = function(): string | null {
 };
 
 ResourceSchema.methods.hasSpecialty = function(specialty: string): boolean {
-  if (this.type !== 'practitioner' || !this.practitioner) return false;
+  if (this.type !== 'practitioner' || !this.practitioner) {return false;}
   
   return this.practitioner.specialties.some(s => 
     s.toLowerCase().includes(specialty.toLowerCase())

@@ -400,10 +400,10 @@ export class ClientMigration extends BaseMigration {
    * Utility functions for data transformation
    */
   private normalizeGender(gender?: string): 'Male' | 'Female' | 'Other' {
-    if (!gender) return 'Other';
+    if (!gender) {return 'Other';}
     const normalized = gender.toLowerCase();
-    if (normalized.includes('m') || normalized.includes('male')) return 'Male';
-    if (normalized.includes('f') || normalized.includes('female')) return 'Female';
+    if (normalized.includes('m') || normalized.includes('male')) {return 'Male';}
+    if (normalized.includes('f') || normalized.includes('female')) {return 'Female';}
     return 'Other';
   }
 
@@ -415,7 +415,7 @@ export class ClientMigration extends BaseMigration {
   }
 
   private buildFullPhone(areaCode?: string, number?: string, extension?: string): string {
-    if (!areaCode || !number) return '';
+    if (!areaCode || !number) {return '';}
     
     const formatted = `(${areaCode}) ${number}`;
     return extension ? `${formatted} ext. ${extension}` : formatted;

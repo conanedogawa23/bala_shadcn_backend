@@ -49,17 +49,17 @@ export class ClientClinicRelationshipService {
       // Build filter efficiently
       const filter: any = {};
 
-      if (clientId) filter.clientId = clientId;
-      if (clinicName) filter.clinicName = clinicName;
-      if (relationshipType) filter.relationshipType = relationshipType;
-      if (isActive !== undefined) filter.isActive = isActive;
-      if (isPrimary !== undefined) filter.isPrimary = isPrimary;
+      if (clientId) {filter.clientId = clientId;}
+      if (clinicName) {filter.clinicName = clinicName;}
+      if (relationshipType) {filter.relationshipType = relationshipType;}
+      if (isActive !== undefined) {filter.isActive = isActive;}
+      if (isPrimary !== undefined) {filter.isPrimary = isPrimary;}
 
       // Date range filter
       if (startDate || endDate) {
         filter.startDate = {};
-        if (startDate) filter.startDate.$gte = startDate;
-        if (endDate) filter.startDate.$lte = endDate;
+        if (startDate) {filter.startDate.$gte = startDate;}
+        if (endDate) {filter.startDate.$lte = endDate;}
       }
 
       // Calculate pagination
@@ -106,7 +106,7 @@ export class ClientClinicRelationshipService {
       logger.info(`🏥 Retrieved relationship: ${id}`);
       return relationship;
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError) {throw error;}
       logger.error('Error retrieving relationship by ID:', error);
       throw new DatabaseError('Failed to retrieve relationship');
     }
@@ -200,7 +200,7 @@ export class ClientClinicRelationshipService {
 
       return savedRelationship;
     } catch (error) {
-      if (error instanceof ValidationError || error instanceof ConflictError) throw error;
+      if (error instanceof ValidationError || error instanceof ConflictError) {throw error;}
       logger.error('Error creating client-clinic relationship:', error);
       throw new DatabaseError('Failed to create client-clinic relationship');
     }
@@ -231,7 +231,7 @@ export class ClientClinicRelationshipService {
 
       return updatedRelationship;
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError) {throw error;}
       logger.error('Error updating relationship:', error);
       throw new DatabaseError('Failed to update relationship');
     }
@@ -267,7 +267,7 @@ export class ClientClinicRelationshipService {
 
       logger.info(`🏥 Deactivated relationship: ${id}`);
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError) {throw error;}
       logger.error('Error deactivating relationship:', error);
       throw new DatabaseError('Failed to deactivate relationship');
     }
@@ -317,7 +317,7 @@ export class ClientClinicRelationshipService {
       logger.info(`🏥 Retrieved primary relationship for client: ${clientId}`);
       return primaryRelationship;
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError) {throw error;}
       logger.error('Error retrieving primary relationship:', error);
       throw new DatabaseError('Failed to retrieve primary relationship');
     }
@@ -571,7 +571,7 @@ export class ClientClinicRelationshipService {
         transferDate: effectiveDate
       };
     } catch (error) {
-      if (error instanceof NotFoundError || error instanceof ConflictError) throw error;
+      if (error instanceof NotFoundError || error instanceof ConflictError) {throw error;}
       logger.error('Error transferring client:', error);
       throw new DatabaseError('Failed to transfer client');
     }

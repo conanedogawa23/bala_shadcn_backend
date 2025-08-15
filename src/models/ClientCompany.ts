@@ -380,7 +380,7 @@ ClientCompanySchema.statics.findBySize = function(size: string) {
     .lean();
 };
 
-ClientCompanySchema.statics.searchCompanies = function(searchTerm: string, limit: number = 20) {
+ClientCompanySchema.statics.searchCompanies = function(searchTerm: string, limit = 20) {
   return this.find({
     $text: { $search: searchTerm },
     isActive: true
@@ -391,7 +391,7 @@ ClientCompanySchema.statics.searchCompanies = function(searchTerm: string, limit
     .lean();
 };
 
-ClientCompanySchema.statics.getTopCompanies = function(limit: number = 10) {
+ClientCompanySchema.statics.getTopCompanies = function(limit = 10) {
   return this.find({ isActive: true })
     .sort({ 'stats.activeClients': -1, 'stats.totalBilledAmount': -1 })
     .limit(limit)

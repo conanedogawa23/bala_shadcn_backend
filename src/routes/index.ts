@@ -4,6 +4,10 @@ import clientRoutes from './clientRoutes';
 import appointmentRoutes from './appointmentRoutes';
 import resourceRoutes from './resourceRoutes';
 import contactHistoryRoutes from './contactHistoryRoutes';
+import insuranceCompanyAddressRoutes from './insuranceCompanyAddressRoutes';
+import eventRoutes from './eventRoutes';
+import advancedBillingRoutes from './advancedBillingRoutes';
+import insuranceReferenceRoutes from './insuranceReferenceRoutes';
 
 const router = Router();
 
@@ -34,7 +38,12 @@ router.get('/', (req: Request, res: Response) => {
       appointments: '/api/v1/appointments',
       resources: '/api/v1/resources',
       practitioners: '/api/v1/resources/practitioners/list',
-      services: '/api/v1/resources/services/list'
+      services: '/api/v1/resources/services/list',
+      insuranceAddresses: '/api/v1/insurance-addresses',
+      events: '/api/v1/events',
+      contactHistory: '/api/v1/contact-history',
+      advancedBilling: '/api/v1/advanced-billing',
+      insuranceReference: '/api/v1/insurance-reference'
     }
   });
 });
@@ -226,5 +235,9 @@ router.use('/clients', clientRoutes);
 router.use('/appointments', appointmentRoutes);
 router.use('/resources', resourceRoutes);
 router.use('/contact-history', contactHistoryRoutes);
+router.use('/insurance-addresses', insuranceCompanyAddressRoutes);
+router.use('/events', eventRoutes);
+router.use('/advanced-billing', advancedBillingRoutes);
+router.use('/insurance-reference', insuranceReferenceRoutes);
 
 export default router;

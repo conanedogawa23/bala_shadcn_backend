@@ -107,7 +107,7 @@ CitySchema.index({
 });
 
 // Instance methods
-CitySchema.methods.updateStats = function(type: 'client' | 'clinic', increment: number = 1): void {
+CitySchema.methods.updateStats = function(type: 'client' | 'clinic', increment = 1): void {
   if (type === 'client') {
     this.stats.clientCount += increment;
   } else if (type === 'clinic') {
@@ -141,7 +141,7 @@ CitySchema.statics.findByPostalPrefix = function(prefix: string) {
     .lean();
 };
 
-CitySchema.statics.searchCities = function(searchTerm: string, limit: number = 20) {
+CitySchema.statics.searchCities = function(searchTerm: string, limit = 20) {
   return this.find({
     $text: { $search: searchTerm },
     isActive: true
@@ -152,7 +152,7 @@ CitySchema.statics.searchCities = function(searchTerm: string, limit: number = 2
     .lean();
 };
 
-CitySchema.statics.getPopularCities = function(limit: number = 10) {
+CitySchema.statics.getPopularCities = function(limit = 10) {
   return this.find({ isActive: true })
     .sort({ 'stats.clientCount': -1, cityName: 1 })
     .limit(limit)

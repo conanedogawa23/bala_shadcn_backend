@@ -86,7 +86,7 @@ export class TestSetup {
   /**
    * Create test data efficiently using bulk operations
    */
-  static async createTestClients(count: number = 10): Promise<any[]> {
+  static async createTestClients(count = 10): Promise<any[]> {
     const { ClientModel } = await import('@/models/Client');
     
     // Generate test data efficiently using map instead of forEach
@@ -147,7 +147,7 @@ export class TestSetup {
   /**
    * Create test appointments efficiently
    */
-  static async createTestAppointments(clientIds: string[], count: number = 5): Promise<any[]> {
+  static async createTestAppointments(clientIds: string[], count = 5): Promise<any[]> {
     const { AppointmentModel } = await import('@/models/Appointment');
     
     const baseDate = new Date();
@@ -185,7 +185,7 @@ export class TestSetup {
   /**
    * Create test resources efficiently
    */
-  static async createTestResources(count: number = 5): Promise<any[]> {
+  static async createTestResources(count = 5): Promise<any[]> {
     const { ResourceModel } = await import('@/models/Resource');
     
     const resourceTypes = ['practitioner', 'service', 'equipment', 'room'];
@@ -257,7 +257,7 @@ export class TestSetup {
   /**
    * Create test clinics efficiently
    */
-  static async createTestClinics(count: number = 3): Promise<any[]> {
+  static async createTestClinics(count = 3): Promise<any[]> {
     const { ClinicModel } = await import('@/models/Clinic');
     
     const testClinics = Array.from({ length: count }, (_, index) => ({
@@ -314,7 +314,7 @@ export class TestHelpers {
   /**
    * Generate random test data efficiently
    */
-  static generateRandomString(length: number = 10): string {
+  static generateRandomString(length = 10): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     return Array.from({ length }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
   }
@@ -322,7 +322,7 @@ export class TestHelpers {
   /**
    * Generate random date within range
    */
-  static generateRandomDate(daysFromNow: number = 30): Date {
+  static generateRandomDate(daysFromNow = 30): Date {
     const now = new Date();
     const randomDays = Math.floor(Math.random() * daysFromNow);
     const randomDate = new Date(now);
@@ -341,7 +341,7 @@ export class TestHelpers {
    * Compare arrays efficiently without forEach
    */
   static arraysEqual<T>(arr1: T[], arr2: T[]): boolean {
-    if (arr1.length !== arr2.length) return false;
+    if (arr1.length !== arr2.length) {return false;}
     return arr1.every((value, index) => value === arr2[index]);
   }
 }

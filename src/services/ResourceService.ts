@@ -544,7 +544,7 @@ export class ResourceService {
           { $match: query },
           { 
             $group: { 
-              _id: { $dateToString: { format: "%Y-%m-%d", date: "$startDate" } },
+              _id: { $dateToString: { format: '%Y-%m-%d', date: '$startDate' } },
               count: { $sum: 1 }
             } 
           },

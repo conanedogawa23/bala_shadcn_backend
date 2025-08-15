@@ -52,18 +52,18 @@ export class ContactHistoryService {
       // Build filter efficiently
       const filter: any = { isActive: true };
 
-      if (clinicName) filter.clinicName = clinicName;
-      if (clientId) filter.clientId = clientId;
-      if (contactType) filter.contactType = contactType;
-      if (direction) filter.direction = direction;
-      if (priority) filter.priority = priority;
-      if (followUpRequired !== undefined) filter.followUpRequired = followUpRequired;
+      if (clinicName) {filter.clinicName = clinicName;}
+      if (clientId) {filter.clientId = clientId;}
+      if (contactType) {filter.contactType = contactType;}
+      if (direction) {filter.direction = direction;}
+      if (priority) {filter.priority = priority;}
+      if (followUpRequired !== undefined) {filter.followUpRequired = followUpRequired;}
 
       // Date range filter
       if (startDate || endDate) {
         filter.contactDate = {};
-        if (startDate) filter.contactDate.$gte = startDate;
-        if (endDate) filter.contactDate.$lte = endDate;
+        if (startDate) {filter.contactDate.$gte = startDate;}
+        if (endDate) {filter.contactDate.$lte = endDate;}
       }
 
       // Text search filter
@@ -115,7 +115,7 @@ export class ContactHistoryService {
       logger.info(`📞 Retrieved contact history: ${id}`);
       return contact;
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError) {throw error;}
       logger.error('Error retrieving contact history by ID:', error);
       throw new DatabaseError('Failed to retrieve contact history');
     }
@@ -162,7 +162,7 @@ export class ContactHistoryService {
 
       return savedContact;
     } catch (error) {
-      if (error instanceof ValidationError) throw error;
+      if (error instanceof ValidationError) {throw error;}
       logger.error('Error creating contact history:', error);
       throw new DatabaseError('Failed to create contact history');
     }
@@ -187,7 +187,7 @@ export class ContactHistoryService {
 
       return updatedContact;
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError) {throw error;}
       logger.error('Error updating contact history:', error);
       throw new DatabaseError('Failed to update contact history');
     }
@@ -210,7 +210,7 @@ export class ContactHistoryService {
 
       logger.info(`📞 Deleted contact history: ${id}`);
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError) {throw error;}
       logger.error('Error deleting contact history:', error);
       throw new DatabaseError('Failed to delete contact history');
     }
@@ -219,7 +219,7 @@ export class ContactHistoryService {
   /**
    * Get contact history by client with optimized aggregation
    */
-  static async getContactHistoryByClient(clientId: string, limit: number = 50) {
+  static async getContactHistoryByClient(clientId: string, limit = 50) {
     try {
       const contacts = await ContactHistoryModel.findByClient(clientId, limit);
       
@@ -234,7 +234,7 @@ export class ContactHistoryService {
   /**
    * Get contact history by clinic with efficient querying
    */
-  static async getContactHistoryByClinic(clinicName: string, limit: number = 100) {
+  static async getContactHistoryByClinic(clinicName: string, limit = 100) {
     try {
       const contacts = await ContactHistoryModel.findByClinic(clinicName, limit);
       
@@ -285,7 +285,7 @@ export class ContactHistoryService {
 
       return contact;
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError) {throw error;}
       logger.error('Error marking follow-up completed:', error);
       throw new DatabaseError('Failed to mark follow-up completed');
     }
@@ -294,7 +294,7 @@ export class ContactHistoryService {
   /**
    * Get contact history statistics with efficient aggregation
    */
-  static async getContactHistoryStats(clinicName?: string, days: number = 30): Promise<ContactHistoryStats> {
+  static async getContactHistoryStats(clinicName?: string, days = 30): Promise<ContactHistoryStats> {
     try {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
@@ -403,7 +403,7 @@ export class ContactHistoryService {
       logger.info(`📞 Added tag "${tag}" to contact: ${id}`);
       return contact;
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError) {throw error;}
       logger.error('Error adding tag to contact history:', error);
       throw new DatabaseError('Failed to add tag to contact history');
     }
@@ -412,7 +412,7 @@ export class ContactHistoryService {
   /**
    * Get recent activity with efficient date filtering
    */
-  static async getRecentActivity(clinicName?: string, days: number = 7) {
+  static async getRecentActivity(clinicName?: string, days = 7) {
     try {
       const recentContacts = await ContactHistoryModel.getRecentActivity(clinicName, days);
       

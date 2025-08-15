@@ -395,7 +395,7 @@ ClientSchema.methods.getFullName = function(): string {
 };
 
 ClientSchema.methods.getAge = function(): number | null {
-  if (!this.personalInfo.dateOfBirth) return null;
+  if (!this.personalInfo.dateOfBirth) {return null;}
   const today = new Date();
   const birthDate = new Date(this.personalInfo.dateOfBirth);
   let age = today.getFullYear() - birthDate.getFullYear();
@@ -430,9 +430,9 @@ ClientSchema.methods.hasDPA = function(): boolean {
 
 ClientSchema.methods.getFormattedPhone = function(type: 'home' | 'cell' | 'work'): string | null {
   const phone = this.contact.phones[type];
-  if (!phone) return null;
+  if (!phone) {return null;}
   
-  if (phone.full) return phone.full;
+  if (phone.full) {return phone.full;}
   
   if (phone.countryCode && phone.areaCode && phone.number) {
     const formatted = `(${phone.areaCode}) ${phone.number}`;
@@ -496,9 +496,9 @@ ClientSchema.pre('save', function(next) {
     this.contact.address.postalCode.full = `${this.contact.address.postalCode.first3} ${this.contact.address.postalCode.last3}`;
   }
   
-  // Generate computed fields for phone numbers
+  // Generate computed fields for phone numbers using for...of (avoiding forEach per coding standards)
   const phoneTypes: Array<keyof IClient['contact']['phones']> = ['home', 'cell', 'work'];
-  phoneTypes.forEach(type => {
+  for (const type of phoneTypes) {
     const phone = this.contact.phones[type];
     if (phone && phone.countryCode && phone.areaCode && phone.number) {
       phone.full = `(${phone.areaCode}) ${phone.number}`;
@@ -506,7 +506,7 @@ ClientSchema.pre('save', function(next) {
         phone.full += ` ext. ${phone.extension}`;
       }
     }
-  });
+  }
   
   // Parse birthday to dateOfBirth if available
   if (this.personalInfo.birthday.day && this.personalInfo.birthday.month && this.personalInfo.birthday.year) {

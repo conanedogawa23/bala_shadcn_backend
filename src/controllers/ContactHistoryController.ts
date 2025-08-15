@@ -28,7 +28,7 @@ export class ContactHistoryController {
       direction: req.query.direction as string,
       priority: req.query.priority as string,
       followUpRequired: req.query.followUpRequired === 'true' ? true : 
-                       req.query.followUpRequired === 'false' ? false : undefined,
+        req.query.followUpRequired === 'false' ? false : undefined,
       startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
       endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
       search: req.query.search as string
@@ -286,51 +286,52 @@ export class ContactHistoryController {
     
     try {
       switch (operation) {
-        case 'delete':
-          // Use Promise.all for parallel processing instead of forEach
-          await Promise.all(
-            contactIds.map(id => ContactHistoryService.deleteContactHistory(id))
-          );
-          results = contactIds.map(id => ({ id, status: 'deleted' }));
-          break;
+      case 'delete':
+        // Use Promise.all for parallel processing instead of forEach
+        await Promise.all(
+          contactIds.map(id => ContactHistoryService.deleteContactHistory(id))
+        );
+        results = contactIds.map(id => ({ id, status: 'deleted' }));
+        break;
           
-        case 'update':
-          if (!data) {
-            return res.status(400).json(
-              ContactHistoryView.formatError('Update data is required for bulk update', 'MISSING_UPDATE_DATA')
-            );
-          }
-          
-          // Use Promise.all for parallel processing
-          const updatePromises = contactIds.map(id => 
-            ContactHistoryService.updateContactHistory(id, data)
-          );
-          const updatedContacts = await Promise.all(updatePromises);
-          results = updatedContacts.map((contact, index) => ({ 
-            id: contactIds[index], 
-            status: 'updated',
-            data: ContactHistoryView.formatContactHistory(contact)
-          }));
-          break;
-          
-        case 'addTag':
-          if (!data?.tag) {
-            return res.status(400).json(
-              ContactHistoryView.formatError('Tag is required for bulk tag operation', 'MISSING_TAG')
-            );
-          }
-          
-          // Use Promise.all for parallel processing
-          await Promise.all(
-            contactIds.map(id => ContactHistoryService.addTag(id, data.tag))
-          );
-          results = contactIds.map(id => ({ id, status: 'tagged', tag: data.tag }));
-          break;
-          
-        default:
+      case 'update': {
+        if (!data) {
           return res.status(400).json(
-            ContactHistoryView.formatError(`Unsupported operation: ${operation}`, 'UNSUPPORTED_OPERATION')
+            ContactHistoryView.formatError('Update data is required for bulk update', 'MISSING_UPDATE_DATA')
           );
+        }
+          
+        // Use Promise.all for parallel processing
+        const updatePromises = contactIds.map(id => 
+          ContactHistoryService.updateContactHistory(id, data)
+        );
+        const updatedContacts = await Promise.all(updatePromises);
+        results = updatedContacts.map((contact, index) => ({ 
+          id: contactIds[index], 
+          status: 'updated',
+          data: ContactHistoryView.formatContactHistory(contact)
+        }));
+        break;
+      }
+          
+      case 'addTag':
+        if (!data?.tag) {
+          return res.status(400).json(
+            ContactHistoryView.formatError('Tag is required for bulk tag operation', 'MISSING_TAG')
+          );
+        }
+          
+        // Use Promise.all for parallel processing
+        await Promise.all(
+          contactIds.map(id => ContactHistoryService.addTag(id, data.tag))
+        );
+        results = contactIds.map(id => ({ id, status: 'tagged', tag: data.tag }));
+        break;
+          
+      default:
+        return res.status(400).json(
+          ContactHistoryView.formatError(`Unsupported operation: ${operation}`, 'UNSUPPORTED_OPERATION')
+        );
       }
       
       res.status(200).json({

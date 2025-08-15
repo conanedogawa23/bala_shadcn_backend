@@ -18,8 +18,8 @@ export default async (): Promise<void> => {
   console.info = () => {}; // Suppress info output  
   console.warn = () => {}; // Suppress warning output
   
-  // Keep error output for debugging
-  console.error = console.error;
+  // Keep error output for debugging (preserve original console.error)
+  // console.error = console.error; // Removed self-assignment
   
   // Store original functions for cleanup
   (global as any).__originalConsole = {

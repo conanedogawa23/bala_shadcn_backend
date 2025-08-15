@@ -299,15 +299,15 @@ export class ClientClinicRelationshipMigration extends BaseMigration {
    * Utility functions for data normalization
    */
   private normalizeRelationshipType(type?: string): 'primary' | 'secondary' | 'temporary' | 'referral' | 'inactive' {
-    if (!type) return 'primary';
+    if (!type) {return 'primary';}
     
     const normalized = type.toLowerCase().trim();
     
-    if (normalized.includes('primary') || normalized.includes('main')) return 'primary';
-    if (normalized.includes('secondary') || normalized.includes('alternate')) return 'secondary';
-    if (normalized.includes('temporary') || normalized.includes('temp')) return 'temporary';
-    if (normalized.includes('referral') || normalized.includes('refer')) return 'referral';
-    if (normalized.includes('inactive') || normalized.includes('disabled')) return 'inactive';
+    if (normalized.includes('primary') || normalized.includes('main')) {return 'primary';}
+    if (normalized.includes('secondary') || normalized.includes('alternate')) {return 'secondary';}
+    if (normalized.includes('temporary') || normalized.includes('temp')) {return 'temporary';}
+    if (normalized.includes('referral') || normalized.includes('refer')) {return 'referral';}
+    if (normalized.includes('inactive') || normalized.includes('disabled')) {return 'inactive';}
     
     return 'primary';
   }

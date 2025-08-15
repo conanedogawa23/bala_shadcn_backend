@@ -246,7 +246,7 @@ export class ClientService {
   /**
    * Search clients across all clinics or specific clinic
    */
-  static async searchClients(searchTerm: string, clinicName?: string, limit: number = 20): Promise<IClient[]> {
+  static async searchClients(searchTerm: string, clinicName?: string, limit = 20): Promise<IClient[]> {
     try {
       if (clinicName) {
         // Verify clinic exists

@@ -104,7 +104,7 @@ export abstract class BaseMigration {
     tableName: string,
     processed: number,
     total: number,
-    errors: number = 0
+    errors = 0
   ): void {
     const percentage = ((processed / total) * 100).toFixed(1);
     logger.info(
@@ -140,7 +140,7 @@ export abstract class BaseMigration {
     const startTime = Date.now();
     
     try {
-      logger.info(`Starting migration with options:`, this.options);
+      logger.info('Starting migration with options:', this.options);
       
       if (this.options.dryRun) {
         logger.info('DRY RUN MODE - No data will be written');

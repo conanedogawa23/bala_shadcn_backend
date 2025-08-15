@@ -411,19 +411,19 @@ InsuranceGroupNumberSchema.methods.updateClaimStats = function(claimData: {
   this.stats.lastClaimDate = claimData.date;
   
   switch (claimData.type) {
-    case 'approved':
-      this.stats.approvedClaims += 1;
-      if (claimData.amount) {
-        this.stats.totalClaimAmount += claimData.amount;
-        this.stats.averageClaimAmount = this.stats.totalClaimAmount / this.stats.approvedClaims;
-      }
-      break;
-    case 'denied':
-      this.stats.deniedClaims += 1;
-      break;
-    case 'pending':
-      this.stats.pendingClaims += 1;
-      break;
+  case 'approved':
+    this.stats.approvedClaims += 1;
+    if (claimData.amount) {
+      this.stats.totalClaimAmount += claimData.amount;
+      this.stats.averageClaimAmount = this.stats.totalClaimAmount / this.stats.approvedClaims;
+    }
+    break;
+  case 'denied':
+    this.stats.deniedClaims += 1;
+    break;
+  case 'pending':
+    this.stats.pendingClaims += 1;
+    break;
   }
   
   this.modifiedAt = new Date();
@@ -482,8 +482,8 @@ InsuranceGroupNumberSchema.methods.isExpired = function(): boolean {
   return this.planDetails.expiryDate ? this.planDetails.expiryDate < new Date() : false;
 };
 
-InsuranceGroupNumberSchema.methods.isRenewalDue = function(daysAhead: number = 30): boolean {
-  if (!this.planDetails.renewalDate) return false;
+InsuranceGroupNumberSchema.methods.isRenewalDue = function(daysAhead = 30): boolean {
+  if (!this.planDetails.renewalDate) {return false;}
   
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + daysAhead);
@@ -522,7 +522,7 @@ InsuranceGroupNumberSchema.statics.findActiveGroups = function() {
     .lean();
 };
 
-InsuranceGroupNumberSchema.statics.findExpiringGroups = function(daysAhead: number = 30) {
+InsuranceGroupNumberSchema.statics.findExpiringGroups = function(daysAhead = 30) {
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + daysAhead);
   
@@ -537,7 +537,7 @@ InsuranceGroupNumberSchema.statics.findExpiringGroups = function(daysAhead: numb
     .lean();
 };
 
-InsuranceGroupNumberSchema.statics.findRenewalsDue = function(daysAhead: number = 30) {
+InsuranceGroupNumberSchema.statics.findRenewalsDue = function(daysAhead = 30) {
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + daysAhead);
   
