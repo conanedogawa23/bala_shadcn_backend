@@ -81,9 +81,8 @@ const updateContactHistoryValidation = [
   param('id')
     .isInt({ min: 1 })
     .withMessage('Contact history ID must be a positive integer'),
-  ...createContactHistoryValidation.filter(rule => 
-    !rule.builder.fields.includes('contactType') && 
-    !rule.builder.fields.includes('contactDate')
+  ...createContactHistoryValidation.filter((rule, index) => 
+    index !== 0 && index !== 4 // Skip contactType and contactDate validations
   ) // Remove required fields for updates
 ];
 

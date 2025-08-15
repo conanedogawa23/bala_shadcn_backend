@@ -1,7 +1,7 @@
-import { BaseMigration } from './BaseMigration';
+import { BaseMigration, MigrationResult } from './BaseMigration';
 import { InsuranceCompanyAddressModel } from '../models/InsuranceCompanyAddress';
 import { DataFilter } from './DataFilter';
-import logger from '../utils/logger';
+import { logger } from '../utils/logger';
 
 interface MSSQLInsuranceCompanyAddressRecord {
   sb_1st_insurance_company_address_key: number;
@@ -80,7 +80,7 @@ export class InsuranceCompanyAddressMigration extends BaseMigration {
    */
   protected applyVisioFilters(records: any[]): any[] {
     // Apply base VISIO filters first
-    let filteredRecords = DataFilter.applyVISIOFilters(records, this.tableName);
+    let filteredRecords = DataFilter.applyVISIOFilters(records);
 
     // Insurance address specific filters
     filteredRecords = filteredRecords.filter(record => {
@@ -109,7 +109,8 @@ export class InsuranceCompanyAddressMigration extends BaseMigration {
   /**
    * Execute the migration
    */
-  async migrate(): Promise<void> {
+  async migrate(): Promise<MigrationResult> {
+    const startTime = Date.now();
     try {
       logger.info(`Starting ${this.modelName} migration from ${this.tableName}`);
 
@@ -119,22 +120,56 @@ export class InsuranceCompanyAddressMigration extends BaseMigration {
 
       if (totalCount === 0) {
         logger.warn(`No records found in ${this.tableName}`);
-        return;
+        return {
+          success: true,
+          totalRecords: 0,
+          migratedRecords: 0,
+          skippedRecords: 0,
+          errors: [],
+          duration: Date.now() - startTime,
+          tableName: this.tableName
+        };
       }
 
       // Check if migration already completed
       const existingCount = await InsuranceCompanyAddressModel.countDocuments();
       if (existingCount > 0) {
         logger.info(`Found ${existingCount} existing documents. Skipping migration.`);
-        return;
+        return {
+          success: true,
+          totalRecords: totalCount,
+          migratedRecords: 0,
+          skippedRecords: existingCount,
+          errors: [],
+          duration: Date.now() - startTime,
+          tableName: this.tableName
+        };
       }
 
-      // Fetch all records
-      const mssqlRecords = await this.fetchAllRecords();
+      // Fetch all records from MSSQL
+      const query = `
+        SELECT 
+          ia.id,
+          ia.company_name,
+          ia.address_key,
+          ia.address1,
+          ia.address2,
+          ia.city,
+          ia.province,
+          ia.postal_code,
+          ia.country,
+          ia.is_active,
+          ia.date_created,
+          ia.date_modified
+        FROM insurance_company_address ia
+        WHERE ia.is_active = 1
+        ORDER BY ia.id
+      `;
+      const mssqlRecords = await this.executeMSSQLQuery(query);
       logger.info(`Fetched ${mssqlRecords.length} records from MSSQL`);
 
       // Transform records
-      const transformedRecords = mssqlRecords.map(record => this.transformRecord(record));
+      const transformedRecords = mssqlRecords.map((record: any) => this.transformRecord(record));
       logger.info(`Transformed ${transformedRecords.length} records`);
 
       // Apply VISIO filters
@@ -147,7 +182,15 @@ export class InsuranceCompanyAddressMigration extends BaseMigration {
 
       if (validRecords.length === 0) {
         logger.warn('No valid records to migrate');
-        return;
+        return {
+          success: true,
+          totalRecords: totalCount,
+          migratedRecords: 0,
+          skippedRecords: totalCount,
+          errors: [],
+          duration: Date.now() - startTime,
+          tableName: this.tableName
+        };
       }
 
       // Batch insert
@@ -160,6 +203,15 @@ export class InsuranceCompanyAddressMigration extends BaseMigration {
       // Create indexes
       await this.createIndexes();
 
+      return {
+        success: true,
+        totalRecords: totalCount,
+        migratedRecords: finalCount,
+        skippedRecords: 0,
+        errors: [],
+        duration: Date.now() - startTime,
+        tableName: this.tableName
+      };
     } catch (error) {
       logger.error(`Error during ${this.modelName} migration:`, error);
       throw error;

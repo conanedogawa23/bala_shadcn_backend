@@ -280,14 +280,13 @@ export class ClientClinicRelationshipMigration extends BaseMigration {
     // Use insertMany for optimal performance
     try {
       const result = await ClientClinicRelationshipModel.insertMany(batch, { 
-        ordered: false,
-        writeConcern: { w: 1, j: false } // Optimize for speed
+        ordered: false
       });
       return Array.isArray(result) ? result : [result];
     } catch (error) {
       logger.error('Error inserting client-clinic relationship batch:', error);
       // Handle duplicate key errors gracefully
-      if (error.code === 11000) {
+      if ((error as any).code === 11000) {
         logger.warn('Duplicate key error in relationship batch, skipping duplicates');
         return [];
       }

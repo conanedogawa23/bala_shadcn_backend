@@ -1,5 +1,5 @@
 import { AdvancedBillingModel, IAdvancedBilling, BillingStatus } from '../models/AdvancedBilling';
-import logger from '../utils/logger';
+import { logger } from '../utils/logger';
 import { AppError } from '../utils/errors';
 
 export class AdvancedBillingService {

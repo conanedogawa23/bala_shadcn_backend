@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Model } from 'mongoose';
 
 export interface IInsurance {
   type: '1st' | '2nd' | '3rd';
@@ -114,6 +114,10 @@ export interface IClient extends Document {
   hasInsurance(): boolean;
   hasDPA(): boolean;
   getFormattedPhone(type: 'home' | 'cell' | 'work'): string | null;
+}
+
+interface IClientModel extends Model<IClient> {
+  searchClients(searchTerm: string, clinicName?: string): any;
 }
 
 const InsuranceSchema = new Schema<IInsurance>({
@@ -523,4 +527,4 @@ ClientSchema.pre('save', function(next) {
   next();
 });
 
-export const ClientModel = model<IClient>('Client', ClientSchema);
+export const ClientModel = model<IClient, IClientModel>('Client', ClientSchema);

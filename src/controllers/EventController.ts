@@ -57,7 +57,9 @@ export class EventController {
    */
   static getEventById = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-
+    if (!id) {
+      return res.status(400).json({ error: 'Event ID is required' });
+    }
     const event = await EventService.getEventById(id);
     
     if (!event) {
@@ -66,7 +68,7 @@ export class EventController {
 
     const response = EventView.formatEvent(event);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Event retrieved successfully',
       data: response
@@ -79,7 +81,9 @@ export class EventController {
    */
   static getEventByEventId = asyncHandler(async (req: Request, res: Response) => {
     const { eventId } = req.params;
-
+    if (!eventId) {
+      return res.status(400).json({ error: 'Event ID is required' });
+    }
     const event = await EventService.getEventByEventId(parseInt(eventId));
     
     if (!event) {
@@ -88,7 +92,7 @@ export class EventController {
 
     const response = EventView.formatEvent(event);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Event retrieved successfully',
       data: response
@@ -152,11 +156,13 @@ export class EventController {
    */
   static getEventsByClient = asyncHandler(async (req: Request, res: Response) => {
     const { clientId } = req.params;
-
+    if (!clientId) {
+      return res.status(400).json({ error: 'Client ID is required' });
+    }
     const events = await EventService.getEventsByClient(clientId);
     const response = EventView.formatClientEvents(clientId, events);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Client events retrieved successfully',
       data: response
@@ -169,11 +175,13 @@ export class EventController {
    */
   static getEventsByCategory = asyncHandler(async (req: Request, res: Response) => {
     const { categoryId } = req.params;
-
+    if (!categoryId) {
+      return res.status(400).json({ error: 'Category ID is required' });
+    }
     const events = await EventService.getEventsByCategory(parseInt(categoryId));
     const response = EventView.formatEvents(events);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Category events retrieved successfully',
       data: {
@@ -190,11 +198,13 @@ export class EventController {
    */
   static getEventsByClinic = asyncHandler(async (req: Request, res: Response) => {
     const { clinicName } = req.params;
-
+    if (!clinicName) {
+      return res.status(400).json({ error: 'Clinic name is required' });
+    }
     const events = await EventService.getEventsByClinic(clinicName);
     const response = EventView.formatEvents(events);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Clinic events retrieved successfully',
       data: {
@@ -336,9 +346,12 @@ export class EventController {
    * PUT /api/events/:id
    */
   static updateEvent = asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
+        const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: 'Event ID is required' });
+    }
     const updateData = req.body;
-
+    
     const event = await EventService.updateEvent(id, updateData);
     
     if (!event) {
@@ -347,7 +360,7 @@ export class EventController {
 
     const response = EventView.formatEvent(event);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Event updated successfully',
       data: response
@@ -359,15 +372,17 @@ export class EventController {
    * DELETE /api/events/:id
    */
   static deleteEvent = asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-
+        const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: 'Event ID is required' });
+    }
     const deleted = await EventService.deleteEvent(id);
     
     if (!deleted) {
       throw new AppError('Event not found', 404);
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Event deleted successfully',
       data: { deleted: true }
@@ -379,8 +394,10 @@ export class EventController {
    * PUT /api/events/:id/approve
    */
   static approveEvent = asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-
+        const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: 'Event ID is required' });
+    }
     const event = await EventService.approveEvent(id);
     
     if (!event) {
@@ -389,7 +406,7 @@ export class EventController {
 
     const response = EventView.formatEvent(event);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Event approved successfully',
       data: response
@@ -401,8 +418,10 @@ export class EventController {
    * PUT /api/events/:id/toggle-visibility
    */
   static toggleEventVisibility = asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-
+        const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: 'Event ID is required' });
+    }
     const event = await EventService.toggleEventVisibility(id);
     
     if (!event) {
@@ -411,7 +430,7 @@ export class EventController {
 
     const response = EventView.formatEvent(event);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Event visibility toggled successfully',
       data: response

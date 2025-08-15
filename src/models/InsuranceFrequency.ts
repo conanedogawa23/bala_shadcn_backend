@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Model } from 'mongoose';
 
 export enum FrequencyType {
   SELECT = 'select',
@@ -150,4 +150,24 @@ InsuranceFrequencySchema.pre('save', function(next) {
   next();
 });
 
-export const InsuranceFrequencyModel = model<IInsuranceFrequency>('InsuranceFrequency', InsuranceFrequencySchema);
+// Add static methods to the schema
+InsuranceFrequencySchema.statics.getAllFrequencies = function() {
+  return this.find({}).sort({ displayOrder: 1 });
+};
+
+InsuranceFrequencySchema.statics.getSelectableFrequencies = function() {
+  return this.find({ isSelectable: true }).sort({ displayOrder: 1 });
+};
+
+InsuranceFrequencySchema.statics.getByKey = function(frequencyKey: number) {
+  return this.findOne({ frequencyKey });
+};
+
+// InsuranceFrequency model interface with static methods
+interface IInsuranceFrequencyModel extends Model<IInsuranceFrequency> {
+  getAllFrequencies(): any;
+  getSelectableFrequencies(): any;
+  getByKey(key: number): any;
+}
+
+export const InsuranceFrequencyModel = model<IInsuranceFrequency, IInsuranceFrequencyModel>('InsuranceFrequency', InsuranceFrequencySchema);

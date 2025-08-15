@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
-import { ClinicService } from '@/services/ClinicService';
-import { ClinicView } from '@/views/ClinicView';
-import { asyncHandler } from '@/utils/asyncHandler';
-import { ValidationError } from '@/utils/errors';
+import { ClinicService } from '../services/ClinicService';
+import { ClinicView } from '../views/ClinicView';
+import { asyncHandler } from '../utils/asyncHandler';
+import { ValidationError } from '../utils/errors';
+import { validateRequiredString, ensureNumber } from '../utils/mongooseHelpers';
 
 export class ClinicController {
   /**
@@ -37,7 +38,7 @@ export class ClinicController {
       result.total
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -45,7 +46,14 @@ export class ClinicController {
    */
   static getClinicById = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const clinicId = parseInt(id);
+    if (!id) {
+      return res.status(400).json({ error: 'Clinic ID is required' });
+    }
+    const parsedId = parseInt(id);
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ error: 'Invalid clinic ID format' });
+    }
+    const clinicId = parsedId;
 
     if (isNaN(clinicId)) {
       const response = ClinicView.formatError('Invalid clinic ID format', 'INVALID_ID');
@@ -61,7 +69,7 @@ export class ClinicController {
       'Clinic retrieved successfully'
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -69,14 +77,10 @@ export class ClinicController {
    */
   static getClinicByName = asyncHandler(async (req: Request, res: Response) => {
     const { name } = req.params;
-
-    if (!name) {
-      const response = ClinicView.formatError('Clinic name is required', 'MISSING_PARAMETER');
-      return res.status(400).json(response);
-    }
+    const validName = validateRequiredString(name, 'Clinic Name');
 
     // Call service layer
-    const clinic = await ClinicService.getClinicByName(name);
+    const clinic = await ClinicService.getClinicByName(validName);
 
     // Format response using view layer
     const response = ClinicView.formatSuccess(
@@ -84,7 +88,7 @@ export class ClinicController {
       'Clinic retrieved successfully'
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -107,7 +111,7 @@ export class ClinicController {
       'Clinic created successfully'
     );
 
-    res.status(201).json(response);
+    return res.status(201).json(response);
   });
 
   /**
@@ -122,7 +126,14 @@ export class ClinicController {
     }
 
     const { id } = req.params;
-    const clinicId = parseInt(id);
+    if (!id) {
+      return res.status(400).json({ error: 'Clinic ID is required' });
+    }
+    const parsedId = parseInt(id);
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ error: 'Invalid clinic ID format' });
+    }
+    const clinicId = parsedId;
 
     if (isNaN(clinicId)) {
       const response = ClinicView.formatError('Invalid clinic ID format', 'INVALID_ID');
@@ -138,7 +149,7 @@ export class ClinicController {
       'Clinic updated successfully'
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -146,7 +157,14 @@ export class ClinicController {
    */
   static deleteClinic = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const clinicId = parseInt(id);
+    if (!id) {
+      return res.status(400).json({ error: 'Clinic ID is required' });
+    }
+    const parsedId = parseInt(id);
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ error: 'Invalid clinic ID format' });
+    }
+    const clinicId = parsedId;
 
     if (isNaN(clinicId)) {
       const response = ClinicView.formatError('Invalid clinic ID format', 'INVALID_ID');
@@ -162,7 +180,7 @@ export class ClinicController {
       'Clinic deleted successfully'
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -178,7 +196,7 @@ export class ClinicController {
       'Active clinics retrieved successfully'
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -186,12 +204,14 @@ export class ClinicController {
    */
   static getClinicStats = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const clinicId = parseInt(id);
-
-    if (isNaN(clinicId)) {
-      const response = ClinicView.formatError('Invalid clinic ID format', 'INVALID_ID');
-      return res.status(400).json(response);
+    if (!id) {
+      return res.status(400).json({ error: 'Clinic ID is required' });
     }
+          const parsedId = parseInt(id);
+      if (isNaN(parsedId)) {
+        return res.status(400).json({ error: 'Invalid clinic ID format' });
+      }
+      const clinicId = parsedId;
 
     // Call service layer
     const stats = await ClinicService.getClinicStats(clinicId);
@@ -202,7 +222,7 @@ export class ClinicController {
       'Clinic statistics retrieved successfully'
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -231,7 +251,7 @@ export class ClinicController {
     // Format response using frontend-compatible view
     const clinicsData = result.clinics.map(clinic => ClinicView.formatClinicForFrontend(clinic));
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: clinicsData,
       pagination: {
@@ -250,7 +270,14 @@ export class ClinicController {
    */
   static getClinicByIdCompatible = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const clinicId = parseInt(id);
+    if (!id) {
+      return res.status(400).json({ error: 'Clinic ID is required' });
+    }
+    const parsedId = parseInt(id);
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ error: 'Invalid clinic ID format' });
+    }
+    const clinicId = parsedId;
 
     if (isNaN(clinicId)) {
       const response = ClinicView.formatError('Invalid clinic ID format', 'INVALID_ID');
@@ -263,7 +290,7 @@ export class ClinicController {
     // Format response using frontend-compatible view
     const clinicData = ClinicView.formatClinicForFrontend(clinic);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: clinicData,
       message: 'Clinic retrieved successfully'

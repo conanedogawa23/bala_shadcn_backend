@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Model } from 'mongoose';
 
 export interface IResource extends Document {
   resourceId: number; // ResourceID from MSSQL
@@ -323,7 +323,7 @@ ResourceSchema.methods.getFullName = function(): string | null {
 ResourceSchema.methods.hasSpecialty = function(specialty: string): boolean {
   if (this.type !== 'practitioner' || !this.practitioner) {return false;}
   
-  return this.practitioner.specialties.some(s => 
+  return this.practitioner.specialties.some((s: string) => 
     s.toLowerCase().includes(specialty.toLowerCase())
   );
 };
@@ -404,4 +404,11 @@ ResourceSchema.pre('save', function(next) {
   next();
 });
 
-export const ResourceModel = model<IResource>('Resource', ResourceSchema);
+// Resource model interface with static methods
+interface IResourceModel extends Model<IResource> {
+  findPractitioners(clinicName?: string, specialtyFilter?: string): any;
+  findServices(category?: string): any;
+  findBookableResources(clinicName?: string): any;
+}
+
+export const ResourceModel = model<IResource, IResourceModel>('Resource', ResourceSchema);

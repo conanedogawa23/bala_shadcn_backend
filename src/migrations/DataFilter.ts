@@ -1,10 +1,22 @@
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 /**
  * DataFilter utility to implement VISIO business rules
  * Based on Copy of VISIO_(1)(1).xlsx - VISIO.csv requirements
  */
 export class DataFilter {
+  private static instance: DataFilter;
+
+  /**
+   * Get singleton instance of DataFilter
+   */
+  static getInstance(): DataFilter {
+    if (!this.instance) {
+      this.instance = new DataFilter();
+    }
+    return this.instance;
+  }
+
   // Clinics to retain during migration
   private static readonly RETAINED_CLINICS = new Set([
     'Bodybliss Physiotherapy',
@@ -287,5 +299,72 @@ export class DataFilter {
     logger.info(`   Retained: ${filteredCount}`);
     logger.info(`   Excluded: ${excludedCount}`);
     logger.info(`   Retention Rate: ${retentionRate}%`);
+  }
+
+  /**
+   * Apply comprehensive VISIO filters to data records
+   * Combines all filtering rules for complete data processing
+   */
+  static applyVISIOFilters<T extends {
+    clinicName?: string;
+    productCode?: string;
+    status?: string;
+    [key: string]: any;
+  }>(records: T[]): T[] {
+    logger.info(`🔍 Applying VISIO filters to ${records.length} records`);
+    
+    // Step 1: Filter by clinic retention rules
+    const clinicFiltered = records.filter(record => this.shouldRetainClinic(record.clinicName));
+    logger.info(`   After clinic filter: ${clinicFiltered.length}/${records.length} retained`);
+    
+    // Step 2: Filter by product codes (if applicable)
+    const productFiltered = clinicFiltered.filter(record => {
+      // Only apply product filter if record has productCode
+      if (record.productCode !== undefined) {
+        return this.shouldRetainProduct(record.productCode);
+      }
+      return true;
+    });
+    logger.info(`   After product filter: ${productFiltered.length}/${clinicFiltered.length} retained`);
+    
+    // Step 3: Filter by order status (if applicable)
+    const statusFiltered = productFiltered.filter(record => {
+      // Only apply status filter if record has status
+      if (record.status !== undefined) {
+        return this.shouldRetainOrderStatus(record.status);
+      }
+      return true;
+    });
+    logger.info(`   After status filter: ${statusFiltered.length}/${productFiltered.length} retained`);
+    
+    // Step 4: Apply field-level filtering
+    const fieldFiltered = statusFiltered.map(record => {
+      const filteredRecord = { ...record };
+      
+      // Apply client field filtering if this is client data
+      if (record.firstName || record.lastName || record.clientId) {
+        Object.keys(filteredRecord).forEach(key => {
+          if (!this.shouldRetainClientField(key) && this.CLIENT_EXCLUDED_FIELDS.has(key)) {
+            delete filteredRecord[key];
+          }
+        });
+      }
+      
+      // Apply insurance field filtering if this is insurance data
+      if (record.insuranceCompany || record.policyNumber) {
+        Object.keys(filteredRecord).forEach(key => {
+          if (!this.shouldRetainInsuranceField(key) && this.INSURANCE_EXCLUDED_FIELDS.has(key)) {
+            delete filteredRecord[key];
+          }
+        });
+      }
+      
+      return filteredRecord;
+    });
+    
+    // Log final statistics
+    this.logFilterStats(records.length, fieldFiltered.length, 'VISIO Comprehensive');
+    
+    return fieldFiltered;
   }
 }

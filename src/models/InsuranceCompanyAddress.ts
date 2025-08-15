@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Model } from 'mongoose';
 
 export interface IInsuranceCompanyAddress extends Document {
   addressKey: number; // sb_1st_insurance_company_address_key from MSSQL
@@ -194,4 +194,12 @@ InsuranceCompanyAddressSchema.pre('save', function(next) {
   next();
 });
 
-export const InsuranceCompanyAddressModel = model<IInsuranceCompanyAddress>('InsuranceCompanyAddress', InsuranceCompanyAddressSchema);
+// InsuranceCompanyAddress model interface with static methods
+interface IInsuranceCompanyAddressModel extends Model<IInsuranceCompanyAddress> {
+  findByCompany(companyName: string): any;
+  findByProvince(province: string): any;
+  findByCity(city: string): any;
+  findByPostalCode(postalCode: string): any;
+}
+
+export const InsuranceCompanyAddressModel = model<IInsuranceCompanyAddress, IInsuranceCompanyAddressModel>('InsuranceCompanyAddress', InsuranceCompanyAddressSchema);

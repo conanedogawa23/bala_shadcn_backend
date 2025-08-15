@@ -1,7 +1,7 @@
-import { BaseMigration } from './BaseMigration';
+import { BaseMigration, MigrationResult } from './BaseMigration';
 import { EventModel } from '../models/Event';
 import { DataFilter } from './DataFilter';
-import logger from '../utils/logger';
+import { logger } from '../utils/logger';
 
 interface MSSQLEventRecord {
   event_id: number;
@@ -116,7 +116,7 @@ export class EventMigration extends BaseMigration {
    */
   protected applyVisioFilters(records: any[]): any[] {
     // Apply base VISIO filters first
-    let filteredRecords = DataFilter.applyVISIOFilters(records, this.tableName);
+    let filteredRecords = DataFilter.applyVISIOFilters(records);
 
     // Event specific filters
     filteredRecords = filteredRecords.filter(record => {
@@ -149,7 +149,8 @@ export class EventMigration extends BaseMigration {
   /**
    * Execute the migration
    */
-  async migrate(): Promise<void> {
+  async migrate(): Promise<MigrationResult> {
+    const startTime = Date.now();
     try {
       logger.info(`Starting ${this.modelName} migration from ${this.tableName}`);
 
@@ -159,22 +160,71 @@ export class EventMigration extends BaseMigration {
 
       if (totalCount === 0) {
         logger.warn(`No records found in ${this.tableName}`);
-        return;
+        return {
+          success: true,
+          totalRecords: 0,
+          migratedRecords: 0,
+          skippedRecords: 0,
+          errors: [],
+          duration: 0,
+          tableName: this.tableName
+        };
       }
 
       // Check if migration already completed
       const existingCount = await EventModel.countDocuments();
       if (existingCount > 0) {
         logger.info(`Found ${existingCount} existing documents. Skipping migration.`);
-        return;
+        return {
+          success: true,
+          totalRecords: totalCount,
+          migratedRecords: 0,
+          skippedRecords: existingCount,
+          errors: [],
+          duration: 0,
+          tableName: this.tableName
+        };
       }
 
-      // Fetch all records
-      const mssqlRecords = await this.fetchAllRecords();
+      // Fetch all records from MSSQL
+      const query = `
+        SELECT 
+          e.event_id,
+          e.event_parent_id,
+          e.user_id,
+          e.category_id,
+          e.event_title,
+          e.event_desc,
+          e.event_date,
+          e.event_time,
+          e.event_time_end,
+          e.event_location,
+          e.event_cost,
+          e.event_url,
+          e.event_is_public,
+          e.event_is_approved,
+          e.custom_TextBox1,
+          e.custom_TextBox2,
+          e.custom_TextBox3,
+          e.custom_TextArea1,
+          e.custom_TextArea2,
+          e.custom_TextArea3,
+          e.custom_CheckBox1,
+          e.custom_CheckBox2,
+          e.custom_CheckBox3,
+          e.sb_client_id,
+          e.sb_client_full_name,
+          e.sb_client_clinic_name,
+          e.event_date_add,
+          e.event_user_add
+        FROM events e
+        ORDER BY e.event_id
+      `;
+      const mssqlRecords = await this.executeMSSQLQuery(query);
       logger.info(`Fetched ${mssqlRecords.length} records from MSSQL`);
 
       // Transform records
-      const transformedRecords = mssqlRecords.map(record => this.transformRecord(record));
+      const transformedRecords = mssqlRecords.map((record: any) => this.transformRecord(record));
       logger.info(`Transformed ${transformedRecords.length} records`);
 
       // Apply VISIO filters
@@ -187,7 +237,15 @@ export class EventMigration extends BaseMigration {
 
       if (validRecords.length === 0) {
         logger.warn('No valid records to migrate');
-        return;
+        return {
+          success: true,
+          totalRecords: totalCount,
+          migratedRecords: 0,
+          skippedRecords: totalCount,
+          errors: [],
+          duration: 0,
+          tableName: this.tableName
+        };
       }
 
       // Batch insert
@@ -203,6 +261,15 @@ export class EventMigration extends BaseMigration {
       // Log event statistics
       await this.logEventStatistics();
 
+      return {
+        success: true,
+        totalRecords: totalCount,
+        migratedRecords: finalCount,
+        skippedRecords: 0,
+        errors: [],
+        duration: Date.now() - startTime,
+        tableName: this.tableName
+      };
     } catch (error) {
       logger.error(`Error during ${this.modelName} migration:`, error);
       throw error;

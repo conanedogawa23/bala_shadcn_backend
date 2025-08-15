@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Model } from 'mongoose';
 
 export enum BillingStatus {
   ACTIVE = 'Active',
@@ -41,6 +41,16 @@ export interface IAdvancedBilling extends Document {
   complete(): Promise<void>;
   suspend(): Promise<void>;
   updateBillDate(newBillDate: Date): Promise<void>;
+}
+
+interface IAdvancedBillingModel extends Model<IAdvancedBilling> {
+  getActiveBillings(): any;
+  getBillingsByClient(clientId: string): any;
+  getBillingsByClinic(clinicName: string): any;
+  getOverdueBillings(): any;
+  getUpcomingBillings(days?: number): any;
+  getBillingsExpiringSoon(days?: number): any;
+  bulkUpdateBillDates(updates: Array<{ billingId: number; billDate: Date }>): any;
 }
 
 const AdvancedBillingSchema = new Schema<IAdvancedBilling>({
@@ -351,4 +361,60 @@ AdvancedBillingSchema.pre('save', function(next) {
   next();
 });
 
-export const AdvancedBillingModel = model<IAdvancedBilling>('AdvancedBilling', AdvancedBillingSchema);
+// Add static methods to the schema
+AdvancedBillingSchema.statics.getActiveBillings = function() {
+  return this.find({ isActive: true });
+};
+
+AdvancedBillingSchema.statics.getBillingsByClient = function(clientId: string) {
+  return this.find({ clientId });
+};
+
+AdvancedBillingSchema.statics.getBillingsByClinic = function(clinicName: string) {
+  return this.find({ clinicName });
+};
+
+AdvancedBillingSchema.statics.getOverdueBillings = function() {
+  const now = new Date();
+  return this.find({ 
+    endDate: { $lt: now },
+    status: { $in: [BillingStatus.ACTIVE, BillingStatus.SUSPENDED] }
+  });
+};
+
+AdvancedBillingSchema.statics.getUpcomingBillings = function(days: number = 30) {
+  const now = new Date();
+  const futureDate = new Date();
+  futureDate.setDate(now.getDate() + days);
+  
+  return this.find({
+    billDate: { $gte: now, $lte: futureDate },
+    isActive: true
+  });
+};
+
+AdvancedBillingSchema.statics.getBillingsExpiringSoon = function(days: number = 7) {
+  const now = new Date();
+  const expiryDate = new Date();
+  expiryDate.setDate(now.getDate() + days);
+  
+  return this.find({
+    endDate: { $gte: now, $lte: expiryDate },
+    isActive: true
+  });
+};
+
+AdvancedBillingSchema.statics.bulkUpdateBillDates = async function(updates: Array<{ billingId: number; billDate: Date }>) {
+  const bulkOps = updates.map(update => ({
+    updateOne: {
+      filter: { billingId: update.billingId },
+      update: { $set: { billDate: update.billDate } }
+    }
+  }));
+  
+  return this.bulkWrite(bulkOps);
+};
+
+
+
+export const AdvancedBillingModel = model<IAdvancedBilling, IAdvancedBillingModel>('AdvancedBilling', AdvancedBillingSchema);

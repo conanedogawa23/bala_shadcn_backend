@@ -1,5 +1,5 @@
 import { InsuranceCompanyAddressModel, IInsuranceCompanyAddress } from '../models/InsuranceCompanyAddress';
-import logger from '../utils/logger';
+import { logger } from '../utils/logger';
 import { AppError } from '../utils/errors';
 
 export class InsuranceCompanyAddressService {

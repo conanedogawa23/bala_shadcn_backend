@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IClientClinicRelationship extends Document {
   id: number;
@@ -57,6 +57,23 @@ export interface IClientClinicRelationship extends Document {
   modifiedAt?: Date;
   createdBy?: string;
   modifiedBy?: string;
+  
+  // Instance methods
+  isCurrentlyActive(): boolean;
+  getDaysActive(): number;
+  updateLastContactDate(contactDate: Date): Promise<void>;
+  calculateRelationshipDuration(): number;
+  makePrimary(): Promise<void>;
+  deactivate(reason?: string): Promise<void>;
+  updateStats(appointmentData: any): Promise<void>;
+}
+
+interface IClientClinicRelationshipModel extends Model<IClientClinicRelationship> {
+  findByClient(clientId: string): any;
+  findByClinic(clinicName: string, relationshipType?: string): any;
+  findPrimaryRelationship(clientId: string): any;
+  getClinicStats(clinicName: string): any;
+  getClientDistribution(): any;
 }
 
 const ClientClinicRelationshipSchema = new Schema<IClientClinicRelationship>({
@@ -268,7 +285,7 @@ ClientClinicRelationshipSchema.methods.deactivate = function(reason?: string): v
 
 ClientClinicRelationshipSchema.methods.makePrimary = async function(): Promise<void> {
   // First, make all other relationships for this client non-primary
-  await this.constructor.updateMany(
+  await (this.constructor as any).updateMany(
     { 
       clientId: this.clientId, 
       _id: { $ne: this._id },
@@ -403,7 +420,7 @@ ClientClinicRelationshipSchema.pre('save', function(next) {
   
   // Ensure only one primary relationship per client
   if (this.isPrimary && this.isNew) {
-    this.constructor.updateMany(
+    (this.constructor as any).updateMany(
       { 
         clientId: this.clientId, 
         _id: { $ne: this._id },
@@ -424,7 +441,7 @@ ClientClinicRelationshipSchema.pre('save', function(next) {
   next();
 });
 
-export const ClientClinicRelationshipModel = mongoose.model<IClientClinicRelationship>(
+export const ClientClinicRelationshipModel = mongoose.model<IClientClinicRelationship, IClientClinicRelationshipModel>(
   'ClientClinicRelationship', 
   ClientClinicRelationshipSchema
 );

@@ -1,7 +1,7 @@
-import { BaseMigration } from './BaseMigration';
+import { BaseMigration, MigrationResult } from './BaseMigration';
 import { AppointmentModel } from '../models/Appointment';
 import { DataFilter } from './DataFilter';
-import logger from '../utils/logger';
+import { logger } from '../utils/logger';
 
 interface MSSQLAppointmentRecord {
   ID: number;
@@ -130,7 +130,7 @@ export class AppointmentMigration extends BaseMigration {
    */
   protected applyVisioFilters(records: any[]): any[] {
     // Apply base VISIO filters first
-    let filteredRecords = DataFilter.applyVISIOFilters(records, this.tableName);
+    let filteredRecords = DataFilter.applyVISIOFilters(records);
 
     // Appointment specific filters
     filteredRecords = filteredRecords.filter(record => {
@@ -166,7 +166,8 @@ export class AppointmentMigration extends BaseMigration {
   /**
    * Execute the migration with batching for large dataset
    */
-  async migrate(): Promise<void> {
+  async migrate(): Promise<MigrationResult> {
+    const startTime = Date.now();
     try {
       logger.info(`Starting ${this.modelName} migration from ${this.tableName}`);
 
@@ -176,14 +177,30 @@ export class AppointmentMigration extends BaseMigration {
 
       if (totalCount === 0) {
         logger.warn(`No records found in ${this.tableName}`);
-        return;
+        return {
+          success: true,
+          totalRecords: 0,
+          migratedRecords: 0,
+          skippedRecords: 0,
+          errors: [],
+          duration: 0,
+          tableName: this.tableName
+        };
       }
 
       // Check if migration already completed
       const existingCount = await AppointmentModel.countDocuments();
       if (existingCount > 0) {
         logger.info(`Found ${existingCount} existing documents. Skipping migration.`);
-        return;
+        return {
+          success: true,
+          totalRecords: totalCount,
+          migratedRecords: 0,
+          skippedRecords: existingCount,
+          errors: [],
+          duration: 0,
+          tableName: this.tableName
+        };
       }
 
       // Use larger batch size for appointments due to large volume
@@ -237,6 +254,16 @@ export class AppointmentMigration extends BaseMigration {
 
       // Log appointment statistics
       await this.logAppointmentStatistics();
+
+      return {
+        success: true,
+        totalRecords: totalCount,
+        migratedRecords: totalMigrated,
+        skippedRecords: totalCount - totalMigrated,
+        errors: [],
+        duration: Date.now() - startTime,
+        tableName: this.tableName
+      };
 
     } catch (error) {
       logger.error(`Error during ${this.modelName} migration:`, error);

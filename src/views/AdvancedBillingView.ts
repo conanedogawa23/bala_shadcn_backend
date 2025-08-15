@@ -1,4 +1,5 @@
 import { IAdvancedBilling, BillingStatus } from '../models/AdvancedBilling';
+import { toObjectIdString } from '../utils/types';
 
 export interface AdvancedBillingResponse {
   id: string;
@@ -61,7 +62,7 @@ export class AdvancedBillingView {
    */
   static formatBilling(billing: IAdvancedBilling): AdvancedBillingResponse {
     return {
-      id: billing._id.toString(),
+      id: toObjectIdString(billing._id),
       billingId: billing.billingId,
       clientId: billing.clientId?.trim() || '',
       clientKey: billing.clientKey,
@@ -175,7 +176,7 @@ export class AdvancedBillingView {
    */
   static formatBillingForFrontend(billing: IAdvancedBilling): any {
     return {
-      id: billing._id.toString(),
+      id: toObjectIdString(billing._id),
       billingId: billing.billingId,
       client: {
         id: billing.clientId?.trim() || '',
@@ -296,7 +297,7 @@ export class AdvancedBillingView {
     };
   }> {
     return billings.map(billing => ({
-      id: billing._id.toString(),
+      id: toObjectIdString(billing._id),
       title: `Billing: ${billing.clientId} (${billing.status})`,
       start: billing.billDate.toISOString(),
       end: billing.endDate.toISOString(),
@@ -372,10 +373,11 @@ export class AdvancedBillingView {
     
     // Status breakdown
     const statusData = billings.reduce((acc, billing) => {
-      if (!acc[billing.status]) {
-        acc[billing.status] = 0;
+      const status = billing.status;
+      if (!acc[status]) {
+        acc[status] = 0;
       }
-      acc[billing.status] += 100; // Placeholder revenue
+      acc[status] += 100; // Placeholder revenue
       return acc;
     }, {} as Record<string, number>);
     

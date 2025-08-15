@@ -1,6 +1,6 @@
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 let mongoServer: MongoMemoryServer;
 
@@ -17,8 +17,7 @@ export class TestSetup {
       // Create in-memory MongoDB instance
       mongoServer = await MongoMemoryServer.create({
         binary: {
-          version: '6.0.0',
-          skipMD5: true
+          version: '6.0.0'
         },
         instance: {
           dbName: 'test_visio_db'
@@ -47,14 +46,14 @@ export class TestSetup {
    */
   static async cleanDatabase(): Promise<void> {
     try {
-      if (mongoose.connection.readyState === 1) {
+      if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
         // Get all collection names efficiently
         const collections = await mongoose.connection.db.listCollections().toArray();
         const collectionNames = collections.map(collection => collection.name);
         
         // Use Promise.all for parallel cleanup instead of forEach
         await Promise.all(
-          collectionNames.map(name => mongoose.connection.db.collection(name).deleteMany({}))
+          collectionNames.map(name => mongoose.connection.db!.collection(name).deleteMany({}))
         );
       }
     } catch (error) {
@@ -87,7 +86,7 @@ export class TestSetup {
    * Create test data efficiently using bulk operations
    */
   static async createTestClients(count = 10): Promise<any[]> {
-    const { ClientModel } = await import('@/models/Client');
+    const { ClientModel } = await import('../models/Client');
     
     // Generate test data efficiently using map instead of forEach
     const testClients = Array.from({ length: count }, (_, index) => ({
@@ -148,7 +147,7 @@ export class TestSetup {
    * Create test appointments efficiently
    */
   static async createTestAppointments(clientIds: string[], count = 5): Promise<any[]> {
-    const { AppointmentModel } = await import('@/models/Appointment');
+    const { AppointmentModel } = await import('../models/Appointment');
     
     const baseDate = new Date();
     
@@ -186,7 +185,7 @@ export class TestSetup {
    * Create test resources efficiently
    */
   static async createTestResources(count = 5): Promise<any[]> {
-    const { ResourceModel } = await import('@/models/Resource');
+    const { ResourceModel } = await import('../models/Resource');
     
     const resourceTypes = ['practitioner', 'service', 'equipment', 'room'];
     
@@ -258,7 +257,7 @@ export class TestSetup {
    * Create test clinics efficiently
    */
   static async createTestClinics(count = 3): Promise<any[]> {
-    const { ClinicModel } = await import('@/models/Clinic');
+    const { ClinicModel } = await import('../models/Clinic');
     
     const testClinics = Array.from({ length: count }, (_, index) => ({
       clinicId: `TEST_CLINIC_${index + 1}`,

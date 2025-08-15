@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Model } from 'mongoose';
 
 export interface IClinic extends Document {
   clinicId: number;
@@ -30,6 +30,10 @@ export interface IClinic extends Document {
   // Instance methods
   isActive(): boolean;
   getFullAddress(): string;
+}
+
+interface IClinicModel extends Model<IClinic> {
+  findActiveClinic(): any;
 }
 
 const ClinicSchema = new Schema<IClinic>({
@@ -146,7 +150,9 @@ const ClinicSchema = new Schema<IClinic>({
   timestamps: { createdAt: 'dateCreated', updatedAt: 'dateModified' },
   toJSON: {
     transform: function(doc, ret) {
-      delete ret.__v;
+      if ('__v' in ret) {
+        delete (ret as any).__v;
+      }
       return ret;
     }
   }
@@ -184,4 +190,4 @@ ClinicSchema.pre('save', function(next) {
   next();
 });
 
-export const ClinicModel = model<IClinic>('Clinic', ClinicSchema);
+export const ClinicModel = model<IClinic, IClinicModel>('Clinic', ClinicSchema);

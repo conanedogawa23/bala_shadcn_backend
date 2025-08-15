@@ -4,6 +4,7 @@ import { AdvancedBillingView } from '../views/AdvancedBillingView';
 import { BillingStatus } from '../models/AdvancedBilling';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/errors';
+import { validateRequiredString, ensureString } from '../utils/mongooseHelpers';
 
 export class AdvancedBillingController {
   /**
@@ -56,8 +57,9 @@ export class AdvancedBillingController {
    */
   static getBillingById = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
+    const billingId = validateRequiredString(id, 'Billing ID');
 
-    const billing = await AdvancedBillingService.getBillingById(id);
+    const billing = await AdvancedBillingService.getBillingById(billingId);
     
     if (!billing) {
       throw new AppError('Advanced billing not found', 404);
@@ -78,8 +80,9 @@ export class AdvancedBillingController {
    */
   static getBillingByBillingId = asyncHandler(async (req: Request, res: Response) => {
     const { billingId } = req.params;
+    const validBillingId = validateRequiredString(billingId, 'Billing ID');
 
-    const billing = await AdvancedBillingService.getBillingByBillingId(parseInt(billingId));
+    const billing = await AdvancedBillingService.getBillingByBillingId(parseInt(validBillingId));
     
     if (!billing) {
       throw new AppError('Advanced billing not found', 404);
@@ -118,9 +121,10 @@ export class AdvancedBillingController {
    */
   static getBillingsByClient = asyncHandler(async (req: Request, res: Response) => {
     const { clientId } = req.params;
+    const validClientId = validateRequiredString(clientId, 'Client ID');
 
-    const billings = await AdvancedBillingService.getBillingsByClient(clientId);
-    const response = AdvancedBillingView.formatClientBillings(clientId, billings);
+    const billings = await AdvancedBillingService.getBillingsByClient(validClientId);
+    const response = AdvancedBillingView.formatClientBillings(validClientId, billings);
 
     res.json({
       success: true,
@@ -135,9 +139,10 @@ export class AdvancedBillingController {
    */
   static getBillingsByClinic = asyncHandler(async (req: Request, res: Response) => {
     const { clinicName } = req.params;
+    const validClinicName = validateRequiredString(clinicName, 'Clinic Name');
 
-    const billings = await AdvancedBillingService.getBillingsByClinic(clinicName);
-    const response = AdvancedBillingView.formatClinicBillings(clinicName, billings);
+    const billings = await AdvancedBillingService.getBillingsByClinic(validClinicName);
+    const response = AdvancedBillingView.formatClinicBillings(validClinicName, billings);
 
     res.json({
       success: true,
@@ -261,9 +266,10 @@ export class AdvancedBillingController {
    */
   static updateBilling = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
+    const validId = validateRequiredString(id, 'Billing ID');
     const updateData = req.body;
 
-    const billing = await AdvancedBillingService.updateBilling(id, updateData);
+    const billing = await AdvancedBillingService.updateBilling(validId, updateData);
     
     if (!billing) {
       throw new AppError('Advanced billing not found', 404);
@@ -284,13 +290,14 @@ export class AdvancedBillingController {
    */
   static updateBillingStatus = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
+    const validId = validateRequiredString(id, 'Billing ID');
     const { status } = req.body;
 
     if (!Object.values(BillingStatus).includes(status)) {
       throw new AppError('Invalid billing status', 400);
     }
 
-    const billing = await AdvancedBillingService.updateBillingStatus(id, status);
+    const billing = await AdvancedBillingService.updateBillingStatus(validId, status);
     
     if (!billing) {
       throw new AppError('Advanced billing not found', 404);
@@ -311,8 +318,9 @@ export class AdvancedBillingController {
    */
   static deleteBilling = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
+    const validId = validateRequiredString(id, 'Billing ID');
 
-    const deleted = await AdvancedBillingService.deleteBilling(id);
+    const deleted = await AdvancedBillingService.deleteBilling(validId);
     
     if (!deleted) {
       throw new AppError('Advanced billing not found', 404);

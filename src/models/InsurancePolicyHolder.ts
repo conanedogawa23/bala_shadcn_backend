@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Model } from 'mongoose';
 
 export enum PolicyHolderType {
   NONE = 'NONE',
@@ -28,6 +28,7 @@ export interface IInsurancePolicyHolder extends Document {
   isValidPolicyHolderSelection(): boolean;
   requiresDetails(): boolean;
   getDisplayName(): string;
+  getLogicalOrder(policyHolderType: PolicyHolderType): number;
 }
 
 const InsurancePolicyHolderSchema = new Schema<IInsurancePolicyHolder>({
@@ -203,4 +204,12 @@ InsurancePolicyHolderSchema.methods.getLogicalOrder = function(policyHolderType:
   }
 };
 
-export const InsurancePolicyHolderModel = model<IInsurancePolicyHolder>('InsurancePolicyHolder', InsurancePolicyHolderSchema);
+// InsurancePolicyHolder model interface with static methods
+interface IInsurancePolicyHolderModel extends Model<IInsurancePolicyHolder> {
+  getAllPolicyHolders(): any;
+  getValidSelections(): any;
+  getByKey(key: number): any;
+  getRequiringAdditionalInfo(): any;
+}
+
+export const InsurancePolicyHolderModel = model<IInsurancePolicyHolder, IInsurancePolicyHolderModel>('InsurancePolicyHolder', InsurancePolicyHolderSchema);

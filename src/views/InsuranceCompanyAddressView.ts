@@ -38,7 +38,7 @@ export class InsuranceCompanyAddressView {
    */
   static formatAddress(address: IInsuranceCompanyAddress): InsuranceCompanyAddressResponse {
     return {
-      id: address._id.toString(),
+      id: (address._id as any).toString(),
       addressKey: address.addressKey,
       addressName: address.addressName?.trim() || '',
       companyName: address.companyName?.trim() || '',
@@ -138,7 +138,7 @@ export class InsuranceCompanyAddressView {
    */
   static formatAddressForFrontend(address: IInsuranceCompanyAddress): any {
     return {
-      id: address._id.toString(),
+      id: (address._id as any).toString(),
       key: address.addressKey,
       name: address.addressName?.trim() || '',
       company: address.companyName?.trim() || '',

@@ -253,11 +253,11 @@ const availabilityValidation = [
     .isBoolean()
     .withMessage('Monday available must be a boolean'),
   body('availability.monday.start')
-    .if(body('availability.monday.available').equals(true))
+    .if(body('availability.monday.available').equals('true'))
     .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
     .withMessage('Monday start time must be in HH:MM format'),
   body('availability.monday.end')
-    .if(body('availability.monday.available').equals(true))
+    .if(body('availability.monday.available').equals('true'))
     .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
     .withMessage('Monday end time must be in HH:MM format'),
   // Repeat for other days...

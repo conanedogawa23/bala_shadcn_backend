@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
-import { ContactHistoryService } from '@/services/ContactHistoryService';
-import { ContactHistoryView } from '@/views/ContactHistoryView';
-import { asyncHandler } from '@/utils/asyncHandler';
-import { logger } from '@/utils/logger';
+import { ContactHistoryService } from '../services/ContactHistoryService';
+import { ContactHistoryView } from '../views/ContactHistoryView';
+import { asyncHandler } from '../utils/asyncHandler';
+import { logger } from '../utils/logger';
+import { validateRequiredString, ensureNumber } from '../utils/mongooseHelpers';
 
 export class ContactHistoryController {
   /**
@@ -36,7 +37,7 @@ export class ContactHistoryController {
 
     const result = await ContactHistoryService.getContactHistory(query);
     
-    res.status(200).json(ContactHistoryView.formatContactHistoryResponse(result));
+    return res.status(200).json(ContactHistoryView.formatContactHistoryResponse(result));
   });
 
   /**
@@ -51,10 +52,17 @@ export class ContactHistoryController {
       );
     }
 
-    const id = parseInt(req.params.id);
+    if (!req.params.id) {
+      return res.status(400).json({ error: 'Contact History ID is required' });
+    }
+    const parsedId = parseInt(req.params.id);
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ error: 'Invalid Contact History ID format' });
+    }
+    const id = parsedId;
     const contact = await ContactHistoryService.getContactHistoryById(id);
     
-    res.status(200).json(ContactHistoryView.formatSuccess(contact));
+    return res.status(200).json(ContactHistoryView.formatSuccess(contact));
   });
 
   /**
@@ -72,7 +80,7 @@ export class ContactHistoryController {
     const contactData = req.body;
     const newContact = await ContactHistoryService.createContactHistory(contactData);
     
-    res.status(201).json(ContactHistoryView.formatSuccess(newContact, 'Contact history created successfully'));
+    return res.status(201).json(ContactHistoryView.formatSuccess(newContact, 'Contact history created successfully'));
   });
 
   /**
@@ -87,12 +95,19 @@ export class ContactHistoryController {
       );
     }
 
-    const id = parseInt(req.params.id);
+    if (!req.params.id) {
+      return res.status(400).json({ error: 'Contact History ID is required' });
+    }
+    const parsedId = parseInt(req.params.id);
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ error: 'Invalid Contact History ID format' });
+    }
+    const id = parsedId;
     const updateData = req.body;
     
     const updatedContact = await ContactHistoryService.updateContactHistory(id, updateData);
     
-    res.status(200).json(ContactHistoryView.formatSuccess(updatedContact, 'Contact history updated successfully'));
+    return res.status(200).json(ContactHistoryView.formatSuccess(updatedContact, 'Contact history updated successfully'));
   });
 
   /**
@@ -107,10 +122,17 @@ export class ContactHistoryController {
       );
     }
 
-    const id = parseInt(req.params.id);
+    if (!req.params.id) {
+      return res.status(400).json({ error: 'Contact History ID is required' });
+    }
+    const parsedId = parseInt(req.params.id);
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ error: 'Invalid Contact History ID format' });
+    }
+    const id = parsedId;
     await ContactHistoryService.deleteContactHistory(id);
     
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'Contact history deleted successfully'
     });
@@ -128,12 +150,12 @@ export class ContactHistoryController {
       );
     }
 
-    const clientId = req.params.clientId;
+    const clientId = validateRequiredString(req.params.clientId, 'Client ID');
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
     
     const contacts = await ContactHistoryService.getContactHistoryByClient(clientId, limit);
     
-    res.status(200).json(ContactHistoryView.formatSuccess(contacts));
+    return res.status(200).json(ContactHistoryView.formatSuccess(contacts));
   });
 
   /**
@@ -149,11 +171,14 @@ export class ContactHistoryController {
     }
 
     const clinicName = req.params.clinicName;
+    if (!clinicName) {
+      return res.status(400).json({ error: 'Clinic name is required' });
+    }
     const limit = Math.min(parseInt(req.query.limit as string) || 100, 200);
     
     const contacts = await ContactHistoryService.getContactHistoryByClinic(clinicName, limit);
     
-    res.status(200).json(ContactHistoryView.formatSuccess(contacts));
+    return res.status(200).json(ContactHistoryView.formatSuccess(contacts));
   });
 
   /**
@@ -165,7 +190,7 @@ export class ContactHistoryController {
     
     const followUps = await ContactHistoryService.getFollowUpsRequired(clinicName);
     
-    res.status(200).json(ContactHistoryView.formatFollowUpsList(followUps));
+    return res.status(200).json(ContactHistoryView.formatFollowUpsList(followUps));
   });
 
   /**
@@ -180,12 +205,15 @@ export class ContactHistoryController {
       );
     }
 
+    if (!req.params.id) {
+      return res.status(400).json({ error: 'Contact History ID is required' });
+    }
     const id = parseInt(req.params.id);
     const { notes } = req.body;
     
     const updatedContact = await ContactHistoryService.markFollowUpCompleted(id, notes);
     
-    res.status(200).json(ContactHistoryView.formatSuccess(updatedContact, 'Follow-up marked as completed'));
+    return res.status(200).json(ContactHistoryView.formatSuccess(updatedContact, 'Follow-up marked as completed'));
   });
 
   /**
@@ -205,7 +233,7 @@ export class ContactHistoryController {
     
     const stats = await ContactHistoryService.getContactHistoryStats(clinicName, days);
     
-    res.status(200).json(ContactHistoryView.formatContactHistoryStats(stats));
+    return res.status(200).json(ContactHistoryView.formatContactHistoryStats(stats));
   });
 
   /**
@@ -220,6 +248,9 @@ export class ContactHistoryController {
       );
     }
 
+    if (!req.params.id) {
+      return res.status(400).json({ error: 'Contact History ID is required' });
+    }
     const id = parseInt(req.params.id);
     const { tag } = req.body;
     
@@ -231,7 +262,7 @@ export class ContactHistoryController {
     
     const updatedContact = await ContactHistoryService.addTag(id, tag.trim());
     
-    res.status(200).json(ContactHistoryView.formatSuccess(updatedContact, 'Tag added successfully'));
+    return res.status(200).json(ContactHistoryView.formatSuccess(updatedContact, 'Tag added successfully'));
   });
 
   /**
@@ -251,7 +282,7 @@ export class ContactHistoryController {
     
     const recentContacts = await ContactHistoryService.getRecentActivity(clinicName, days);
     
-    res.status(200).json(ContactHistoryView.formatRecentActivity(recentContacts));
+    return res.status(200).json(ContactHistoryView.formatRecentActivity(recentContacts));
   });
 
   /**
@@ -334,7 +365,7 @@ export class ContactHistoryController {
         );
       }
       
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         data: results,
         message: `Bulk ${operation} completed successfully`,
@@ -343,7 +374,7 @@ export class ContactHistoryController {
       
     } catch (error) {
       logger.error('Bulk operation failed:', error);
-      res.status(500).json(
+      return res.status(500).json(
         ContactHistoryView.formatError('Bulk operation failed', 'BULK_OPERATION_ERROR')
       );
     }

@@ -46,7 +46,9 @@ export class InsuranceCompanyAddressController {
    */
   static getAddressById = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-
+    if (!id) {
+      return res.status(400).json({ error: 'Address ID is required' });
+    }
     const address = await InsuranceCompanyAddressService.getAddressById(id);
     
     if (!address) {
@@ -55,7 +57,7 @@ export class InsuranceCompanyAddressController {
 
     const response = InsuranceCompanyAddressView.formatAddress(address);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Insurance address retrieved successfully',
       data: response
@@ -68,7 +70,9 @@ export class InsuranceCompanyAddressController {
    */
   static getAddressByKey = asyncHandler(async (req: Request, res: Response) => {
     const { addressKey } = req.params;
-
+    if (!addressKey) {
+      return res.status(400).json({ error: 'Address key is required' });
+    }
     const address = await InsuranceCompanyAddressService.getAddressByKey(parseInt(addressKey));
     
     if (!address) {
@@ -77,7 +81,7 @@ export class InsuranceCompanyAddressController {
 
     const response = InsuranceCompanyAddressView.formatAddress(address);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Insurance address retrieved successfully',
       data: response
@@ -90,11 +94,13 @@ export class InsuranceCompanyAddressController {
    */
   static getAddressesByCompany = asyncHandler(async (req: Request, res: Response) => {
     const { companyName } = req.params;
-
+    if (!companyName) {
+      return res.status(400).json({ error: 'Company name is required' });
+    }
     const addresses = await InsuranceCompanyAddressService.getAddressesByCompany(companyName);
     const response = InsuranceCompanyAddressView.formatCompanyAddresses(companyName, addresses);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Company addresses retrieved successfully',
       data: response
@@ -107,11 +113,13 @@ export class InsuranceCompanyAddressController {
    */
   static getAddressesByProvince = asyncHandler(async (req: Request, res: Response) => {
     const { province } = req.params;
-
+    if (!province) {
+      return res.status(400).json({ error: 'Province is required' });
+    }
     const addresses = await InsuranceCompanyAddressService.getAddressesByProvince(province);
     const response = InsuranceCompanyAddressView.formatProvinceAddresses(province, addresses);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Province addresses retrieved successfully',
       data: response
@@ -124,11 +132,13 @@ export class InsuranceCompanyAddressController {
    */
   static getAddressesByCity = asyncHandler(async (req: Request, res: Response) => {
     const { city } = req.params;
-
+    if (!city) {
+      return res.status(400).json({ error: 'City is required' });
+    }
     const addresses = await InsuranceCompanyAddressService.getAddressesByCity(city);
     const response = InsuranceCompanyAddressView.formatAddresses(addresses);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'City addresses retrieved successfully',
       data: {
@@ -145,11 +155,13 @@ export class InsuranceCompanyAddressController {
    */
   static searchByPostalCode = asyncHandler(async (req: Request, res: Response) => {
     const { postalCode } = req.params;
-
+    if (!postalCode) {
+      return res.status(400).json({ error: 'Postal code is required' });
+    }
     const addresses = await InsuranceCompanyAddressService.searchByPostalCode(postalCode);
     const response = InsuranceCompanyAddressView.formatSearchResults(addresses, postalCode);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Postal code search completed successfully',
       data: response
@@ -178,9 +190,12 @@ export class InsuranceCompanyAddressController {
    * PUT /api/insurance-addresses/:id
    */
   static updateAddress = asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
+        const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: 'Address ID is required' });
+    }
     const updateData = req.body;
-
+    
     const address = await InsuranceCompanyAddressService.updateAddress(id, updateData);
     
     if (!address) {
@@ -189,7 +204,7 @@ export class InsuranceCompanyAddressController {
 
     const response = InsuranceCompanyAddressView.formatAddress(address);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Insurance address updated successfully',
       data: response
@@ -201,15 +216,17 @@ export class InsuranceCompanyAddressController {
    * DELETE /api/insurance-addresses/:id
    */
   static deleteAddress = asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-
+        const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: 'Address ID is required' });
+    }
     const deleted = await InsuranceCompanyAddressService.deleteAddress(id);
     
     if (!deleted) {
       throw new AppError('Insurance address not found', 404);
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Insurance address deleted successfully',
       data: { deleted: true }

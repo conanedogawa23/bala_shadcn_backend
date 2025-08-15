@@ -66,7 +66,7 @@ export class MigrationManager {
     // PHASE 5: Massive Appointments Data (149,477 records - HIGHEST VOLUME)
     this.migrations.set('appointments', {
       name: 'Appointments Migration (149,477 records)',
-      migration: () => new AppointmentMigration(this.options),
+      migration: () => new AppointmentMigration(),
       priority: 5,
       dependencies: ['clients']
     });
@@ -74,7 +74,7 @@ export class MigrationManager {
     // PHASE 6: Insurance Company Addresses (184 records)
     this.migrations.set('insurance_company_addresses', {
       name: 'Insurance Company Addresses Migration (184 records)',
-      migration: () => new InsuranceCompanyAddressMigration(this.options),
+      migration: () => new InsuranceCompanyAddressMigration(),
       priority: 1,
       dependencies: []
     });
@@ -82,7 +82,7 @@ export class MigrationManager {
     // PHASE 7: Events (110 records)
     this.migrations.set('events', {
       name: 'Events Migration (110 records)',
-      migration: () => new EventMigration(this.options),
+      migration: () => new EventMigration(),
       priority: 3,
       dependencies: ['clients']
     });
@@ -100,7 +100,7 @@ export class MigrationManager {
     // PHASE 5: Insurance Reference Data (9 records total)
     this.migrations.set('insurance_reference', {
       name: 'Insurance Reference Data Migration (9 records)',
-      migration: () => new InsuranceReferenceMigration(this.options),
+      migration: () => new InsuranceReferenceMigration(),
       priority: 1,
       dependencies: []
     });

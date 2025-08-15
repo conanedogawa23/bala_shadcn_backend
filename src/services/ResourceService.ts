@@ -273,7 +273,7 @@ export class ResourceService {
       
       // Add appointment stats for each practitioner
       const practitionersWithStats = await Promise.all(
-        practitioners.map(async (practitioner) => {
+        practitioners.map(async (practitioner: any) => {
           const appointmentCount = await AppointmentModel.countDocuments({
             resourceId: practitioner.resourceId,
             isActive: true
@@ -310,7 +310,7 @@ export class ResourceService {
       const services = await ResourceModel.findServices(category);
       
       // Group services by category
-      const servicesByCategory = services.reduce((acc: any, service) => {
+      const servicesByCategory = services.reduce((acc: any, service: any) => {
         const cat = service.service?.category || 'Other';
         if (!acc[cat]) {
           acc[cat] = [];
@@ -343,7 +343,7 @@ export class ResourceService {
       const resources = await ResourceModel.findBookableResources(clinicName);
 
       // Group by type
-      const resourcesByType = resources.reduce((acc: any, resource) => {
+      const resourcesByType = resources.reduce((acc: any, resource: any) => {
         if (!acc[resource.type]) {
           acc[resource.type] = [];
         }

@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
-import { ClientService } from '@/services/ClientService';
-import { ClientView } from '@/views/ClientView';
-import { asyncHandler } from '@/utils/asyncHandler';
+import { ClientService } from '../services/ClientService';
+import { ClientView } from '../views/ClientView';
+import { asyncHandler } from '../utils/asyncHandler';
+import { validateRequiredString } from '../utils/mongooseHelpers';
 
 export class ClientController {
   /**
@@ -18,11 +19,12 @@ export class ClientController {
 
     // Extract parameters
     const { clinicName } = req.params;
+    const validClinicName = validateRequiredString(clinicName, 'Clinic Name');
     const { page, limit, search, status } = req.query;
 
     // Call service layer
     const result = await ClientService.getClientsByClinic({
-      clinicName,
+      clinicName: validClinicName,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
       search: search as string,
@@ -37,7 +39,7 @@ export class ClientController {
       result.total
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -60,7 +62,7 @@ export class ClientController {
       'Client retrieved successfully'
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -83,7 +85,7 @@ export class ClientController {
       'Client created successfully'
     );
 
-    res.status(201).json(response);
+    return res.status(201).json(response);
   });
 
   /**
@@ -113,7 +115,7 @@ export class ClientController {
       'Client updated successfully'
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -136,7 +138,7 @@ export class ClientController {
       'Client deleted successfully'
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -164,7 +166,7 @@ export class ClientController {
       clients.length
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -172,9 +174,10 @@ export class ClientController {
    */
   static getClientsWithInsurance = asyncHandler(async (req: Request, res: Response) => {
     const { clinicName } = req.params;
+    const validClinicName = validateRequiredString(clinicName, 'Clinic Name');
 
     // Call service layer
-    const clients = await ClientService.getClientsWithInsurance(clinicName);
+    const clients = await ClientService.getClientsWithInsurance(validClinicName);
 
     // Format response using view layer
     const response = ClientView.formatSuccess(
@@ -182,7 +185,7 @@ export class ClientController {
       'Clients with insurance retrieved successfully'
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -190,9 +193,10 @@ export class ClientController {
    */
   static getClientStats = asyncHandler(async (req: Request, res: Response) => {
     const { clinicName } = req.params;
+    const validClinicName = validateRequiredString(clinicName, 'Clinic Name');
 
     // Call service layer
-    const stats = await ClientService.getClientStats(clinicName);
+    const stats = await ClientService.getClientStats(validClinicName);
 
     // Format response using view layer
     const response = ClientView.formatSuccess(
@@ -200,7 +204,7 @@ export class ClientController {
       'Client statistics retrieved successfully'
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -216,11 +220,12 @@ export class ClientController {
 
     // Extract parameters
     const { clinicName } = req.params;
+    const validClinicName = validateRequiredString(clinicName, 'Clinic Name');
     const { page, limit, search, status } = req.query;
 
     // Call service layer
     const result = await ClientService.getClientsByClinic({
-      clinicName,
+      clinicName: validClinicName,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
       search: search as string,
@@ -230,7 +235,7 @@ export class ClientController {
     // Format response using frontend-compatible view
     const clientsData = result.clients.map(client => ClientView.formatClientForFrontend(client));
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: clientsData,
       pagination: {
@@ -261,7 +266,7 @@ export class ClientController {
     // Format response using frontend-compatible view
     const clientData = ClientView.formatClientForFrontend(client);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: clientData,
       message: 'Client retrieved successfully'

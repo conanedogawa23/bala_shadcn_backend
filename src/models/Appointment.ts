@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Model } from 'mongoose';
 
 export interface IAppointment extends Document {
   appointmentId?: number; // ID from MSSQL
@@ -49,6 +49,13 @@ export interface IAppointment extends Document {
   isToday(): boolean;
   canBeBilled(): boolean;
   getFormattedDuration(): string;
+}
+
+interface IAppointmentModel extends Model<IAppointment> {
+  checkTimeSlotConflict(resourceId: number, startDate: Date, endDate: Date, excludeId?: string): any;
+  findReadyToBill(clinicName?: string): any;
+  findByResource(resourceId: number, date: Date): any;
+  findByClient(clientId: string): any;
 }
 
 const AppointmentSchema = new Schema<IAppointment>({
@@ -370,4 +377,53 @@ AppointmentSchema.pre('save', function(next) {
   next();
 });
 
-export const AppointmentModel = model<IAppointment>('Appointment', AppointmentSchema);
+// Add static methods to the schema
+AppointmentSchema.statics.checkTimeSlotConflict = function(
+  resourceId: string, 
+  startTime: Date, 
+  endTime: Date, 
+  excludeId?: string
+) {
+  const query: any = {
+    resourceId,
+    status: { $ne: 'cancelled' },
+    $or: [
+      { startDate: { $lt: endTime }, endDate: { $gt: startTime } }
+    ]
+  };
+  
+  if (excludeId) {
+    query._id = { $ne: excludeId };
+  }
+  
+  return this.find(query);
+};
+
+AppointmentSchema.statics.findReadyToBill = function(clinicName: string) {
+  return this.find({ 
+    clinicName: new RegExp(clinicName, 'i'),
+    readyToBill: true,
+    billDate: { $exists: false }
+  }).sort({ endDate: -1 });
+};
+
+AppointmentSchema.statics.findByResource = function(resourceId: string, date?: Date) {
+  const query: any = { resourceId };
+  
+  if (date) {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    query.startDate = { $gte: startOfDay, $lte: endOfDay };
+  }
+  
+  return this.find(query).sort({ startDate: 1 });
+};
+
+AppointmentSchema.statics.findByClient = function(clientId: string) {
+  return this.find({ clientId }).sort({ startDate: -1 });
+};
+
+export const AppointmentModel = model<IAppointment, IAppointmentModel>('Appointment', AppointmentSchema);

@@ -1,5 +1,5 @@
 import { EventModel, IEvent } from '../models/Event';
-import logger from '../utils/logger';
+import { logger } from '../utils/logger';
 import { AppError } from '../utils/errors';
 
 export class EventService {

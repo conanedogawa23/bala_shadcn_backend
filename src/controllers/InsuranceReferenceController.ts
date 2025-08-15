@@ -51,7 +51,9 @@ export class InsuranceReferenceController {
    */
   static getFrequencyByKey = asyncHandler(async (req: Request, res: Response) => {
     const { frequencyKey } = req.params;
-
+    if (!frequencyKey) {
+      return res.status(400).json({ error: 'Frequency key is required' });
+    }
     const frequency = await InsuranceReferenceService.getFrequencyByKey(parseInt(frequencyKey));
     
     if (!frequency) {
@@ -60,7 +62,7 @@ export class InsuranceReferenceController {
 
     const response = InsuranceReferenceView.formatFrequency(frequency);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Insurance frequency retrieved successfully',
       data: response
@@ -113,7 +115,9 @@ export class InsuranceReferenceController {
    */
   static getPolicyHolderByKey = asyncHandler(async (req: Request, res: Response) => {
     const { policyHolderKey } = req.params;
-
+    if (!policyHolderKey) {
+      return res.status(400).json({ error: 'Policy holder key is required' });
+    }
     const policyHolder = await InsuranceReferenceService.getPolicyHolderByKey(parseInt(policyHolderKey));
     
     if (!policyHolder) {
@@ -122,7 +126,7 @@ export class InsuranceReferenceController {
 
     const response = InsuranceReferenceView.formatPolicyHolder(policyHolder);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Policy holder retrieved successfully',
       data: response
@@ -175,7 +179,9 @@ export class InsuranceReferenceController {
    */
   static getCOBByKey = asyncHandler(async (req: Request, res: Response) => {
     const { cobKey } = req.params;
-
+    if (!cobKey) {
+      return res.status(400).json({ error: 'COB key is required' });
+    }
     const cob = await InsuranceReferenceService.getCOBByKey(parseInt(cobKey));
     
     if (!cob) {
@@ -184,7 +190,7 @@ export class InsuranceReferenceController {
 
     const response = InsuranceReferenceView.formatCOB(cob);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'COB option retrieved successfully',
       data: response
@@ -197,7 +203,9 @@ export class InsuranceReferenceController {
    */
   static getCOBByValue = asyncHandler(async (req: Request, res: Response) => {
     const { cobValue } = req.params;
-
+    if (!cobValue) {
+      return res.status(400).json({ error: 'COB value is required' });
+    }
     const boolValue = cobValue.toLowerCase() === 'true';
     const cob = await InsuranceReferenceService.getCOBByValue(boolValue);
     
@@ -207,7 +215,7 @@ export class InsuranceReferenceController {
 
     const response = InsuranceReferenceView.formatCOB(cob);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'COB option retrieved successfully',
       data: response

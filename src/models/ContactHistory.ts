@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IContactHistory extends Document {
   id: number;
@@ -40,6 +40,10 @@ export interface IContactHistory extends Document {
     claimNumber?: string;
     authorizationNumber?: string;
   };
+  
+  // Instance methods
+  markAsFollowedUp(): void;
+  addTag(tag: string): void;
 }
 
 const ContactHistorySchema = new Schema<IContactHistory>({
@@ -297,5 +301,13 @@ ContactHistorySchema.pre('save', function(next) {
   next();
 });
 
-export const ContactHistoryModel = mongoose.model<IContactHistory>('ContactHistory', ContactHistorySchema);
+// ContactHistory model interface with static methods
+interface IContactHistoryModel extends Model<IContactHistory> {
+  findByClient(clientId: string, options?: any): any;
+  findByClinic(clinicName: string, options?: any): any;
+  findFollowUpsRequired(clinicName?: string): any;
+  getRecentActivity(limit?: any, clinicName?: any): any;
+}
+
+export const ContactHistoryModel = mongoose.model<IContactHistory, IContactHistoryModel>('ContactHistory', ContactHistorySchema);
 export default ContactHistoryModel;

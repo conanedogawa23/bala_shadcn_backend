@@ -1,7 +1,7 @@
 import { InsuranceFrequencyModel, IInsuranceFrequency, FrequencyType } from '../models/InsuranceFrequency';
 import { InsurancePolicyHolderModel, IInsurancePolicyHolder, PolicyHolderType } from '../models/InsurancePolicyHolder';
 import { InsuranceCOBModel, IInsuranceCOB, COBStatus } from '../models/InsuranceCOB';
-import logger from '../utils/logger';
+import { logger } from '../utils/logger';
 import { AppError } from '../utils/errors';
 
 export class InsuranceReferenceService {

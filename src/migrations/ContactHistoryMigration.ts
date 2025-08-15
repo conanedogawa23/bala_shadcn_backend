@@ -76,8 +76,10 @@ export class ContactHistoryMigration extends BaseMigration {
       
       logger.info(`📊 Fetched ${allMssqlRecords.length} contact history records from MSSQL`);
 
-      // Apply VISIO business rules to filter clinics
-      const mssqlRecords = DataFilter.filterRecordsByClinic(allMssqlRecords);
+      // Apply VISIO business rules to filter clinics  
+      const mssqlRecords = allMssqlRecords.filter(record => 
+        DataFilter.shouldRetainClinic(record.clinic_name)
+      );
       
       DataFilter.logFilterStats(allMssqlRecords.length, mssqlRecords.length, 'Contact History Clinic Filter');
       logger.info(`✅ Retained ${mssqlRecords.length} records after applying VISIO clinic filters`);
@@ -240,14 +242,13 @@ export class ContactHistoryMigration extends BaseMigration {
     // Use insertMany for optimal performance
     try {
       const result = await ContactHistoryModel.insertMany(batch, { 
-        ordered: false,
-        writeConcern: { w: 1, j: false } // Optimize for speed
+        ordered: false
       });
       return Array.isArray(result) ? result : [result];
     } catch (error) {
       logger.error('Error inserting contact history batch:', error);
       // Handle duplicate key errors gracefully
-      if (error.code === 11000) {
+      if ((error as any).code === 11000) {
         logger.warn('Duplicate key error in contact history batch, skipping duplicates');
         return [];
       }

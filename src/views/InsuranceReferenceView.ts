@@ -1,6 +1,7 @@
 import { IInsuranceFrequency, FrequencyType } from '../models/InsuranceFrequency';
 import { IInsurancePolicyHolder, PolicyHolderType } from '../models/InsurancePolicyHolder';
 import { IInsuranceCOB, COBStatus } from '../models/InsuranceCOB';
+import { toObjectIdString } from '../utils/types';
 
 // Insurance Frequency Interfaces
 export interface InsuranceFrequencyResponse {
@@ -88,7 +89,7 @@ export class InsuranceReferenceView {
    */
   static formatFrequency(frequency: IInsuranceFrequency): InsuranceFrequencyResponse {
     return {
-      id: frequency._id.toString(),
+      id: toObjectIdString(frequency._id),
       frequencyKey: frequency.frequencyKey,
       frequencyName: frequency.frequencyName?.trim() || '',
       frequencyType: frequency.frequencyType,
@@ -116,7 +117,7 @@ export class InsuranceReferenceView {
    */
   static formatPolicyHolder(policyHolder: IInsurancePolicyHolder): InsurancePolicyHolderResponse {
     return {
-      id: policyHolder._id.toString(),
+      id: toObjectIdString(policyHolder._id),
       policyHolderKey: policyHolder.policyHolderKey,
       policyHolderName: policyHolder.policyHolderName?.trim() || '',
       policyHolderType: policyHolder.policyHolderType,
@@ -145,7 +146,7 @@ export class InsuranceReferenceView {
    */
   static formatCOB(cob: IInsuranceCOB): InsuranceCOBResponse {
     return {
-      id: cob._id.toString(),
+      id: toObjectIdString(cob._id),
       cobKey: cob.cobKey,
       cobName: cob.cobName?.trim() || '',
       cobStatus: cob.cobStatus,
@@ -264,7 +265,7 @@ export class InsuranceReferenceView {
    */
   static formatFrequenciesForFrontend(frequencies: IInsuranceFrequency[]): any[] {
     return frequencies.map(frequency => ({
-      id: frequency._id.toString(),
+      id: (frequency._id as any).toString(),
       key: frequency.frequencyKey,
       name: frequency.frequencyName?.trim() || '',
       type: frequency.frequencyType,
@@ -279,7 +280,7 @@ export class InsuranceReferenceView {
    */
   static formatPolicyHoldersForFrontend(policyHolders: IInsurancePolicyHolder[]): any[] {
     return policyHolders.map(holder => ({
-      id: holder._id.toString(),
+      id: (holder._id as any).toString(),
       key: holder.policyHolderKey,
       name: holder.policyHolderName?.trim() || '',
       type: holder.policyHolderType,
@@ -295,7 +296,7 @@ export class InsuranceReferenceView {
    */
   static formatCOBOptionsForFrontend(cobOptions: IInsuranceCOB[]): any[] {
     return cobOptions.map(cob => ({
-      id: cob._id.toString(),
+      id: (cob._id as any).toString(),
       key: cob.cobKey,
       name: cob.cobName?.trim() || '',
       status: cob.cobStatus,

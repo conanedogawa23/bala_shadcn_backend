@@ -1,8 +1,8 @@
-import { BaseMigration } from './BaseMigration';
+import { BaseMigration, MigrationResult } from './BaseMigration';
 import { InsuranceFrequencyModel, IInsuranceFrequency, FrequencyType } from '../models/InsuranceFrequency';
 import { InsurancePolicyHolderModel, IInsurancePolicyHolder, PolicyHolderType } from '../models/InsurancePolicyHolder';
 import { InsuranceCOBModel, IInsuranceCOB, COBStatus } from '../models/InsuranceCOB';
-import logger from '../utils/logger';
+import { logger } from '../utils/logger';
 
 // MSSQL Record Interfaces
 export interface MSSQLInsuranceFrequencyRecord {
@@ -25,12 +25,42 @@ export class InsuranceReferenceMigration extends BaseMigration {
   protected batchSize = 50; // Small batch size for reference data
 
   /**
+   * Required abstract method implementation
+   */
+  async migrate(): Promise<MigrationResult> {
+    const startTime = Date.now();
+    try {
+      await this.runMigration();
+      return {
+        success: true,
+        totalRecords: 0, // Reference data migration doesn't track individual records
+        migratedRecords: 0,
+        skippedRecords: 0,
+        errors: [],
+        duration: Date.now() - startTime,
+        tableName: 'insurance_reference'
+      };
+    } catch (error) {
+      logger.error('Insurance reference migration failed:', error);
+      return {
+        success: false,
+        totalRecords: 0,
+        migratedRecords: 0,
+        skippedRecords: 0,
+        errors: [error instanceof Error ? error.message : String(error)],
+        duration: Date.now() - startTime,
+        tableName: 'insurance_reference'
+      };
+    }
+  }
+
+  /**
    * Run the complete insurance reference migration
    */
   public async runMigration(): Promise<void> {
     logger.info('Starting Insurance Reference Data Migration...');
     
-    await this.connectToMongoDB();
+    // MongoDB connection is handled automatically by Mongoose
     
     try {
       // Migrate all three reference data types
@@ -458,8 +488,9 @@ export class InsuranceReferenceMigration extends BaseMigration {
     return {}; // Not applicable for unified migration
   }
 
-  protected async processBatch(records: any[]): Promise<void> {
+  protected async processBatch(records: any[]): Promise<any[]> {
     // Not applicable for unified migration
+    return records;
   }
 
   protected async createIndexes(): Promise<void> {

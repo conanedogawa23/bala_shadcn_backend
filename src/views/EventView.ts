@@ -1,4 +1,5 @@
 import { IEvent } from '../models/Event';
+import { toObjectIdString } from '../utils/types';
 
 export interface EventResponse {
   id: string;
@@ -77,7 +78,7 @@ export class EventView {
     const isToday = this.isToday(event);
 
     return {
-      id: event._id.toString(),
+      id: (event._id as any).toString(),
       eventId: event.eventId,
       parentEventId: event.parentEventId,
       userId: event.userId,
@@ -202,7 +203,7 @@ export class EventView {
     };
   } {
     return {
-      id: event._id.toString(),
+      id: (event._id as any).toString(),
       title: event.title?.trim() || 'Untitled Event',
       start: event.eventTime?.toISOString() || event.eventDate.toISOString(),
       end: event.eventTimeEnd?.toISOString(),
@@ -237,7 +238,7 @@ export class EventView {
    */
   static formatEventForFrontend(event: IEvent): any {
     return {
-      id: event._id.toString(),
+      id: (event._id as any).toString(),
       eventId: event.eventId,
       title: event.title?.trim() || '',
       description: event.description?.trim(),
@@ -307,7 +308,7 @@ export class EventView {
     events: EventResponse[];
     count: number;
   } {
-    const clientName = events.length > 0 ? events[0].clientFullName : undefined;
+    const clientName = events.length > 0 ? events[0]?.clientFullName : undefined;
     
     return {
       clientId: clientId.trim(),

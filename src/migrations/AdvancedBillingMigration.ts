@@ -1,7 +1,8 @@
-import { BaseMigration } from './BaseMigration';
+import { MongooseError } from 'mongoose';
 import { AdvancedBillingModel, IAdvancedBilling, BillingStatus } from '../models/AdvancedBilling';
+import { BaseMigration, MigrationResult } from './BaseMigration';
+import { logger } from '../utils/logger';
 import { DataFilter } from './DataFilter';
-import logger from '../utils/logger';
 
 export interface MSSQLAdvancedBillingRecord {
   id: number;
@@ -20,12 +21,72 @@ export interface MSSQLAdvancedBillingRecord {
 }
 
 export class AdvancedBillingMigration extends BaseMigration {
-  protected collectionName = 'advancedbillings';
-  protected batchSize = 100; // Smaller batch size for careful processing
+  private readonly tableName = 'AdvancedBilling';
+  private readonly batchSize = 500;
 
   /**
-   * Get total count from MSSQL
+   * Main migration method that implements the required interface
    */
+  async migrate(): Promise<MigrationResult> {
+    const startTime = Date.now();
+    try {
+      logger.info(`Starting ${this.tableName} migration from ${this.tableName}`);
+
+      // Get total count
+      const totalCount = await this.getTotalCount();
+      logger.info(`Total ${this.tableName} records in MSSQL: ${totalCount}`);
+
+      if (totalCount === 0) {
+        logger.warn(`No records found in ${this.tableName}`);
+        return {
+          success: true,
+          totalRecords: 0,
+          migratedRecords: 0,
+          skippedRecords: 0,
+          errors: [],
+          duration: Date.now() - startTime,
+          tableName: this.tableName
+        };
+      }
+
+      // Perform migration in batches
+      let offset = 0;
+      let allRecords: MSSQLAdvancedBillingRecord[] = [];
+      
+      // Fetch all records in batches
+      while (offset < totalCount) {
+        const batch = await this.fetchBatch(offset);
+        allRecords.push(...batch);
+        offset += this.batchSize;
+      }
+      const processedRecords = await this.processRecordBatch(allRecords);
+      
+      logger.info(`Migration completed. Processed ${processedRecords.length} records`);
+      
+      return {
+        success: true,
+        totalRecords: totalCount,
+        migratedRecords: processedRecords.length,
+        skippedRecords: totalCount - processedRecords.length,
+        errors: [],
+        duration: Date.now() - startTime,
+        tableName: this.tableName
+      };
+
+    } catch (error) {
+      logger.error(`Error during ${this.tableName} migration:`, error);
+      return {
+        success: false,
+        totalRecords: 0,
+        migratedRecords: 0,
+        skippedRecords: 0,
+        errors: [error instanceof Error ? error.message : String(error)],
+        duration: Date.now() - startTime,
+        tableName: this.tableName
+      };
+    }
+  }
+
   protected async getTotalCount(): Promise<number> {
     const query = `
       SELECT COUNT(*) as count 
@@ -115,12 +176,12 @@ export class AdvancedBillingMigration extends BaseMigration {
     
     // Apply VISIO clinic filtering
     const filteredByClinic = records.filter(record => 
-      dataFilter.shouldIncludeClinic(record.clinic_name?.trim() || '')
+      DataFilter.shouldRetainClinic(record.clinic_name?.trim() || '')
     );
     
     // Apply product key filtering if needed
     const filteredByProduct = filteredByClinic.filter(record => 
-      dataFilter.shouldIncludeProduct(record.product_key)
+      DataFilter.shouldRetainProduct(record.product_key?.toString() || '')
     );
     
     // Additional business rules
@@ -161,15 +222,15 @@ export class AdvancedBillingMigration extends BaseMigration {
   /**
    * Process and save batch to MongoDB with conflict resolution
    */
-  protected async processBatch(records: MSSQLAdvancedBillingRecord[]): Promise<void> {
-    if (records.length === 0) {return;}
+  private async processRecordBatch(records: MSSQLAdvancedBillingRecord[]): Promise<MSSQLAdvancedBillingRecord[]> {
+    if (records.length === 0) {return [];}
     
     // Apply business rules
     const filteredRecords = await this.applyBusinessRules(records);
     
     if (filteredRecords.length === 0) {
       logger.info('No records to process after filtering');
-      return;
+      return [];
     }
     
     // Transform records using map for optimization
@@ -178,7 +239,11 @@ export class AdvancedBillingMigration extends BaseMigration {
     );
     
     // Check for existing records to handle duplicates
-    const billingIds = transformedRecords.map(record => record.billingId);
+    // Extract billing IDs (filter out undefined values)
+    const billingIds = transformedRecords
+      .map(record => record.billingId)
+      .filter((id): id is number => id !== undefined);
+    
     const existing = await AdvancedBillingModel.find({
       billingId: { $in: billingIds }
     }).select('billingId').lean();
@@ -187,11 +252,11 @@ export class AdvancedBillingMigration extends BaseMigration {
     
     // Separate new records from updates
     const newRecords = transformedRecords.filter(record => 
-      !existingIds.has(record.billingId)
+      record.billingId !== undefined && !existingIds.has(record.billingId)
     );
     
     const updateRecords = transformedRecords.filter(record => 
-      existingIds.has(record.billingId)
+      record.billingId !== undefined && existingIds.has(record.billingId)
     );
     
     // Insert new records
@@ -220,6 +285,8 @@ export class AdvancedBillingMigration extends BaseMigration {
       const result = await AdvancedBillingModel.bulkWrite(updateOperations);
       logger.info(`Updated ${result.modifiedCount} existing advanced billing records`);
     }
+    
+    return records;
   }
 
   /**
@@ -243,7 +310,7 @@ export class AdvancedBillingMigration extends BaseMigration {
     ];
     
     await Promise.all(
-      indexes.map(index => 
+      indexes.map((index: any) => 
         AdvancedBillingModel.collection.createIndex(index)
       )
     );

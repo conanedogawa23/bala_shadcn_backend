@@ -1,4 +1,4 @@
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 
 export interface MigrationResult {
   success: boolean;
@@ -41,7 +41,7 @@ export abstract class BaseMigration {
   protected async processBatch<T, R>(
     records: T[],
     processor: (batch: T[]) => Promise<R[]>,
-    batchSize: number = this.options.batchSize
+    batchSize: number = this.options.batchSize || this.defaultOptions.batchSize
   ): Promise<R[]> {
     const results: R[] = [];
     const totalBatches = Math.ceil(records.length / batchSize);
@@ -131,6 +131,78 @@ export abstract class BaseMigration {
       duration: Date.now() - startTime,
       tableName
     };
+  }
+
+  /**
+   * Execute MSSQL query safely
+   */
+  protected async executeMSSQLQuery(query: string, params?: any[]): Promise<any[]> {
+    try {
+      // This is a placeholder implementation
+      // In a real implementation, you would use your MSSQL connection
+      logger.info(`Executing MSSQL Query: ${query}`);
+      if (params) {
+        logger.info('Query Parameters:', params);
+      }
+      
+      // Return empty array as placeholder
+      // TODO: Implement actual MSSQL connection logic
+      return [];
+    } catch (error) {
+      logger.error('MSSQL Query failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get total count from migration source
+   */
+  protected async getTotalCount(): Promise<number> {
+    try {
+      // This is a placeholder implementation
+      // Override in child classes with specific logic
+      return 0;
+    } catch (error) {
+      logger.error('Failed to get total count:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Optimized batch insert operation
+   * Prevents memory issues and provides progress tracking
+   */
+  protected async batchInsert<T>(
+    documents: T[],
+    collection: any,
+    batchSize: number = this.options.batchSize || this.defaultOptions.batchSize
+  ): Promise<number> {
+    let insertedCount = 0;
+    
+    try {
+      const batches = Math.ceil(documents.length / batchSize);
+      
+      for (let i = 0; i < batches; i++) {
+        const start = i * batchSize;
+        const end = Math.min(start + batchSize, documents.length);
+        const batch = documents.slice(start, end);
+        
+        if (this.options.dryRun) {
+          logger.info(`DRY RUN: Would insert batch ${i + 1}/${batches} (${batch.length} documents)`);
+          insertedCount += batch.length;
+        } else {
+          const result = await collection.insertMany(batch, { ordered: false });
+          insertedCount += Array.isArray(result) ? result.length : 1;
+          
+          logger.info(`Inserted batch ${i + 1}/${batches} (${batch.length} documents)`);
+        }
+              }
+        
+        return insertedCount;
+    } catch (error) {
+      logger.error('Batch insert failed:', error);
+      throw error;
+    }
   }
 
   /**

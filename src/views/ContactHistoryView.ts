@@ -159,7 +159,7 @@ export class ContactHistoryView {
         contacts: this.formatContactHistoryList(contacts),
         summary: {
           totalContacts: contacts.length,
-          lastContact: contacts.length > 0 ? contacts[0].contactDate : null,
+          lastContact: contacts.length > 0 ? contacts[0]?.contactDate : null,
           contactTypes: this.getContactTypeSummary(contacts),
           pendingFollowUps: contacts.filter(c => c.followUpRequired).length
         }

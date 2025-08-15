@@ -371,7 +371,7 @@ export class AppointmentService {
         },
         date: date.toISOString().split('T')[0],
         availability,
-        appointments: appointments.map(apt => ({
+        appointments: appointments.map((apt: any) => ({
           id: apt._id,
           startDate: apt.startDate,
           endDate: apt.endDate,
@@ -405,7 +405,7 @@ export class AppointmentService {
 
       // Populate resource information
       const populatedAppointments = await Promise.all(
-        appointments.map(async (apt) => {
+        appointments.map(async (apt: any) => {
           const resource = await ResourceModel.findOne({ resourceId: apt.resourceId });
           return {
             ...apt.toObject(),

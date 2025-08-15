@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Model } from 'mongoose';
 
 export enum COBStatus {
   NO = 'NO',
@@ -23,6 +23,7 @@ export interface IInsuranceCOB extends Document {
   getCOBStatus(): COBStatus;
   getBooleanValue(): boolean;
   isPositive(): boolean;
+  checkAndSetDefault(): Promise<void>;
   getDisplayName(): string;
 }
 
@@ -198,7 +199,7 @@ InsuranceCOBSchema.pre('save', function(next) {
 
 // Helper method to check and set default
 InsuranceCOBSchema.methods.checkAndSetDefault = async function(): Promise<void> {
-  const existingDefault = await this.constructor.findOne({ isDefault: true });
+  const existingDefault = await (this.constructor as any).findOne({ isDefault: true });
   if (!existingDefault) {
     this.isDefault = true;
   }
@@ -208,7 +209,7 @@ InsuranceCOBSchema.methods.checkAndSetDefault = async function(): Promise<void> 
 InsuranceCOBSchema.pre('save', async function(next) {
   if (this.isDefault && this.isModified('isDefault')) {
     // Unset other defaults
-    await this.constructor.updateMany(
+    await (this.constructor as any).updateMany(
       { _id: { $ne: this._id } },
       { isDefault: false }
     );
@@ -216,4 +217,29 @@ InsuranceCOBSchema.pre('save', async function(next) {
   next();
 });
 
-export const InsuranceCOBModel = model<IInsuranceCOB>('InsuranceCOB', InsuranceCOBSchema);
+// Add static methods to the schema
+InsuranceCOBSchema.statics.getAllCOBOptions = function() {
+  return this.find({}).sort({ displayOrder: 1 });
+};
+
+InsuranceCOBSchema.statics.getByKey = function(cobKey: number) {
+  return this.findOne({ cobKey });
+};
+
+InsuranceCOBSchema.statics.getByValue = function(cobValue: boolean) {
+  return this.find({ cobValue }).sort({ displayOrder: 1 });
+};
+
+InsuranceCOBSchema.statics.getDefault = function() {
+  return this.findOne({ isDefault: true });
+};
+
+// InsuranceCOB model interface with static methods
+interface IInsuranceCOBModel extends Model<IInsuranceCOB> {
+  getAllCOBOptions(): any;
+  getByKey(key: number): any;
+  getByValue(value: boolean): any;
+  getDefault(): any;
+}
+
+export const InsuranceCOBModel = model<IInsuranceCOB, IInsuranceCOBModel>('InsuranceCOB', InsuranceCOBSchema);

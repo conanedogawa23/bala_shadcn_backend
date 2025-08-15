@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
-import { AppointmentService } from '@/services/AppointmentService';
-import { AppointmentView } from '@/views/AppointmentView';
-import { asyncHandler } from '@/utils/asyncHandler';
+import { AppointmentService } from '../services/AppointmentService';
+import { AppointmentView } from '../views/AppointmentView';
+import { asyncHandler } from '../utils/asyncHandler';
+import { validateRequiredString } from '../utils/mongooseHelpers';
 
 export class AppointmentController {
   /**
@@ -18,6 +19,7 @@ export class AppointmentController {
 
     // Extract parameters
     const { clinicName } = req.params;
+    const validClinicName = validateRequiredString(clinicName, 'Clinic Name');
     const { 
       startDate, 
       endDate, 
@@ -30,7 +32,7 @@ export class AppointmentController {
 
     // Call service layer
     const result = await AppointmentService.getAppointmentsByClinic({
-      clinicName,
+      clinicName: validClinicName,
       startDate: startDate ? new Date(startDate as string) : undefined,
       endDate: endDate ? new Date(endDate as string) : undefined,
       page: page ? Number(page) : undefined,
@@ -48,7 +50,7 @@ export class AppointmentController {
       result.total
     );
 
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -63,13 +65,14 @@ export class AppointmentController {
     }
 
     const { id } = req.params;
+    const validId = validateRequiredString(id, 'Appointment ID');
 
     // Call service layer
-    const appointment = await AppointmentService.getAppointmentById(id);
+    const appointment = await AppointmentService.getAppointmentById(validId);
 
     // Format response
     const response = AppointmentView.formatAppointment(appointment);
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -88,7 +91,7 @@ export class AppointmentController {
 
     // Format response
     const response = AppointmentView.formatAppointment(appointment);
-    res.status(201).json(response);
+    return res.status(201).json(response);
   });
 
   /**
@@ -103,13 +106,14 @@ export class AppointmentController {
     }
 
     const { id } = req.params;
+    const validId = validateRequiredString(id, 'Appointment ID');
 
     // Call service layer
-    const appointment = await AppointmentService.updateAppointment(id, req.body);
+    const appointment = await AppointmentService.updateAppointment(validId, req.body);
 
     // Format response
     const response = AppointmentView.formatAppointment(appointment);
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -124,14 +128,15 @@ export class AppointmentController {
     }
 
     const { id } = req.params;
+    const validId = validateRequiredString(id, 'Appointment ID');
     const { reason } = req.body;
 
     // Call service layer
-    await AppointmentService.cancelAppointment(id, reason);
+    await AppointmentService.cancelAppointment(validId, reason);
 
     // Format response
     const response = AppointmentView.formatSuccess('Appointment cancelled successfully');
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -146,14 +151,15 @@ export class AppointmentController {
     }
 
     const { id } = req.params;
+    const validId = validateRequiredString(id, 'Appointment ID');
     const { notes } = req.body;
 
     // Call service layer
-    const appointment = await AppointmentService.completeAppointment(id, notes);
+    const appointment = await AppointmentService.completeAppointment(validId, notes);
 
     // Format response
     const response = AppointmentView.formatAppointment(appointment);
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -167,7 +173,7 @@ export class AppointmentController {
 
     // Format response
     const response = AppointmentView.formatBillingAppointments(appointments);
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -192,7 +198,7 @@ export class AppointmentController {
 
     // Format response
     const response = AppointmentView.formatSuccess('Resource schedule retrieved', schedule);
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -207,13 +213,14 @@ export class AppointmentController {
     }
 
     const { clientId } = req.params;
+    const validClientId = validateRequiredString(clientId, 'Client ID');
 
     // Call service layer
-    const history = await AppointmentService.getClientAppointmentHistory(clientId);
+    const history = await AppointmentService.getClientAppointmentHistory(validClientId);
 
     // Format response
     const response = AppointmentView.formatClientHistory(history);
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -228,17 +235,18 @@ export class AppointmentController {
     }
 
     const { clinicName } = req.params;
+    const validClinicName = validateRequiredString(clinicName, 'Clinic Name');
     const { startDate, endDate } = req.query;
 
     // Call service layer
     const stats = await AppointmentService.getClinicAppointmentStats(
-      clinicName,
+      validClinicName,
       startDate ? new Date(startDate as string) : undefined,
       endDate ? new Date(endDate as string) : undefined
     );
 
     // Format response
     const response = AppointmentView.formatStats(stats);
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 }

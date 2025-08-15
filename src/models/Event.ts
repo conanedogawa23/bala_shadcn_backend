@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Model } from 'mongoose';
 
 export interface IEvent extends Document {
   eventId: number; // event_id from MSSQL
@@ -359,4 +359,56 @@ EventSchema.pre('save', function(next) {
   next();
 });
 
-export const EventModel = model<IEvent>('Event', EventSchema);
+// Add static methods to the schema
+EventSchema.statics.findUpcoming = function(limit: number = 50) {
+  const now = new Date();
+  return this.find({ 
+    eventDate: { $gte: now },
+    isApproved: true 
+  }).sort({ eventDate: 1 }).limit(limit);
+};
+
+EventSchema.statics.findByDateRange = function(startDate: Date, endDate: Date) {
+  return this.find({
+    eventDate: { $gte: startDate, $lte: endDate }
+  }).sort({ eventDate: 1 });
+};
+
+EventSchema.statics.findByClient = function(clientId: string) {
+  return this.find({ clientId }).sort({ eventDate: -1 });
+};
+
+EventSchema.statics.findByCategory = function(categoryId: string) {
+  return this.find({ categoryId }).sort({ eventDate: -1 });
+};
+
+EventSchema.statics.findByClinic = function(clinicName: string) {
+  return this.find({ clientClinicName: new RegExp(clinicName, 'i') }).sort({ eventDate: -1 });
+};
+
+EventSchema.statics.findPublicEvents = function(startDate?: Date, endDate?: Date) {
+  const query: any = { isPublic: true, isApproved: true };
+  
+  if (startDate && endDate) {
+    query.eventDate = { $gte: startDate, $lte: endDate };
+  }
+  
+  return this.find(query).sort({ eventDate: 1 });
+};
+
+EventSchema.statics.findPendingApproval = function() {
+  return this.find({ isApproved: false }).sort({ dateCreated: -1 });
+};
+
+// Event model interface with static methods
+interface IEventModel extends Model<IEvent> {
+  findUpcoming(daysAhead?: number): any;
+  findByDateRange(startDate: Date, endDate: Date): any;
+  findByClient(clientId: string): any;
+  findByCategory(categoryId: number): any;
+  findByClinic(clinicName: string): any;
+  findPublicEvents(startDate?: Date, endDate?: Date): any;
+  findPendingApproval(): any;
+}
+
+export const EventModel = model<IEvent, IEventModel>('Event', EventSchema);

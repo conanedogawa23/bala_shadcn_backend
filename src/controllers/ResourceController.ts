@@ -60,7 +60,7 @@ export class ResourceController {
 
     // Format response
     const response = ResourceView.formatResource(resource);
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -79,7 +79,7 @@ export class ResourceController {
 
     // Format response
     const response = ResourceView.formatResource(resource);
-    res.status(201).json(response);
+    return res.status(201).json(response);
   });
 
   /**
@@ -100,7 +100,7 @@ export class ResourceController {
 
     // Format response
     const response = ResourceView.formatResource(resource);
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -121,7 +121,7 @@ export class ResourceController {
 
     // Format response
     const response = ResourceView.formatSuccess('Resource deleted successfully');
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -167,13 +167,16 @@ export class ResourceController {
     }
 
     const { clinicName } = req.params;
+    if (!clinicName) {
+      return res.status(400).json({ error: 'Clinic name is required' });
+    }
 
     // Call service layer
     const resources = await ResourceService.getBookableResources(clinicName);
 
     // Format response
     const response = ResourceView.formatBookableResources(resources);
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -195,7 +198,7 @@ export class ResourceController {
 
     // Format response
     const response = ResourceView.formatResource(resource);
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -221,7 +224,7 @@ export class ResourceController {
 
     // Format response
     const response = ResourceView.formatSuccess('Resource availability retrieved', availability);
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 
   /**
@@ -247,6 +250,6 @@ export class ResourceController {
 
     // Format response
     const response = ResourceView.formatResourceStats(stats);
-    res.status(200).json(response);
+    return res.status(200).json(response);
   });
 }
