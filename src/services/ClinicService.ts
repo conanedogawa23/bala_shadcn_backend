@@ -1,285 +1,149 @@
-import { ClinicModel, IClinic } from '@/models/Clinic';
-import { NotFoundError, ValidationError, DatabaseError } from '@/utils/errors';
-import { logger } from '@/utils/logger';
+import { ValidationError } from '../utils/errors';
+
+export interface RetainedClinic {
+  name: string;
+  slug: string;
+  isActive: boolean;
+}
+
+export interface ClinicMapping {
+  [frontendSlug: string]: string; // Maps frontend slug to backend clinic name
+}
 
 export class ClinicService {
   /**
-   * Get all clinics with pagination and filtering
+   * CSV Requirement: Only retained clinics allowed
+   * Reuse from PaymentService to maintain consistency
    */
-  static async getAllClinics(params: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    city?: string;
-    province?: string;
-  }) {
-    try {
-      const {
-        page = 1,
-        limit = 20,
-        status,
-        city,
-        province
-      } = params;
+  private static readonly RETAINED_CLINICS = [
+    'BodyBlissPhysio',
+    'BodyBlissOneCare', 
+    'Century Care',
+    'Ortholine Duncan Mills',
+    'My Cloud',
+    'Physio Bliss'
+  ];
 
-      // Build query
-      const query: any = {};
-      
-      if (status) {
-        query.status = status;
-      }
-      
-      if (city) {
-        query['address.city'] = new RegExp(city, 'i');
-      }
-      
-      if (province) {
-        query['address.province'] = new RegExp(province, 'i');
-      }
+  /**
+   * Frontend slug to backend clinic name mapping
+   * Data-driven approach for clinic name resolution
+   */
+  private static readonly CLINIC_SLUG_MAPPING: ClinicMapping = {
+    'bodybliss-physio': 'BodyBlissPhysio',
+    'bodyblissphysio': 'BodyBlissPhysio', // Support both variations
+    'bodybliss-onecare': 'BodyBlissOneCare',
+    'bodyblissonecare': 'BodyBlissOneCare', // Support both variations
+    'century-care': 'Century Care',
+    'ortholine-duncan-mills': 'Ortholine Duncan Mills',
+    'my-cloud': 'My Cloud',
+    'physio-bliss': 'Physio Bliss'
+  };
 
-      // Execute query with pagination
-      const skip = (page - 1) * limit;
-      const [clinics, total] = await Promise.all([
-        ClinicModel.find(query)
-          .sort({ name: 1 })
-          .skip(skip)
-          .limit(limit)
-          .exec(),
-        ClinicModel.countDocuments(query)
-      ]);
+  /**
+   * Get all available (retained) clinics
+   * CSV: Under Clinic Name - retain the following
+   */
+  static getAvailableClinics(): RetainedClinic[] {
+    return this.RETAINED_CLINICS.map(clinicName => ({
+      name: clinicName,
+      slug: this.clinicNameToSlug(clinicName),
+      isActive: true
+    }));
+  }
 
-      return { clinics, page, limit, total };
-    } catch (error) {
-      logger.error('Error in getAllClinics:', error);
-      throw new DatabaseError('Failed to retrieve clinics', error as Error);
+  /**
+   * Get clinic slug to name mapping for frontend
+   * Enables frontend to convert slugs to proper backend names
+   */
+  static getClinicMapping(): ClinicMapping {
+    return { ...this.CLINIC_SLUG_MAPPING };
+  }
+
+  /**
+   * Validate if clinic is in retained list
+   * Throws ValidationError if not allowed
+   */
+  static validateClinicAccess(clinicName: string): void {
+    if (!this.RETAINED_CLINICS.includes(clinicName)) {
+      throw new ValidationError(`Clinic '${clinicName}' is not in the retained clinics list`);
     }
   }
 
   /**
-   * Get clinic by ID
+   * Convert frontend slug to backend clinic name
+   * Returns proper clinic name for API operations
    */
-  static async getClinicById(clinicId: number): Promise<IClinic> {
-    try {
-      const clinic = await ClinicModel.findOne({ clinicId });
-      
-      if (!clinic) {
-        throw new NotFoundError('Clinic', clinicId.toString());
-      }
-
-      return clinic;
-    } catch (error) {
-      if (error instanceof NotFoundError) {
-        throw error;
-      }
-      logger.error('Error in getClinicById:', error);
-      throw new DatabaseError('Failed to retrieve clinic', error as Error);
+  static slugToClinicName(slug: string): string {
+    const clinicName = this.CLINIC_SLUG_MAPPING[slug];
+    if (!clinicName) {
+      throw new ValidationError(`Invalid clinic slug: '${slug}'`);
     }
+    return clinicName;
   }
 
   /**
-   * Get clinic by name
+   * Convert clinic name to frontend slug
+   * For URL generation and routing
    */
-  static async getClinicByName(name: string): Promise<IClinic> {
-    try {
-      const clinic = await ClinicModel.findOne({ 
-        $or: [
-          { name: name },
-          { displayName: name }
-        ]
-      });
-      
-      if (!clinic) {
-        throw new NotFoundError('Clinic', name);
-      }
-
-      return clinic;
-    } catch (error) {
-      if (error instanceof NotFoundError) {
-        throw error;
-      }
-      logger.error('Error in getClinicByName:', error);
-      throw new DatabaseError('Failed to retrieve clinic by name', error as Error);
-    }
+  static clinicNameToSlug(clinicName: string): string {
+    return clinicName.toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
   }
 
   /**
-   * Create new clinic
+   * Check if clinic name exists in retained list
+   * Non-throwing validation for conditional logic
    */
-  static async createClinic(clinicData: any): Promise<IClinic> {
-    try {
-      // Validate required fields
-      if (!clinicData.name) {
-        throw new ValidationError('Clinic name is required');
-      }
-
-      if (!clinicData.clinicId) {
-        throw new ValidationError('Clinic ID is required');
-      }
-
-      // Check for duplicates
-      const existingById = await ClinicModel.findOne({ clinicId: clinicData.clinicId });
-      if (existingById) {
-        throw new ValidationError('Clinic with this ID already exists');
-      }
-
-      const existingByName = await ClinicModel.findOne({ name: clinicData.name });
-      if (existingByName) {
-        throw new ValidationError('Clinic with this name already exists');
-      }
-
-      // Set default values
-      const clinic = new ClinicModel({
-        ...clinicData,
-        displayName: clinicData.displayName || clinicData.name,
-        status: clinicData.status || 'active',
-        clientCount: 0,
-        stats: {
-          totalOrders: 0,
-          totalRevenue: 0
-        }
-      });
-
-      const savedClinic = await clinic.save();
-      logger.info(`Clinic created: ${savedClinic.name} (ID: ${savedClinic.clinicId})`);
-
-      return savedClinic;
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        throw error;
-      }
-      logger.error('Error in createClinic:', error);
-      throw new DatabaseError('Failed to create clinic', error as Error);
-    }
+  static isValidClinic(clinicName: string): boolean {
+    return this.RETAINED_CLINICS.includes(clinicName);
   }
 
   /**
-   * Update clinic
+   * Get clinic info by slug
+   * Returns clinic details for frontend consumption
    */
-  static async updateClinic(clinicId: number, updateData: any): Promise<IClinic> {
+  static getClinicBySlug(slug: string): RetainedClinic | null {
     try {
-      // Check if clinic exists
-      const existingClinic = await this.getClinicById(clinicId);
-
-      // If name is being updated, check for duplicates
-      if (updateData.name && updateData.name !== existingClinic.name) {
-        const duplicateClinic = await ClinicModel.findOne({ 
-          name: updateData.name,
-          clinicId: { $ne: clinicId } 
-        });
-        
-        if (duplicateClinic) {
-          throw new ValidationError('Clinic with this name already exists');
-        }
-      }
-
-      const updatedClinic = await ClinicModel.findOneAndUpdate(
-        { clinicId },
-        { 
-          ...updateData,
-          dateModified: new Date()
-        },
-        { new: true, runValidators: true }
-      );
-
-      logger.info(`Clinic updated: ${updatedClinic!.name} (ID: ${clinicId})`);
-      return updatedClinic!;
-    } catch (error) {
-      if (error instanceof ValidationError || error instanceof NotFoundError) {
-        throw error;
-      }
-      logger.error('Error in updateClinic:', error);
-      throw new DatabaseError('Failed to update clinic', error as Error);
-    }
-  }
-
-  /**
-   * Delete clinic (soft delete by setting status to inactive)
-   */
-  static async deleteClinic(clinicId: number): Promise<void> {
-    try {
-      const clinic = await this.getClinicById(clinicId);
-      
-      await ClinicModel.findOneAndUpdate(
-        { clinicId },
-        { 
-          status: 'inactive',
-          dateModified: new Date()
-        }
-      );
-
-      logger.info(`Clinic soft deleted: ${clinic.name} (ID: ${clinicId})`);
-    } catch (error) {
-      if (error instanceof NotFoundError) {
-        throw error;
-      }
-      logger.error('Error in deleteClinic:', error);
-      throw new DatabaseError('Failed to delete clinic', error as Error);
-    }
-  }
-
-  /**
-   * Get active clinics only
-   */
-  static async getActiveClinics(): Promise<IClinic[]> {
-    try {
-      return await ClinicModel.findActiveClinic();
-    } catch (error) {
-      logger.error('Error in getActiveClinics:', error);
-      throw new DatabaseError('Failed to retrieve active clinics', error as Error);
-    }
-  }
-
-  /**
-   * Get clinic statistics
-   */
-  static async getClinicStats(clinicId: number) {
-    try {
-      const clinic = await this.getClinicById(clinicId);
-      
-      // Here you would typically aggregate data from related collections
-      // For now, we'll return the stored stats
+      const clinicName = this.slugToClinicName(slug);
       return {
-        clinic: {
-          id: clinic.clinicId,
-          name: clinic.name,
-          displayName: clinic.displayName
-        },
-        stats: clinic.stats,
-        clientCount: clinic.clientCount,
-        status: clinic.status,
-        lastUpdated: clinic.dateModified
+        name: clinicName,
+        slug,
+        isActive: true
       };
-    } catch (error) {
-      if (error instanceof NotFoundError) {
-        throw error;
-      }
-      logger.error('Error in getClinicStats:', error);
-      throw new DatabaseError('Failed to retrieve clinic statistics', error as Error);
+    } catch {
+      return null;
     }
   }
 
+  // ========================
+  // COMPATIBILITY METHODS FOR EXISTING CODE
+  // ========================
+
   /**
-   * Update clinic statistics
+   * Get clinic by name - Compatibility method
+   * Returns a minimal clinic object for backward compatibility
+   */
+  static async getClinicByName(name: string): Promise<{ name: string; clinicId: number; displayName: string }> {
+    // Check if it's in our retained clinics
+    if (!this.RETAINED_CLINICS.includes(name)) {
+      throw new ValidationError(`Clinic '${name}' is not in the retained clinics list`);
+    }
+    
+    // Return minimal compatible object
+    return {
+      name,
+      clinicId: this.RETAINED_CLINICS.indexOf(name) + 1, // Simple ID mapping
+      displayName: name
+    };
+  }
+
+  /**
+   * Update clinic stats - Compatibility stub
+   * No-op for retained clinics as they don't use dynamic stats
    */
   static async updateClinicStats(clinicId: number, stats: any): Promise<void> {
-    try {
-      await ClinicModel.findOneAndUpdate(
-        { clinicId },
-        { 
-          $set: {
-            'stats.totalOrders': stats.totalOrders || 0,
-            'stats.totalRevenue': stats.totalRevenue || 0,
-            'stats.lastActivity': stats.lastActivity || new Date(),
-            clientCount: stats.clientCount || 0,
-            dateModified: new Date()
-          }
-        }
-      );
-
-      logger.info(`Clinic stats updated for clinic ID: ${clinicId}`);
-    } catch (error) {
-      logger.error('Error in updateClinicStats:', error);
-      throw new DatabaseError('Failed to update clinic statistics', error as Error);
-    }
+    // No-op: Retained clinics don't need dynamic stats updates
+    console.log(`Clinic stats update skipped for retained clinic ID: ${clinicId}`);
   }
 }

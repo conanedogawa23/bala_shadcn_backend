@@ -72,7 +72,6 @@ const appointmentFiltersValidation = [
   query('clientId')
     .optional()
     .trim()
-    .withMessage('Client ID must be a string')
 ];
 
 const createAppointmentValidation = [
@@ -271,7 +270,6 @@ router.get(
     query('clinicName')
       .optional()
       .trim()
-      .withMessage('Clinic name must be a string')
   ],
   AppointmentController.getAppointmentsReadyToBill
 );

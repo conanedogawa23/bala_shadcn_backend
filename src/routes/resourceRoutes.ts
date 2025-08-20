@@ -14,8 +14,8 @@ const resourceIdValidation = [
 const clinicNameValidation = [
   param('clinicName')
     .notEmpty()
-    .trim()
     .withMessage('Clinic name is required')
+    .trim()
 ];
 
 const paginationValidation = [
@@ -36,12 +36,10 @@ const resourceFiltersValidation = [
     .withMessage('Type must be one of: practitioner, service, equipment, room'),
   query('clinicName')
     .optional()
-    .trim()
-    .withMessage('Clinic name must be a string'),
+    .trim(),
   query('specialty')
     .optional()
-    .trim()
-    .withMessage('Specialty must be a string'),
+    .trim(),
   query('isActive')
     .optional()
     .isBoolean()
@@ -354,12 +352,10 @@ router.get(
   [
     query('clinicName')
       .optional()
-      .trim()
-      .withMessage('Clinic name must be a string'),
+      .trim(),
     query('specialty')
       .optional()
       .trim()
-      .withMessage('Specialty must be a string')
   ],
   ResourceController.getPractitioners
 );
@@ -375,7 +371,6 @@ router.get(
     query('category')
       .optional()
       .trim()
-      .withMessage('Category must be a string')
   ],
   ResourceController.getServices
 );
