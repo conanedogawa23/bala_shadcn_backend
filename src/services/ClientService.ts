@@ -2,6 +2,7 @@ import { ClientModel, IClient } from '@/models/Client';
 import { NotFoundError, ValidationError, DatabaseError } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import { ClinicService } from './ClinicService';
+import mongoose from 'mongoose';
 
 export class ClientService {
   /**
@@ -14,37 +15,83 @@ export class ClientService {
     search?: string;
     status?: string;
   }) {
+    // Extract parameters outside try block for error logging access
+    const {
+      clinicName: rawClinicName,
+      page = 1,
+      limit = 20,
+      search,
+      status
+    } = params;
+
+    // Declare clinic name variable outside try block
+    let actualClinicName: string = rawClinicName;
+
     try {
-      const {
-        clinicName,
-        page = 1,
-        limit = 20,
-        search,
-        status
-      } = params;
+      // Convert slug to proper clinic name if needed
+      try {
+        // First try direct conversion from slug to clinic name
+        actualClinicName = ClinicService.slugToClinicName(rawClinicName);
+      } catch (conversionError) {
+        // If that fails, assume it's already a proper clinic name
+        actualClinicName = rawClinicName;
+        logger.debug('Clinic name conversion failed, using raw name:', { rawClinicName, error: conversionError });
+      }
 
-      // Verify clinic exists
-      await ClinicService.getClinicByName(clinicName);
+      // Verify clinic exists using the converted name
+      await ClinicService.getClinicByName(actualClinicName);
 
-      // Build query
-      const query: any = {
-        defaultClinic: clinicName
+      // Verify database connection
+      if (mongoose.connection.readyState !== 1) {
+        throw new DatabaseError('Database connection not ready', new Error(`Connection state: ${mongoose.connection.readyState}`));
+      }
+
+      // Build query using the converted clinic name
+      // Check multiple fields to handle different data formats:
+      // - defaultClinic: newer format
+      // - clinicId: older format  
+      // - clinics: array format
+      const clinicQuery = {
+        $or: [
+          { defaultClinic: actualClinicName },
+          { clinicId: actualClinicName },
+          { clinics: actualClinicName }
+        ]
       };
+
+      // Start with clinic filter
+      const query: any = { ...clinicQuery };
 
       if (status === 'active' || status === 'inactive') {
         query.isActive = status === 'active';
       }
 
-      // Add search functionality
+      // Add search functionality using $and to combine with clinic filter
       if (search) {
-        query.$or = [
-          { 'personalInfo.firstName': new RegExp(search, 'i') },
-          { 'personalInfo.lastName': new RegExp(search, 'i') },
-          { 'personalInfo.fullName': new RegExp(search, 'i') },
-          { 'contact.email': new RegExp(search, 'i') },
-          { clientId: new RegExp(search, 'i') }
-        ];
+        const searchQuery = {
+          $or: [
+            { 'personalInfo.firstName': new RegExp(search, 'i') },
+            { 'personalInfo.lastName': new RegExp(search, 'i') },
+            { 'personalInfo.fullName': new RegExp(search, 'i') },
+            { 'contact.email': new RegExp(search, 'i') },
+            { clientId: new RegExp(search, 'i') }
+          ]
+        };
+        
+        // Combine clinic filter and search filter using $and
+        query.$and = [clinicQuery, searchQuery];
+        delete query.$or; // Remove the top-level $or since we're using $and now
       }
+
+      logger.debug('ClientService query details:', { 
+        rawClinicName, 
+        actualClinicName, 
+        query, 
+        page, 
+        limit,
+        search,
+        status 
+      });
 
       // Execute query with pagination
       const skip = (page - 1) * limit;
@@ -62,7 +109,12 @@ export class ClientService {
       if (error instanceof NotFoundError) {
         throw error;
       }
-      logger.error('Error in getClientsByClinic:', error);
+      logger.error('Error in getClientsByClinic:', {
+        rawClinicName,
+        actualClinicName: actualClinicName || 'undefined',
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined
+      });
       throw new DatabaseError('Failed to retrieve clients', error as Error);
     }
   }

@@ -11,10 +11,10 @@ export class ClinicView {
       displayName: clinic.displayName,
       completeName: clinic.completeName,
       address: {
-        street: clinic.address.street,
-        city: clinic.address.city,
-        province: clinic.address.province,
-        postalCode: clinic.address.postalCode,
+        street: clinic.address?.[0]?.line?.join(', ') || '',
+        city: clinic.address?.[0]?.city || '',
+        province: clinic.address?.[0]?.state || '',
+        postalCode: clinic.address?.[0]?.postalCode || '',
         fullAddress: clinic.getFullAddress()
       },
       contact: clinic.contact,
@@ -36,10 +36,10 @@ export class ClinicView {
       id: clinic.clinicId,
       name: clinic.name,
       displayName: clinic.displayName,
-      address: clinic.address.street,
-      city: clinic.address.city,
-      province: clinic.address.province,
-      postalCode: clinic.address.postalCode,
+      address: clinic.address?.[0]?.line?.join(', ') || '',
+      city: clinic.address?.[0]?.city || '',
+      province: clinic.address?.[0]?.state || '',
+      postalCode: clinic.address?.[0]?.postalCode || '',
       status: clinic.status,
       lastActivity: clinic.stats.lastActivity?.toISOString().split('T')[0],
       totalAppointments: clinic.stats.totalOrders, // Map orders to appointments
@@ -77,8 +77,8 @@ export class ClinicView {
       status: clinic.status,
       isActive: clinic.isActive(),
       clientCount: clinic.clientCount,
-      city: clinic.address.city,
-      province: clinic.address.province
+      city: clinic.address?.[0]?.city || '',
+      province: clinic.address?.[0]?.state || ''
     };
   }
 

@@ -40,10 +40,10 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-// Rate limiting
+// Rate limiting - more lenient in development
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || (process.env.NODE_ENV === 'development' ? '1000' : '100')), // Higher limit in dev
   message: {
     success: false,
     error: {
@@ -53,8 +53,13 @@ const limiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: process.env.NODE_ENV === 'development' ? () => false : undefined, // Never skip in dev, but allow override in production
 });
-app.use('/api/', limiter);
+
+// Only apply rate limiting in production or when explicitly enabled
+if (process.env.NODE_ENV === 'production' || process.env.ENABLE_RATE_LIMITING === 'true') {
+  app.use('/api/', limiter);
+}
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

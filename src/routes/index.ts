@@ -8,6 +8,13 @@ import insuranceCompanyAddressRoutes from './insuranceCompanyAddressRoutes';
 import eventRoutes from './eventRoutes';
 import advancedBillingRoutes from './advancedBillingRoutes';
 import insuranceReferenceRoutes from './insuranceReferenceRoutes';
+import productRoutes from './productRoutes';
+import orderRoutes from './orderRoutes';
+import paymentRoutes from './paymentRoutes';
+import authRoutes from './authRoutes';
+import userRoutes from './userRoutes';
+import reportRoutes from './reportRoutes';
+import { authenticate, optionalAuthenticate, trackActivity } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -33,6 +40,8 @@ router.get('/', (req: Request, res: Response) => {
     endpoints: {
       health: '/health',
       status: '/api/v1/status',
+      auth: '/api/v1/auth',
+      users: '/api/v1/users',
       clinics: '/api/v1/clinics',
       clients: '/api/v1/clients',
       appointments: '/api/v1/appointments',
@@ -43,7 +52,11 @@ router.get('/', (req: Request, res: Response) => {
       events: '/api/v1/events',
       contactHistory: '/api/v1/contact-history',
       advancedBilling: '/api/v1/advanced-billing',
-      insuranceReference: '/api/v1/insurance-reference'
+      insuranceReference: '/api/v1/insurance-reference',
+      products: '/api/v1/products',
+      orders: '/api/v1/orders',
+      payments: '/api/v1/payments',
+      reports: '/api/v1/reports'
     }
   });
 });
@@ -79,6 +92,37 @@ router.get('/docs', (req: Request, res: Response) => {
     
     // Core Healthcare Management Endpoints
     endpoints: {
+      // 🔐 Authentication & Security
+      'POST /auth/register': {
+        description: 'Register new user account',
+        parameters: ['username', 'email', 'password', 'confirmPassword', 'firstName', 'lastName', 'phone', 'role', 'clinics']
+      },
+      'POST /auth/login': {
+        description: 'User login with email and password',
+        parameters: ['email', 'password', 'deviceId', 'rememberMe']
+      },
+      'POST /auth/refresh': 'Refresh access token using refresh token',
+      'POST /auth/logout': 'Logout from current session',
+      'POST /auth/logout-all': 'Logout from all devices/sessions',
+      'GET /auth/profile': 'Get current user profile',
+      'PUT /auth/password': 'Change user password',
+      'POST /auth/forgot-password': 'Request password reset email',
+      'POST /auth/reset-password': 'Reset password with token',
+      'GET /auth/verify-email/:token': 'Verify email address',
+      
+      // 👥 User Management (Admin)
+      'GET /users': {
+        description: 'Get all users with filtering and pagination',
+        parameters: ['page', 'limit', 'search', 'role', 'status', 'clinicName', 'sortBy', 'sortOrder']
+      },
+      'GET /users/stats': 'Get user statistics and analytics',
+      'GET /users/:id': 'Get user by ID',
+      'POST /users': 'Create new user (Admin only)',
+      'PUT /users/:id': 'Update user (Admin or self)',
+      'DELETE /users/:id': 'Delete user (Admin only)',
+      'PUT /users/:id/status': 'Update user status (Admin only)',
+      'PUT /users/:id/unlock': 'Unlock user account (Admin only)',
+      
       // Clinic Management
       'GET /clinics': {
         description: 'Get all clinics with pagination and filtering',
@@ -122,6 +166,64 @@ router.get('/docs', (req: Request, res: Response) => {
       'GET /appointments/resource/:resourceId/schedule': 'Get resource schedule for a specific date',
       'GET /appointments/client/:clientId/history': 'Get client appointment history',
       'GET /appointments/clinic/:clinicName/stats': 'Get clinic appointment statistics',
+      
+      // 🆕 Product Management
+      'GET /products': {
+        description: 'Get all products with filtering and pagination',
+        parameters: ['page', 'limit', 'category', 'status', 'clinicName', 'search', 'sortBy', 'sortOrder']
+      },
+      'GET /products/popular': 'Get popular products by usage statistics',
+      'GET /products/search': 'Search products by name or description',
+      'GET /products/analytics': 'Get product analytics by category',
+      'GET /products/category/:category': 'Get products by category',
+      'GET /products/clinic/:clinicName': 'Get products available for specific clinic',
+      'GET /products/:id': 'Get product by ID or ProductKey',
+      'POST /products': 'Create new product',
+      'PUT /products/:id': 'Update product',
+      'DELETE /products/:id': 'Deactivate product (soft delete)',
+      
+      // 🆕 Order Management & Billing
+      'GET /orders': {
+        description: 'Get all orders with comprehensive filtering',
+        parameters: ['page', 'limit', 'status', 'paymentStatus', 'clinicName', 'clientId', 'startDate', 'endDate', 'search', 'readyToBill']
+      },
+      'GET /orders/billing/ready': 'Get orders ready for billing',
+      'GET /orders/billing/overdue': 'Get overdue orders',
+      'GET /orders/analytics/revenue': 'Get revenue analytics for clinic',
+      'GET /orders/analytics/products': 'Get product performance analytics',
+      'GET /orders/client/:clientId': 'Get orders by client ID',
+      'GET /orders/clinic/:clinicName': 'Get orders by clinic with date range',
+      'GET /orders/:id': 'Get order by ID or Order Number',
+      'POST /orders': 'Create new order',
+      'PUT /orders/:id': 'Update order',
+      'PUT /orders/:id/status': 'Update order status with validation',
+      'PUT /orders/:id/billing/ready': 'Mark order ready for billing',
+      'POST /orders/:id/payment': 'Process payment for order',
+      'PUT /orders/:id/cancel': 'Cancel order with reason',
+      
+      // 📊 Reports & Analytics (VISIO Compliance)
+      'GET /reports/:clinicName/available': 'Get all available reports for clinic',
+      'GET /reports/:clinicName/account-summary': {
+        description: 'Account Summary Report - comprehensive clinic performance overview',
+        parameters: ['startDate', 'endDate']
+      },
+      'GET /reports/:clinicName/payment-summary': {
+        description: 'Payment Summary by Day Range - detailed payment analysis',
+        parameters: ['startDate', 'endDate']
+      },
+      'GET /reports/:clinicName/timesheet': {
+        description: 'Time Sheet Report - practitioner hours and utilization',
+        parameters: ['startDate', 'endDate']
+      },
+      'GET /reports/:clinicName/order-status': 'Order Status Report - current status of all orders',
+      'GET /reports/:clinicName/copay-summary': {
+        description: 'Co Pay Summary Report - insurance co-payment analysis',
+        parameters: ['startDate', 'endDate']
+      },
+      'GET /reports/:clinicName/marketing-budget': {
+        description: 'Marketing Budget Summary Report - marketing spend and ROI analysis',
+        parameters: ['startDate', 'endDate']
+      },
       
       // 🆕 Resource Management (Practitioners & Services)
       'GET /resources': {
@@ -230,14 +332,28 @@ router.get('/docs', (req: Request, res: Response) => {
 });
 
 // Mount route modules
-router.use('/clinics', clinicRoutes);
-router.use('/clients', clientRoutes);
-router.use('/appointments', appointmentRoutes);
-router.use('/resources', resourceRoutes);
-router.use('/contact-history', contactHistoryRoutes);
-router.use('/insurance-addresses', insuranceCompanyAddressRoutes);
-router.use('/events', eventRoutes);
-router.use('/advanced-billing', advancedBillingRoutes);
-router.use('/insurance-reference', insuranceReferenceRoutes);
+
+// Public routes (no authentication required)
+router.use('/auth', authRoutes);
+
+// Admin routes (authentication + admin permissions required)
+router.use('/users', userRoutes);
+
+// Temporarily public routes until authentication is implemented
+router.use('/clinics', clinicRoutes); // Public routes for clinic validation and discovery
+router.use('/clients', clientRoutes); // Core business functionality
+router.use('/appointments', appointmentRoutes); // Core business functionality
+router.use('/products', productRoutes); // Core business functionality  
+router.use('/orders', orderRoutes); // Core business functionality
+router.use('/payments', paymentRoutes); // Core business functionality
+router.use('/events', eventRoutes); // Core business functionality
+router.use('/reports', reportRoutes); // Core business functionality
+
+// Still protected routes (less commonly used)
+router.use('/resources', authenticate, trackActivity, resourceRoutes);
+router.use('/contact-history', authenticate, trackActivity, contactHistoryRoutes);
+router.use('/insurance-addresses', authenticate, trackActivity, insuranceCompanyAddressRoutes);
+router.use('/advanced-billing', authenticate, trackActivity, advancedBillingRoutes);
+router.use('/insurance-reference', authenticate, trackActivity, insuranceReferenceRoutes);
 
 export default router;

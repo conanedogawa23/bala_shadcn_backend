@@ -51,6 +51,31 @@ export class ClientView {
       year: ''
     };
 
+    // Extract phone number safely from nested structure
+    let phone = '';
+    if (client.contact?.phones?.cell?.full) {
+      phone = client.contact.phones.cell.full;
+    } else if (client.contact?.phones?.home?.full) {
+      phone = client.contact.phones.home.full;
+    } else if (typeof client.contact?.phones?.cell === 'string') {
+      // Handle legacy string format
+      phone = client.contact.phones.cell;
+    } else if (typeof client.contact?.phones?.home === 'string') {
+      // Handle legacy string format
+      phone = client.contact.phones.home;
+    }
+
+    // Determine clinic name from multiple possible fields
+    let clinic = '';
+    
+    if (client.defaultClinic) {
+      clinic = client.defaultClinic;
+    } else if (client.clinicId) {
+      clinic = client.clinicId;
+    } else if (client.clinics && client.clinics.length > 0 && client.clinics[0]) {
+      clinic = client.clinics[0];
+    }
+
     return {
       id: client.clientId,
       name: client.getFullName(),
@@ -58,11 +83,15 @@ export class ClientView {
       lastName: client.personalInfo.lastName,
       birthday,
       gender: client.personalInfo.gender,
-      city: client.contact.address.city,
-      province: client.contact.address.province,
-      phone: client.contact.phones.cell || client.contact.phones.home || '',
-      email: client.contact.email || '',
-      clinic: client.defaultClinic
+      city: client.contact?.address?.city || '',
+      province: client.contact?.address?.province || '',
+      phone,
+      email: client.contact?.email || '',
+      clinic,
+      status: client.isActive ? 'active' : 'inactive',
+      dateOfBirth: dateOfBirth ? dateOfBirth.toISOString() : '',
+      createdAt: client.dateCreated ? client.dateCreated.toISOString() : '',
+      updatedAt: client.dateModified ? client.dateModified.toISOString() : ''
     };
   }
 

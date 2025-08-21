@@ -97,6 +97,7 @@ export interface IClient extends Document {
   insurance: IInsurance[]; // Up to 3 insurance plans
   clinics: string[]; // Associated clinic names
   defaultClinic: string; // sb_default_clinic
+  clinicId?: string; // Legacy field for older records
   isActive: boolean;
   dateCreated: Date; // sb_clients_date_created
   dateModified: Date;
@@ -341,6 +342,11 @@ const ClientSchema = new Schema<IClient>({
   defaultClinic: {
     type: String,
     required: true,
+    trim: true,
+    index: true
+  },
+  clinicId: {
+    type: String,
     trim: true,
     index: true
   },
