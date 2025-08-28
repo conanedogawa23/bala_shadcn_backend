@@ -13,11 +13,63 @@ interface AuthenticatedRequest extends Request {
 }
 
 export class PaymentController {
+
+  /**
+   * Helper method to find payment by ID (supports both ObjectId and paymentNumber)
+   */
+    private static async findPaymentById(id: string): Promise<any> {
+    console.log(`Helper findPaymentById called with: ${id}`);
+    
+    let payment;
+    
+    // Try to find by MongoDB _id first
+    console.log(`Searching by ObjectId: ${id}`);
+    try {
+      payment = await PaymentModel.findById(id)
+        .populate('orderId', 'orderNumber status clientId clientName totalAmount')
+        .populate('createdBy', 'username email')
+        .populate('updatedBy', 'username email');
+      console.log(`ObjectId search result: ${payment ? 'found' : 'not found'}`);
+    } catch (objectIdError) {
+      console.log('ObjectId search failed, trying other methods...');
+    }
+    
+    // If not found by ObjectId, try paymentId
+    if (!payment) {
+      console.log(`Searching by paymentId: ${id}`);
+      try {
+        payment = await PaymentModel.findOne({ paymentId: id })
+          .populate('orderId', 'orderNumber status clientId clientName totalAmount')
+          .populate('createdBy', 'username email')
+          .populate('updatedBy', 'username email');
+        console.log(`PaymentId search result: ${payment ? 'found' : 'not found'}`);
+      } catch (paymentIdError) {
+        console.log('PaymentId search failed, trying paymentNumber...');
+      }
+    }
+    
+    // If still not found, try paymentNumber as final fallback
+    if (!payment) {
+      console.log(`Fallback: Searching by paymentNumber: ${id}`);
+      try {
+        payment = await PaymentModel.findOne({ paymentNumber: id })
+          .populate('orderId', 'orderNumber status clientId clientName totalAmount')
+          .populate('createdBy', 'username email')
+          .populate('updatedBy', 'username email');
+        console.log(`PaymentNumber fallback result: ${payment ? 'found' : 'not found'}`);
+      } catch (paymentNumberError) {
+        console.error('All search methods failed:', paymentNumberError);
+      }
+    }
+    
+    return payment;
+  }
+
   /**
    * @route   GET /api/v1/payments
    * @desc    Get all payments with filtering and pagination
    * @access  Private
-   * @params  page, limit, status, paymentMethod, paymentType, clinicName, clientId, startDate, endDate, outstanding
+   * @params  page, limit, status, paymentMethod, paymentType, clinicName, clientId, orderNumber, orderId, startDate, endDate, outstanding
    */
   static async getAllPayments(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
@@ -29,6 +81,8 @@ export class PaymentController {
         paymentType,
         clinicName,
         clientId,
+        orderNumber,
+        orderId,
         startDate,
         endDate,
         outstanding
@@ -52,6 +106,16 @@ export class PaymentController {
         filter.clinicName = actualClinicName;
       }
       if (clientId) filter.clientId = Number(clientId);
+      if (orderNumber) filter.orderNumber = orderNumber as string;
+      if (orderId) {
+        // Handle ObjectId filtering for orderId
+        try {
+          filter.orderId = new Types.ObjectId(orderId as string);
+        } catch (error) {
+          // If invalid ObjectId, filter will not match anything
+          filter.orderId = null;
+        }
+      }
       if (outstanding === 'true') filter['amounts.totalOwed'] = { $gt: 0 };
 
       // Date range filter
@@ -62,7 +126,7 @@ export class PaymentController {
       }
 
       const skip = (Number(page) - 1) * Number(limit);
-      
+
       const [payments, total] = await Promise.all([
         PaymentModel.find(filter)
           .populate('orderId', 'orderNumber status clientId')
@@ -98,14 +162,14 @@ export class PaymentController {
 
   /**
    * @route   GET /api/v1/payments/:id
-   * @desc    Get payment by ID
+   * @desc    Get payment by ID (accepts both MongoDB _id and paymentNumber)
    * @access  Private
    */
   static async getPaymentById(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      
-      if (!id) {
+
+      if (!id || id.trim().length === 0) {
         res.status(400).json({
           success: false,
           message: 'Payment ID is required'
@@ -113,10 +177,9 @@ export class PaymentController {
         return;
       }
 
-      const payment = await PaymentModel.findById(id)
-        .populate('orderId', 'orderNumber status clientId clientName totalAmount')
-        .populate('createdBy', 'username email')
-        .populate('updatedBy', 'username email');
+      console.log(`PaymentController.getPaymentById called with ID: ${id}`);
+
+      const payment = await PaymentController.findPaymentById(id);
 
       if (!payment) {
         res.status(404).json({
@@ -126,12 +189,48 @@ export class PaymentController {
         return;
       }
 
+            // Transform payment data for frontend compatibility
+      const paymentData = payment.toObject();
+      
+      // Handle both data formats: direct fields vs nested amounts object
+      if (paymentData.amounts && paymentData.amounts.totalPaymentAmount !== undefined) {
+        // Legacy format with amounts object
+        paymentData.total = paymentData.amounts.totalPaymentAmount;
+        paymentData.amountPaid = paymentData.amounts.totalPaid;
+        paymentData.amountDue = paymentData.amounts.totalOwed;
+      } else {
+        // New format with direct fields - ensure they exist or set defaults
+        paymentData.total = paymentData.total || 0;
+        paymentData.amountPaid = paymentData.amountPaid || 0;
+        paymentData.amountDue = paymentData.amountDue || 0;
+      }
+
+      // Add alias fields (preserve original paymentId from database)
+      if (!paymentData.paymentId) {
+        paymentData.paymentId = paymentData._id; // Fallback to _id if no paymentId
+      }
+      paymentData.invoiceNumber = paymentData.invoiceNumber || paymentData.paymentNumber;
+
+      console.log(`Successfully found payment: ${paymentData.paymentNumber}`);
+
       res.json({
         success: true,
-        data: payment
+        data: paymentData
       });
     } catch (error) {
       console.error('Error fetching payment:', error);
+
+      // Enhanced error handling
+      if (error instanceof Error) {
+        if (error.name === 'CastError') {
+          res.status(400).json({
+            success: false,
+            message: 'Invalid payment ID format'
+          });
+          return;
+        }
+      }
+
       res.status(500).json({
         success: false,
         message: 'Failed to fetch payment',
@@ -523,9 +622,9 @@ export class PaymentController {
         PaymentModel.getPaymentStats(clinicName),
         PaymentModel.getPaymentMethodStats(clinicName),
         PaymentModel.getTotalRevenue(clinicName),
-        PaymentModel.countDocuments({ 
-          clinicName, 
-          'amounts.totalOwed': { $gt: 0 } 
+        PaymentModel.countDocuments({
+          clinicName,
+          'amounts.totalOwed': { $gt: 0 }
         })
       ]);
 
@@ -569,16 +668,16 @@ export class PaymentController {
       const skip = (Number(page) - 1) * Number(limit);
 
       const [payments, total] = await Promise.all([
-        PaymentModel.find({ 
-          clinicName, 
-          'amounts.totalOwed': { $gt: 0 } 
+        PaymentModel.find({
+          clinicName,
+          'amounts.totalOwed': { $gt: 0 }
         })
-        .sort({ paymentDate: 1 })
-        .skip(skip)
-        .limit(Number(limit)),
-        PaymentModel.countDocuments({ 
-          clinicName, 
-          'amounts.totalOwed': { $gt: 0 } 
+          .sort({ paymentDate: 1 })
+          .skip(skip)
+          .limit(Number(limit)),
+        PaymentModel.countDocuments({
+          clinicName,
+          'amounts.totalOwed': { $gt: 0 }
         })
       ]);
 

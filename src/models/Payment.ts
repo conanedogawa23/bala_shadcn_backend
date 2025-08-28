@@ -73,7 +73,8 @@ export interface IPayment extends Document {
   _id: Types.ObjectId;
   
   // Core Payment Information (based on MSSQL structure)
-  paymentNumber: string;           // sb_payment_number (auto-generated)
+  paymentNumber?: string;          // sb_payment_number (auto-generated) - optional for backwards compatibility
+  paymentId?: string;              // Primary payment identifier (actual database field)
   orderNumber?: string;            // sb_order_number
   clientId: number;                // sb_client_id (matches MSSQL)
   clientName?: string;             // Derived from clientId
@@ -150,10 +151,19 @@ const PaymentAmountsSchema = new Schema<IPaymentAmounts>({
 const PaymentSchema = new Schema<IPayment>({
   paymentNumber: {
     type: String,
-    required: true,
+    required: false, // Made optional since data uses paymentId
     unique: true,
     trim: true,
-    index: true
+    index: true,
+    sparse: true // Allow multiple null values
+  },
+  paymentId: {
+    type: String,
+    required: false, // Made optional for backwards compatibility
+    unique: true,
+    trim: true,
+    index: true,
+    sparse: true // Allow multiple null values
   },
   orderNumber: {
     type: String,
