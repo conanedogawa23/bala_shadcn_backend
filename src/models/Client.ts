@@ -198,12 +198,10 @@ const ClientSchema = new Schema<IClient>({
     type: String,
     required: true,
     unique: true,
-    trim: true,
-    index: true
+    trim: true
   },
   clientKey: {
-    type: Number,
-    index: true
+    type: Number
   },
   personalInfo: {
     firstName: {
@@ -342,23 +340,19 @@ const ClientSchema = new Schema<IClient>({
   defaultClinic: {
     type: String,
     required: true,
-    trim: true,
-    index: true
+    trim: true
   },
   clinicId: {
     type: String,
-    trim: true,
-    index: true
+    trim: true
   },
   isActive: {
     type: Boolean,
-    default: true,
-    index: true
+    default: true
   },
   dateCreated: {
     type: Date,
-    default: Date.now,
-    index: true
+    default: Date.now
   },
   dateModified: {
     type: Date,
