@@ -11,13 +11,6 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --watchAll=false",
-    "test:appointments": "jest AppointmentController.test.ts",
-    "test:resources": "jest ResourceController.test.ts",
-    "test:clients": "jest ClientController.test.ts",
-    "test:clinics": "jest ClinicController.test.ts",
-    "migrate": "ts-node src/migrations/index.ts",
-    "migrate:dry": "ts-node src/migrations/index.ts --dry-run",
-    "migrate:clients": "ts-node src/migrations/ClientMigration.ts",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix"
   },
@@ -46,7 +39,10 @@
     "mongoose": "^8.0.3",
     "morgan": "^1.10.0",
     "mssql": "^10.0.1",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "colors": "^1.4.0",
+    "progress": "^2.0.3",
+    "mongodb": "^6.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
