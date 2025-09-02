@@ -35,7 +35,7 @@ app.use(helmet({
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://cd923b6c2ed5.ngrok-free.app',
+  origin: process.env.FRONTEND_URL || 'https://2cd1ee6f3ee9.ngrok.app',
   credentials: true,
   optionsSuccessStatus: 200
 }));

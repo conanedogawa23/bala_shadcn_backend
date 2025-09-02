@@ -58,7 +58,10 @@ export class ProductController {
       }
       
       if (clinicName) {
-        filter.clinics = clinicName;
+        filter.$or = [
+          { clinics: clinicName },
+          { applicableClinics: clinicName }
+        ];
       }
 
       if (search) {
@@ -170,7 +173,10 @@ export class ProductController {
       const { status = ProductStatus.ACTIVE } = req.query as ProductQuery;
 
       const products = await Product.find({
-        clinics: clinicName,
+        $or: [
+          { clinics: clinicName },
+          { applicableClinics: clinicName }
+        ],
         status,
         isActive: true
       }).sort({ name: 1 });
