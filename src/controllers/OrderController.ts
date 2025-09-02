@@ -220,12 +220,23 @@ export class OrderController {
   }
 
   /**
-   * Get orders by clinic with date range
+   * Get orders by clinic with date range and pagination
    */
   static async getOrdersByClinic(req: Request, res: Response): Promise<void> {
     try {
       const { clinicName: rawClinicName } = req.params;
-      const { startDate, endDate, status } = req.query as OrderQuery;
+      const {
+        page = '1',
+        limit = '20',
+        startDate,
+        endDate,
+        status,
+        search
+      } = req.query as OrderQuery;
+
+      const pageNum = Math.max(1, parseInt(page));
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+      const skip = (pageNum - 1) * limitNum;
 
       // Convert slug to proper clinic name if needed
       let actualClinicName: string = rawClinicName || '';
@@ -242,6 +253,7 @@ export class OrderController {
         filter.status = status;
       }
 
+      // Date range filter
       if (startDate || endDate) {
         filter.serviceDate = {};
         if (startDate) {
@@ -252,12 +264,38 @@ export class OrderController {
         }
       }
 
-      const orders = await Order.find(filter)
-        .sort({ serviceDate: 1 });
+      // Search filter
+      if (search) {
+        const searchRegex = new RegExp(search, 'i');
+        filter.$or = [
+          { clientName: searchRegex },
+          { orderNumber: searchRegex },
+          { description: searchRegex },
+          { 'items.productName': searchRegex }
+        ];
+      }
+
+      // Execute queries in parallel for better performance
+      const [orders, total] = await Promise.all([
+        Order.find(filter)
+          .sort({ serviceDate: -1 })
+          .skip(skip)
+          .limit(limitNum)
+          .lean(),
+        Order.countDocuments(filter)
+      ]);
+
+      const totalPages = Math.ceil(total / limitNum);
 
       const response: OrderResponse = {
         success: true,
-        data: orders
+        data: orders,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages
+        }
       };
 
       res.status(200).json(response);
