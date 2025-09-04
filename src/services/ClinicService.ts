@@ -13,11 +13,12 @@ export interface ClinicMapping {
 export class ClinicService {
   /**
    * CSV Requirement: Only retained clinics allowed
-   * Reuse from PaymentService to maintain consistency
+   * Updated to match actual MongoDB clinic names
    */
   private static readonly RETAINED_CLINICS = [
-    'BodyBlissPhysio',
-    'BodyBlissOneCare', 
+    'BodyBliss',           // MongoDB: name="BodyBliss", displayName="BodyBliss"
+    'BodyBlissOneCare',    // MongoDB: name="BodyBlissOneCare", displayName="BodyBlissOneCare"
+    'bodyblissphysio',     // MongoDB: name="bodyblissphysio", displayName="BodyBliss Physiotherapy"
     'Century Care',
     'Ortholine Duncan Mills',
     'My Cloud',
@@ -26,13 +27,14 @@ export class ClinicService {
 
   /**
    * Frontend slug to backend clinic name mapping
-   * Data-driven approach for clinic name resolution
+   * Updated to match actual MongoDB clinic names
    */
   private static readonly CLINIC_SLUG_MAPPING: ClinicMapping = {
-    'bodybliss-physio': 'BodyBlissPhysio',
-    'bodyblissphysio': 'BodyBlissPhysio', // Support both variations
-    'bodybliss-onecare': 'BodyBlissOneCare',
-    'bodyblissonecare': 'BodyBlissOneCare', // Support both variations
+    'bodybliss': 'BodyBliss',                    // MongoDB: name="BodyBliss"
+    'bodybliss-physio': 'bodyblissphysio',       // MongoDB: name="bodyblissphysio"  
+    'bodyblissphysio': 'bodyblissphysio',        // Support both variations
+    'bodybliss-onecare': 'BodyBlissOneCare',     // MongoDB: name="BodyBlissOneCare"
+    'bodyblissonecare': 'BodyBlissOneCare',      // Support both variations
     'century-care': 'Century Care',
     'ortholine-duncan-mills': 'Ortholine Duncan Mills',
     'my-cloud': 'My Cloud',
