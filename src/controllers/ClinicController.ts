@@ -1,8 +1,102 @@
 import { Request, Response } from 'express';
 import { ClinicService } from '../services/ClinicService';
+import { ClinicModel } from '../models/Clinic';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export class ClinicController {
+  /**
+   * Get all available clinics with full data
+   * GET /api/v1/clinics/frontend-compatible
+   */
+  static getClinicsFrontendCompatible = asyncHandler(async (req: Request, res: Response) => {
+    try {
+      // Get retained clinics from MongoDB with full data
+      const retainedClinics = await ClinicModel.findRetainedClinics();
+      
+      // Create proper slug and backend name mapping
+      const generateProperSlug = (clinicName: string, displayName: string): string => {
+        // Special mappings for known clinics to match frontend expectations
+        const specialMappings: Record<string, string> = {
+          'bodyblissphysio': 'bodybliss-physio',
+          'BodyBliss': 'bodybliss',
+          'BodyBlissOneCare': 'bodybliss-onecare',
+          'Ortholine Duncan Mills': 'ortholine-duncan-mills',
+          'Physio Bliss': 'physio-bliss',
+          'My Cloud': 'my-cloud',
+          'Century Care': 'century-care'
+        };
+
+        // Check if we have a special mapping first
+        if (specialMappings[clinicName]) {
+          return specialMappings[clinicName];
+        }
+        if (specialMappings[displayName]) {
+          return specialMappings[displayName];
+        }
+
+        // Default slug generation from displayName
+        return displayName.toLowerCase()
+          .replace(/\s+/g, '-')
+          .replace(/[^a-z0-9-]/g, '')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '');
+      };
+
+      // Get proper backend clinic name for API calls (what's stored in client documents)
+      const getBackendClinicName = (clinicName: string, displayName: string): string => {
+        // Map to actual clinic names used in client documents
+        const backendNameMappings: Record<string, string> = {
+          'bodyblissphysio': 'BodyBlissPhysio',
+          'BodyBliss': 'BodyBliss',
+          'BodyBlissOneCare': 'BodyBlissOneCare',
+          'Ortholine Duncan Mills': 'Ortholine Duncan Mills',
+          'Physio Bliss': 'Physio Bliss',
+          'My Cloud': 'My Cloud',
+          'Century Care': 'Century Care'
+        };
+
+        return backendNameMappings[clinicName] || backendNameMappings[displayName] || displayName;
+      };
+
+      // Transform to frontend-compatible format
+      const clinicsData = retainedClinics.map(clinic => {
+        const primaryAddress = clinic.address?.[0];
+        
+        return {
+          id: clinic.clinicId,
+          name: generateProperSlug(clinic.name, clinic.displayName),
+          displayName: clinic.displayName,
+          backendName: getBackendClinicName(clinic.name, clinic.displayName), // For API calls to other services
+          address: primaryAddress?.line?.join(', ') || '',
+          city: primaryAddress?.city || '',
+          province: primaryAddress?.state || '',
+          postalCode: primaryAddress?.postalCode || '',
+          status: clinic.isActive() ? 'active' : 'inactive',
+          lastActivity: clinic.stats?.lastActivity?.toISOString()?.split('T')[0] || null,
+          totalAppointments: clinic.stats?.totalOrders || 0,
+          clientCount: clinic.stats?.totalClients || clinic.clientCount || 0,
+          description: `${clinic.displayName} - Active retained clinic`
+        };
+      });
+
+      res.json({
+        success: true,
+        message: 'Clinics retrieved successfully',
+        data: {
+          clinics: clinicsData,
+          total: clinicsData.length,
+          retainedOnly: true
+        }
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve clinics',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   /**
    * Get all available clinics
    * GET /api/v1/clinics/available

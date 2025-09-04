@@ -108,14 +108,16 @@ interface IClinicModel extends Model<IClinic> {
   getRetainedClinicNames(): string[];
 }
 
-// BUSINESS RULE: Retained Clinics (from VISIO CSV analysis)
+// BUSINESS RULE: Retained Clinics (from MongoDB analysis)
 const RETAINED_CLINIC_NAMES = [
-  'Bodybliss Physiotherapy',
-  'Bodybliss One Care', 
+  'BodyBliss',
+  'bodyblissphysio',
+  'BodyBlissPhysio', // Alternative spelling
+  'BodyBlissOneCare',
   'Century Care',
-  'Duncan Mills Ortholine',
+  'Ortholine Duncan Mills',
   'My Cloud',
-  'Physiobliss'
+  'Physio Bliss'
 ];
 
 // Sub-schemas
@@ -373,7 +375,7 @@ ClinicSchema.statics.findActiveClinic = function(): Promise<IClinic[]> {
 ClinicSchema.statics.findRetainedClinics = function(): Promise<IClinic[]> {
   return this.find({ 
     isRetainedClinic: true,
-    name: { $in: RETAINED_CLINIC_NAMES }
+    active: true
   }).sort({ name: 1 });
 };
 
