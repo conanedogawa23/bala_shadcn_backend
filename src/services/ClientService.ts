@@ -209,19 +209,65 @@ export class ClientService {
 
       // Add search functionality using $and to combine with clinic filter
       if (search) {
-        const searchQuery = {
-          $or: [
-            { 'personalInfo.firstName': new RegExp(search, 'i') },
-            { 'personalInfo.lastName': new RegExp(search, 'i') },
-            { 'personalInfo.fullName': new RegExp(search, 'i') },
-            { 'contact.email': new RegExp(search, 'i') },
-            { clientId: new RegExp(search, 'i') }
-          ]
-        };
+        // Trim whitespace and normalize search term
+        const trimmedSearch = search.trim();
         
-        // Combine clinic filter and search filter using $and
-        query.$and = [clinicQuery, searchQuery];
-        delete query.$or; // Remove the top-level $or since we're using $and now
+        if (trimmedSearch) {
+          // Create flexible search patterns for different scenarios
+          const searchPatterns = [];
+          
+          // 1. Direct field matches (case-insensitive, trimmed)
+          searchPatterns.push(
+            { 'personalInfo.firstName': new RegExp(trimmedSearch, 'i') },
+            { 'personalInfo.lastName': new RegExp(trimmedSearch, 'i') },
+            { 'personalInfo.fullName': new RegExp(trimmedSearch, 'i') },
+            { 'contact.email': new RegExp(trimmedSearch, 'i') },
+            { clientId: new RegExp(trimmedSearch, 'i') }
+          );
+          
+          // 2. Handle multi-word searches for full names
+          if (trimmedSearch.includes(' ')) {
+            const words = trimmedSearch.split(/\s+/).filter(word => word.length > 0);
+            if (words.length >= 2) {
+              // Try different combinations for first name + last name
+              const firstWord = words[0];
+              const lastWord = words.slice(1).join(' ');
+              
+              // Only add patterns if both words exist
+              if (firstWord && lastWord) {
+                // firstName + lastName pattern
+                searchPatterns.push({
+                  $and: [
+                    { 'personalInfo.firstName': new RegExp(firstWord, 'i') },
+                    { 'personalInfo.lastName': new RegExp(lastWord, 'i') }
+                  ]
+                });
+                
+                // lastName + firstName pattern (reverse order)
+                searchPatterns.push({
+                  $and: [
+                    { 'personalInfo.firstName': new RegExp(lastWord, 'i') },
+                    { 'personalInfo.lastName': new RegExp(firstWord, 'i') }
+                  ]
+                });
+              }
+            }
+          }
+          
+          // 3. Escape special regex characters for exact matches
+          const escapedSearch = trimmedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          
+          // 4. Add patterns that look for words anywhere in the combined name fields
+          searchPatterns.push(
+            { 'personalInfo.fullName': new RegExp(escapedSearch, 'i') }
+          );
+          
+          const searchQuery = { $or: searchPatterns };
+          
+          // Combine clinic filter and search filter using $and
+          query.$and = [clinicQuery, searchQuery];
+          delete query.$or; // Remove the top-level $or since we're using $and now
+        }
       }
 
       logger.debug('ClientService query details:', { 
