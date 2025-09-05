@@ -73,6 +73,7 @@ export class AppointmentService {
           .skip(skip)
           .limit(limit)
           .populate('clientId', 'personalInfo contact defaultClinic', ClientModel)
+          .populate('resourceId', 'resourceName', ResourceModel)
           .exec(),
         AppointmentModel.countDocuments(query)
       ]);
