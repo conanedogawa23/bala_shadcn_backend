@@ -59,8 +59,14 @@ export class ClinicController {
       // Get retained clinics from MongoDB with full data
       const retainedClinics = await ClinicModel.findRetainedClinics();
 
-      // Transform to frontend-compatible format
-      const clinicsData = retainedClinics.map(clinic => {
+      // Import services for stats calculation
+      const { ClientService } = await import('../services/ClientService');
+      const { AppointmentService } = await import('../services/AppointmentService');
+      const { ClientModel } = await import('../models/Client');
+      const { AppointmentModel } = await import('../models/Appointment');
+
+      // Transform to frontend-compatible format with real stats
+      const clinicsData = await Promise.all(retainedClinics.map(async (clinic) => {
         // Handle Mongoose address structure: array of address documents
         const addressArray = clinic.address || [];
         const firstAddress = addressArray[0];
@@ -77,6 +83,56 @@ export class ClinicController {
         // Extract phone and fax from telecom array if available
         const phoneContact = clinic.telecom?.find(contact => contact.system === 'phone');
         const faxContact = clinic.telecom?.find(contact => contact.system === 'fax');
+
+        // Calculate real stats from database
+        let clientCount = 0;
+        let totalAppointments = 0;
+        let lastActivity: Date | null = null;
+
+        try {
+          // Get clinic names that might be used in client/appointment data
+          const possibleClinicNames = [
+            clinic.name,           // e.g., "bodyblissphysio"
+            clinic.displayName,    // e.g., "BodyBliss Physiotherapy"
+            // Handle common variations
+            clinic.name.toLowerCase().includes('bodybliss') ? 'BodyBliss' : null,
+            clinic.name.toLowerCase().includes('bodybliss') ? 'BodyBlissPhysio' : null
+          ].filter(Boolean);
+
+          // Count clients across all possible clinic name variations
+          for (const clinicNameVariation of possibleClinicNames) {
+            const count = await ClientModel.countDocuments({ 
+              defaultClinic: clinicNameVariation, 
+              isActive: true 
+            });
+            clientCount += count;
+          }
+
+          // Count appointments across all possible clinic name variations
+          for (const clinicNameVariation of possibleClinicNames) {
+            const count = await AppointmentModel.countDocuments({ 
+              clinicName: clinicNameVariation, 
+              isActive: true 
+            });
+            totalAppointments += count;
+
+            // Get latest activity
+            const latestAppointment = await AppointmentModel.findOne({ 
+              clinicName: clinicNameVariation, 
+              isActive: true 
+            }).sort({ startDate: -1 }).limit(1);
+            
+            if (latestAppointment && latestAppointment.startDate) {
+              if (!lastActivity || latestAppointment.startDate > lastActivity) {
+                lastActivity = latestAppointment.startDate;
+              }
+            }
+          }
+
+        } catch (statsError) {
+          console.error(`Error calculating stats for clinic ${clinic.name}:`, statsError);
+          // Continue with zeros if stats calculation fails
+        }
         
         return {
           id: clinic.clinicId,
@@ -90,12 +146,12 @@ export class ClinicController {
           phone: phoneContact?.value || '',
           fax: faxContact?.value || '',
           status: clinic.isActive() ? 'active' : 'inactive',
-          lastActivity: clinic.stats?.lastActivity?.toISOString()?.split('T')[0] || null,
-          totalAppointments: clinic.stats?.totalOrders || 0,
-          clientCount: clinic.stats?.totalClients || clinic.clientCount || 0,
+          lastActivity: lastActivity?.toISOString()?.split('T')[0] || null,
+          totalAppointments: totalAppointments,
+          clientCount: clientCount,
           description: `${clinic.displayName} - Active retained clinic`
         };
-      });
+      }));
 
       res.json({
         success: true,

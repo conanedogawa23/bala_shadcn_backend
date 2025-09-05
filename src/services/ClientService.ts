@@ -151,6 +151,60 @@ function safeStringify(obj: unknown): string {
 
 export class ClientService {
   /**
+   * Get all possible clinic name variations for a given clinic
+   * This handles the mapping between slugs and actual database clinic names
+   */
+  private static getClinicNameVariations(rawClinicName: string, actualClinicName?: string): string[] {
+    const variations = new Set<string>();
+    
+    // Add the raw name and actual name
+    variations.add(rawClinicName);
+    if (actualClinicName) {
+      variations.add(actualClinicName);
+    }
+
+    // Handle specific bodybliss variations
+    const lowerRaw = rawClinicName.toLowerCase();
+    if (lowerRaw.includes('bodybliss')) {
+      variations.add('BodyBliss');
+      variations.add('BodyBlissPhysio'); 
+      variations.add('BodyBliss Physio');
+      variations.add('BodyBliss Physiotherapy');
+      variations.add('bodyblissphysio');
+      variations.add('bodybliss');
+      
+      // If it's the physio clinic, also add OneCare variations
+      if (lowerRaw.includes('physio')) {
+        variations.add('BodyBlissOneCare');
+        variations.add('BodyBliss OneCare');
+      }
+    }
+
+    // Handle other clinic variations
+    if (lowerRaw.includes('ortholine')) {
+      variations.add('Ortholine Duncan Mills');
+      variations.add('ortholine-duncan-mills');
+    }
+    
+    if (lowerRaw.includes('century')) {
+      variations.add('Century Care');
+      variations.add('centurycare');
+    }
+    
+    if (lowerRaw.includes('cloud')) {
+      variations.add('My Cloud');
+      variations.add('mycloud');
+    }
+    
+    if (lowerRaw.includes('physio') && !lowerRaw.includes('bodybliss')) {
+      variations.add('Physio Bliss');
+      variations.add('physiobliss');
+    }
+
+    return Array.from(variations);
+  }
+
+  /**
    * Get clients by clinic with pagination and filtering
    */
   static async getClientsByClinic(params: {
@@ -191,13 +245,18 @@ export class ClientService {
         throw new DatabaseError('Database connection not ready', new Error(`Connection state: ${mongoose.connection.readyState}`));
       }
 
-      // Build query using the converted clinic name with proper typing
+      // Get all possible clinic name variations for this slug/name
+      const possibleClinicNames = this.getClinicNameVariations(rawClinicName, actualClinicName);
+      
+      // Build query using all possible clinic name variations
+      const clinicQueries = possibleClinicNames.flatMap(clinicName => [
+        { defaultClinic: clinicName },
+        { clinicId: clinicName },
+        { clinics: clinicName }
+      ]);
+
       const clinicQuery = {
-        $or: [
-          { defaultClinic: actualClinicName },
-          { clinicId: actualClinicName },
-          { clinics: actualClinicName }
-        ]
+        $or: clinicQueries
       };
 
       // Start with clinic filter - properly typed
@@ -734,23 +793,46 @@ export class ClientService {
       // Verify clinic exists
       await ClinicService.getClinicByName(clinicName);
 
+      // Get all possible clinic name variations for querying
+      const possibleClinicNames = this.getClinicNameVariations(clinicName);
+
+      // Build query to match any of the clinic name variations
+      const clinicQuery = {
+        $or: [
+          { defaultClinic: { $in: possibleClinicNames } },
+          { clinicId: { $in: possibleClinicNames } },
+          { clinics: { $in: possibleClinicNames } }
+        ]
+      };
+
+      // Calculate "New This Month" properly
+      const currentDate = new Date();
+      const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+
       const [
         totalClients,
         activeClients,
         clientsWithInsurance,
-        recentClients
+        recentClients,
+        newThisMonth
       ] = await Promise.all([
-        ClientModel.countDocuments({ defaultClinic: clinicName }),
-        ClientModel.countDocuments({ defaultClinic: clinicName, isActive: true }),
+        ClientModel.countDocuments(clinicQuery),
+        ClientModel.countDocuments({ ...clinicQuery, isActive: true }),
         ClientModel.countDocuments({ 
-          defaultClinic: clinicName, 
+          ...clinicQuery, 
           isActive: true,
           'insurance.0': { $exists: true }
         }),
         ClientModel.countDocuments({
-          defaultClinic: clinicName,
+          ...clinicQuery,
           isActive: true,
           dateCreated: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } // Last 30 days
+        }),
+        // New clients this month (the key fix!)
+        ClientModel.countDocuments({
+          ...clinicQuery,
+          isActive: true,
+          dateCreated: { $gte: startOfMonth }
         })
       ]);
 
@@ -761,6 +843,7 @@ export class ClientService {
         clientsWithInsurance,
         clientsWithoutInsurance: activeClients - clientsWithInsurance,
         recentClients,
+        newThisMonth, // Add the new clients this month count
         insurancePercentage: activeClients > 0 ? Math.round((clientsWithInsurance / activeClients) * 100) : 0
       };
     } catch (error) {

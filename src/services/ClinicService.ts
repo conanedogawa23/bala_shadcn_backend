@@ -26,6 +26,58 @@ export class ClinicService {
   ];
 
   /**
+   * Clinic name variations mapping - handles different name formats
+   * Maps various name formats to the canonical MongoDB clinic name
+   */
+  private static readonly CLINIC_NAME_VARIATIONS: Record<string, string> = {
+    // BodyBliss variations
+    'BodyBliss': 'BodyBliss',
+    'bodybliss': 'BodyBliss',
+    
+    // BodyBlissOneCare variations  
+    'BodyBlissOneCare': 'BodyBlissOneCare',
+    'bodyblissonecare': 'BodyBlissOneCare',
+    'BodyBliss OneCare': 'BodyBlissOneCare',
+    
+    // BodyBliss Physiotherapy variations
+    'bodyblissphysio': 'bodyblissphysio',
+    'BodyBlissPhysio': 'bodyblissphysio',
+    'BodyBliss Physio': 'bodyblissphysio',
+    'BodyBliss Physiotherapy': 'bodyblissphysio',
+    
+    // Other clinics
+    'Century Care': 'Century Care',
+    'centurycare': 'Century Care',
+    'Ortholine Duncan Mills': 'Ortholine Duncan Mills',
+    'ortholine-duncan-mills': 'Ortholine Duncan Mills',
+    'My Cloud': 'My Cloud',
+    'mycloud': 'My Cloud',
+    'Physio Bliss': 'Physio Bliss',
+    'physiobliss': 'Physio Bliss'
+  };
+
+  /**
+   * Normalize clinic name to canonical format
+   */
+  private static normalizeClinicName(name: string): string {
+    // First try direct lookup
+    if (this.CLINIC_NAME_VARIATIONS[name]) {
+      return this.CLINIC_NAME_VARIATIONS[name];
+    }
+
+    // Try case-insensitive lookup
+    const lowerName = name.toLowerCase();
+    for (const [variation, canonical] of Object.entries(this.CLINIC_NAME_VARIATIONS)) {
+      if (variation.toLowerCase() === lowerName) {
+        return canonical;
+      }
+    }
+
+    // Return original name if no match found
+    return name;
+  }
+
+  /**
    * Frontend slug to backend clinic name mapping
    * Updated to match actual MongoDB clinic names
    */
@@ -123,20 +175,23 @@ export class ClinicService {
   // ========================
 
   /**
-   * Get clinic by name - Compatibility method
+   * Get clinic by name - Compatibility method with name variation handling
    * Returns a minimal clinic object for backward compatibility
    */
   static async getClinicByName(name: string): Promise<{ name: string; clinicId: number; displayName: string }> {
-    // Check if it's in our retained clinics
-    if (!this.RETAINED_CLINICS.includes(name)) {
-      throw new ValidationError(`Clinic '${name}' is not in the retained clinics list`);
+    // Normalize the clinic name to handle variations
+    const normalizedName = this.normalizeClinicName(name);
+    
+    // Check if the normalized name is in our retained clinics
+    if (!this.RETAINED_CLINICS.includes(normalizedName)) {
+      throw new ValidationError(`Clinic '${name}' (normalized: '${normalizedName}') is not in the retained clinics list. Available clinics: ${this.RETAINED_CLINICS.join(', ')}`);
     }
     
-    // Return minimal compatible object
+    // Return minimal compatible object with normalized name
     return {
-      name,
-      clinicId: this.RETAINED_CLINICS.indexOf(name) + 1, // Simple ID mapping
-      displayName: name
+      name: normalizedName,
+      clinicId: this.RETAINED_CLINICS.indexOf(normalizedName) + 1, // Simple ID mapping
+      displayName: normalizedName
     };
   }
 
