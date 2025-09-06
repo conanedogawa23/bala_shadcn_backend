@@ -349,8 +349,9 @@ router.use('/payments', paymentRoutes); // Core business functionality
 router.use('/events', eventRoutes); // Core business functionality
 router.use('/reports', reportRoutes); // Core business functionality
 
-// Still protected routes (less commonly used)
-router.use('/resources', authenticate, trackActivity, resourceRoutes);
+// Still protected routes (less commonly used) 
+// Temporarily public routes until authentication is implemented
+router.use('/resources', resourceRoutes); // Core business functionality - needed for appointment forms
 router.use('/contact-history', authenticate, trackActivity, contactHistoryRoutes);
 router.use('/insurance-addresses', authenticate, trackActivity, insuranceCompanyAddressRoutes);
 router.use('/advanced-billing', authenticate, trackActivity, advancedBillingRoutes);

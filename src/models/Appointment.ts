@@ -377,27 +377,7 @@ AppointmentSchema.pre('save', function(next) {
   next();
 });
 
-// Add static methods to the schema
-AppointmentSchema.statics.checkTimeSlotConflict = function(
-  resourceId: string, 
-  startTime: Date, 
-  endTime: Date, 
-  excludeId?: string
-) {
-  const query: any = {
-    resourceId,
-    status: { $ne: 'cancelled' },
-    $or: [
-      { startDate: { $lt: endTime }, endDate: { $gt: startTime } }
-    ]
-  };
-  
-  if (excludeId) {
-    query._id = { $ne: excludeId };
-  }
-  
-  return this.find(query);
-};
+// Note: checkTimeSlotConflict is already defined above (line 335) with correct number type
 
 AppointmentSchema.statics.findReadyToBill = function(clinicName: string) {
   return this.find({ 

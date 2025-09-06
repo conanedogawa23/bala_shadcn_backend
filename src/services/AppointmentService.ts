@@ -135,14 +135,13 @@ export class AppointmentService {
    */
   static async getAppointmentById(appointmentId: string): Promise<IAppointment> {
     try {
-      const appointment = await AppointmentModel.findById(appointmentId)
-        .populate('clientId', 'personalInfo contact medical insurance', ClientModel);
+      const appointment = await AppointmentModel.findById(appointmentId);
       
       if (!appointment) {
         throw new NotFoundError('Appointment', appointmentId);
       }
 
-      // Populate resource information
+      // Populate resource information manually (populate was causing issues)
       const resource = await ResourceModel.findOne({ resourceId: appointment.resourceId });
       if (resource) {
         appointment.resourceName = resource.getFullName() || resource.resourceName;
@@ -155,6 +154,39 @@ export class AppointmentService {
       }
       logger.error('Error in getAppointmentById:', error);
       throw new DatabaseError('Failed to retrieve appointment', error as Error);
+    }
+  }
+
+  /**
+   * Get appointment by business appointmentId
+   */
+  static async getAppointmentByBusinessId(appointmentId: number): Promise<IAppointment> {
+    try {
+      // Simplified query without populate for debugging
+      const appointment = await AppointmentModel.findOne({ appointmentId });
+      
+      if (!appointment) {
+        throw new NotFoundError('Appointment', appointmentId.toString());
+      }
+
+      // Try to get resource information (optional - won't fail if resource not found)
+      try {
+        const resource = await ResourceModel.findOne({ resourceId: appointment.resourceId });
+        if (resource) {
+          appointment.resourceName = resource.getFullName() || resource.resourceName;
+        }
+      } catch (resourceError) {
+        logger.warn('Could not populate resource information:', resourceError);
+        // Continue without resource information
+      }
+
+      return appointment;
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      logger.error('Error in getAppointmentByBusinessId:', error);
+      throw new DatabaseError('Failed to retrieve appointment by business ID', error as Error);
     }
   }
 
@@ -214,7 +246,9 @@ export class AppointmentService {
       const dayOfWeek = appointmentDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
       
       if (!resource.isAvailableOnDay(dayOfWeek)) {
-        throw new ValidationError(`Resource is not available on ${dayOfWeek}`);
+        const availabilityInfo = resource.getAvailabilityForDay(dayOfWeek);
+        const errorMessage = `Resource "${resource.resourceName}" is not available on ${dayOfWeek}${availabilityInfo ? ` (availability: ${availabilityInfo.available ? 'available' : 'not available'} ${availabilityInfo.start}-${availabilityInfo.end})` : ''}`;
+        throw new ValidationError(errorMessage);
       }
 
       // Create appointment

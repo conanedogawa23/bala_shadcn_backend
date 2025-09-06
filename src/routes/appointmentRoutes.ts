@@ -308,8 +308,23 @@ router.get(
 );
 
 /**
+ * @route   GET /api/v1/appointments/business/:appointmentId
+ * @desc    Get appointment by business appointmentId
+ * @access  Public
+ */
+router.get(
+  '/business/:appointmentId',
+  [
+    param('appointmentId')
+      .isInt({ min: 1 })
+      .withMessage('Invalid business appointment ID format')
+  ],
+  AppointmentController.getAppointmentByBusinessId
+);
+
+/**
  * @route   GET /api/v1/appointments/:id
- * @desc    Get appointment by ID
+ * @desc    Get appointment by MongoDB ObjectId
  * @access  Public
  */
 router.get(
