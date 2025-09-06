@@ -194,13 +194,116 @@ const completeAppointmentValidation = [
 // Routes
 
 /**
+ * @route   GET /api/v1/appointments/test/:clinicName
+ * @desc    Simple test for appointments by clinic - no validation
+ * @access  Public
+ */
+router.get('/test/:clinicName', async (req, res): Promise<void> => {
+  try {
+    const { clinicName } = req.params;
+    console.log('=== SIMPLE TEST ENDPOINT ===');
+    console.log('clinicName:', clinicName);
+    
+    const { AppointmentModel } = require('@/models/Appointment');
+    const { ClinicModel } = require('@/models/Clinic');
+    const mongoose = require('mongoose');
+    
+    // Debug: Check database connection
+    console.log('Connected to database:', mongoose.connection.name);
+    console.log('Connection state:', mongoose.connection.readyState);
+    
+    // Debug: List all databases available
+    const adminDb = mongoose.connection.db.admin();
+    const dbList = await adminDb.listDatabases();
+    
+    // Debug: List all collections in current database  
+    const collections = await mongoose.connection.db.listCollections().toArray();
+    
+    // Test: Count all clinics first
+    const allClinicsCount = await ClinicModel.countDocuments({});
+    console.log('Total clinics in database:', allClinicsCount);
+    
+    // Test: Raw MongoDB collection access
+    const rawCollection = mongoose.connection.collection('clinics');
+    const rawCount = await rawCollection.countDocuments({});
+    const rawClinics = await rawCollection.find({}, { projection: { name: 1 } }).limit(5).toArray();
+    
+    // Test: Find all clinic names
+    const allClinicNames = await ClinicModel.find({}, { name: 1 }).limit(5);
+    console.log('First 5 clinic names:', allClinicNames.map((c: any) => c.name));
+    
+    // Test 1: Check if clinic exists
+    const clinic = await ClinicModel.findOne({ name: clinicName });
+    console.log('Clinic found:', !!clinic, clinic?.name);
+    
+    // Test: Try case-insensitive search
+    const clinicInsensitive = await ClinicModel.findOne({ name: { $regex: new RegExp(`^${clinicName}$`, 'i') } });
+    console.log('Case-insensitive search:', !!clinicInsensitive, clinicInsensitive?.name);
+    
+    if (!clinic) {
+      res.json({ 
+        error: 'Clinic not found', 
+        clinicName,
+        debugInfo: {
+          database: mongoose.connection.name,
+          connectionState: mongoose.connection.readyState,
+          availableDatabases: dbList.databases.map((db: any) => db.name),
+          collectionsInCurrentDb: collections.map((col: any) => col.name),
+          mongooseClinics: allClinicsCount,
+          mongooseClinicNames: allClinicNames.map((c: any) => c.name),
+          rawClinicsCount: rawCount,
+          rawClinicNames: rawClinics.map((c: any) => c.name),
+          caseInsensitiveFound: !!clinicInsensitive,
+          caseInsensitiveName: clinicInsensitive?.name
+        }
+      });
+      return;
+    }
+    
+    // Test 2: Get appointment clinic name
+    const appointmentClinicName = clinicName === 'bodyblissphysio' ? 'BodyBlissPhysio' : clinicName;
+    console.log('Mapped clinic name:', appointmentClinicName);
+    
+    // Test 3: Simple count
+    const count = await AppointmentModel.countDocuments({ 
+      clinicName: appointmentClinicName, 
+      isActive: true 
+    });
+    console.log('Appointment count:', count);
+    
+    // Test 4: Simple find (no lean, no populate)
+    const appointments = await AppointmentModel.find({ 
+      clinicName: appointmentClinicName, 
+      isActive: true 
+    }).limit(2);
+    console.log('Appointments found:', appointments.length);
+    
+    res.json({
+      success: true,
+      clinicName,
+      appointmentClinicName,
+      count,
+      appointments: appointments.length,
+      firstAppointment: appointments[0] || null
+    });
+    
+  } catch (error) {
+    console.error('ERROR in test endpoint:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : 'No stack available';
+    res.status(500).json({ error: errorMessage, stack: errorStack });
+  }
+});
+
+/**
  * @route   GET /api/v1/appointments/clinic/:clinicName
  * @desc    Get appointments by clinic with filtering and pagination
  * @access  Public
  */
 router.get(
   '/clinic/:clinicName',
-  clinicNameValidation.concat(paginationValidation).concat(dateRangeValidation).concat(appointmentFiltersValidation),
+  // Temporarily disable validation to debug
+  // clinicNameValidation.concat(paginationValidation).concat(dateRangeValidation).concat(appointmentFiltersValidation),
   AppointmentController.getAppointmentsByClinic
 );
 

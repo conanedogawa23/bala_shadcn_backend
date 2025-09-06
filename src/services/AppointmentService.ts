@@ -6,6 +6,24 @@ import { NotFoundError, ValidationError, DatabaseError, ConflictError } from '@/
 import { logger } from '@/utils/logger';
 
 export class AppointmentService {
+  
+  /**
+   * Map clinic names between collections due to data inconsistency
+   * clinics collection uses different naming than appointments collection
+   */
+  private static getAppointmentClinicName(clinicName: string): string {
+    const clinicToAppointmentMapping: Record<string, string> = {
+      'bodyblissphysio': 'BodyBlissPhysio',  // clinics.name -> appointments.clinicName
+      'Physio Bliss': 'Physio Bliss',
+      'Ortholine Duncan Mills': 'Ortholine Duncan Mills',
+      'BodyBlissOneCare': 'BodyBlissOneCare',
+      'Markham Orthopedic': 'Markham Orthopedic',
+      'ExtremePhysio': 'ExtremePhysio',
+      'My Cloud': 'My Cloud'
+    };
+    
+    return clinicToAppointmentMapping[clinicName] || clinicName;
+  }
   /**
    * Get appointments by clinic with filtering and pagination
    */
@@ -31,15 +49,33 @@ export class AppointmentService {
         clientId
       } = params;
 
+      // For debugging - log the input parameters
+      logger.info('getAppointmentsByClinic called with:', {
+        clinicName,
+        startDate,
+        endDate,
+        page,
+        limit,
+        status,
+        resourceId,
+        clientId
+      });
+
       // Verify clinic exists
       const clinic = await ClinicModel.findOne({ name: clinicName });
       if (!clinic) {
         throw new NotFoundError('Clinic', clinicName);
       }
 
-      // Build query
+      logger.info('Clinic found:', { name: clinic.name, displayName: clinic.displayName });
+
+      // Map to appointment collection clinic name due to data inconsistency
+      const appointmentClinicName = AppointmentService.getAppointmentClinicName(clinicName);
+      logger.info('Mapped clinic name:', { original: clinicName, mapped: appointmentClinicName });
+
+      // Build query using the mapped clinic name
       const query: any = {
-        clinicName: clinicName,
+        clinicName: appointmentClinicName,
         isActive: true
       };
 
@@ -65,24 +101,30 @@ export class AppointmentService {
         query.clientId = clientId;
       }
 
-      // Execute query with pagination
+      logger.info('MongoDB query:', query);
+
+      // Execute query with pagination - ultra-simplified for debugging
       const skip = (page - 1) * limit;
-      const [appointments, total] = await Promise.all([
-        AppointmentModel.find(query)
-          .sort({ startDate: 1 })
-          .skip(skip)
-          .limit(limit)
-          .populate('clientId', 'personalInfo contact defaultClinic', ClientModel)
-          .populate('resourceId', 'resourceName', ResourceModel)
-          .exec(),
-        AppointmentModel.countDocuments(query)
-      ]);
+      
+      // Test count first
+      const total = await AppointmentModel.countDocuments(query);
+      logger.info('Count result:', total);
+      
+      // Test find
+      const appointments = await AppointmentModel.find(query)
+        .sort({ startDate: 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+        
+      logger.info('Found appointments:', appointments.length);
 
       return { appointments, page, limit, total };
     } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
       }
+      
       logger.error('Error in getAppointmentsByClinic:', error);
       throw new DatabaseError('Failed to retrieve appointments', error as Error);
     }
@@ -190,7 +232,7 @@ export class AppointmentService {
       const savedAppointment = await appointment.save();
 
       // Update resource statistics
-      await this.updateResourceStats(appointmentData.resourceId);
+      await AppointmentService.updateResourceStats(appointmentData.resourceId);
 
       logger.info(`Appointment created: ${savedAppointment._id} for client ${client.getFullName()}`);
 
@@ -272,7 +314,7 @@ export class AppointmentService {
       );
 
       // Update resource statistics
-      await this.updateResourceStats(appointment.resourceId);
+      await AppointmentService.updateResourceStats(appointment.resourceId);
 
       logger.info(`Appointment cancelled: ${appointmentId}${reason ? ` - ${reason}` : ''}`);
     } catch (error) {
@@ -312,7 +354,7 @@ export class AppointmentService {
       }
 
       // Update resource statistics
-      await this.updateResourceStats(appointment.resourceId);
+      await AppointmentService.updateResourceStats(appointment.resourceId);
 
       logger.info(`Appointment completed: ${appointmentId}`);
       return updatedAppointment;
@@ -443,7 +485,9 @@ export class AppointmentService {
         throw new NotFoundError('Clinic', clinicName);
       }
 
-      const query: any = { clinicName, isActive: true };
+      // Map to appointment collection clinic name due to data inconsistency
+      const appointmentClinicName = AppointmentService.getAppointmentClinicName(clinicName);
+      const query: any = { clinicName: appointmentClinicName, isActive: true };
       
       if (startDate && endDate) {
         query.startDate = { $gte: startDate, $lte: endDate };
