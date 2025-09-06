@@ -12,17 +12,9 @@ export class AppointmentService {
    * clinics collection uses different naming than appointments collection
    */
   private static getAppointmentClinicName(clinicName: string): string {
-    const clinicToAppointmentMapping: Record<string, string> = {
-      'bodyblissphysio': 'BodyBlissPhysio',  // clinics.name -> appointments.clinicName
-      'Physio Bliss': 'Physio Bliss',
-      'Ortholine Duncan Mills': 'Ortholine Duncan Mills',
-      'BodyBlissOneCare': 'BodyBlissOneCare',
-      'Markham Orthopedic': 'Markham Orthopedic',
-      'ExtremePhysio': 'ExtremePhysio',
-      'My Cloud': 'My Cloud'
-    };
-    
-    return clinicToAppointmentMapping[clinicName] || clinicName;
+    // Since appointments are stored with both "bodyblissphysio" and "BodyBlissPhysio"
+    // we need to query for both formats using case-insensitive regex
+    return clinicName; // Return as-is, we'll handle case-insensitive search in query
   }
   /**
    * Get appointments by clinic with filtering and pagination
@@ -73,9 +65,9 @@ export class AppointmentService {
       const appointmentClinicName = AppointmentService.getAppointmentClinicName(clinicName);
       logger.info('Mapped clinic name:', { original: clinicName, mapped: appointmentClinicName });
 
-      // Build query using the mapped clinic name
+      // Build query using case-insensitive regex to handle inconsistent naming
       const query: any = {
-        clinicName: appointmentClinicName,
+        clinicName: new RegExp(`^${appointmentClinicName}$`, 'i'), // Case-insensitive exact match
         isActive: true
       };
 
@@ -110,12 +102,11 @@ export class AppointmentService {
       const total = await AppointmentModel.countDocuments(query);
       logger.info('Count result:', total);
       
-      // Test find
+      // Test find - Remove .lean() to preserve Mongoose methods for view layer
       const appointments = await AppointmentModel.find(query)
         .sort({ startDate: 1 })
         .skip(skip)
-        .limit(limit)
-        .lean();
+        .limit(limit);
         
       logger.info('Found appointments:', appointments.length);
 

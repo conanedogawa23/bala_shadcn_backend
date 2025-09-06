@@ -227,8 +227,7 @@ const UserSchema = new Schema<IUser>({
 });
 
 // Indexes for performance
-UserSchema.index({ email: 1 });
-UserSchema.index({ username: 1 });
+// Note: email and username indices are automatically created by unique: true
 UserSchema.index({ role: 1 });
 UserSchema.index({ status: 1 });
 UserSchema.index({ 'permissions.allowedClinics': 1 });

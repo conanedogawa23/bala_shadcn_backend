@@ -7,64 +7,68 @@ import { validateRequiredString } from '../utils/mongooseHelpers';
 
 export class AppointmentController {
   /**
-   * Get appointments by clinic with filtering
+   * Get appointments by clinic with filtering - FIXED TO USE SERVICE LAYER
    */
   static getAppointmentsByClinic = asyncHandler(async (req: Request, res: Response) => {
-    // Use simplified logic that works (based on test endpoint)
+    // Validate request parameters
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const response = AppointmentView.formatValidationError(errors.array());
+      return res.status(400).json(response);
+    }
+
     const { clinicName } = req.params;
-    const { page = '1', limit = '20' } = req.query;
     
-    const { AppointmentModel } = require('@/models/Appointment');
-    const { ClinicModel } = require('@/models/Clinic');
-    
-    // Check if clinic exists
-    const clinic = await ClinicModel.findOne({ name: clinicName });
-    if (!clinic) {
-      return res.status(404).json({
+    // Validate required path parameter
+    if (!clinicName) {
+      return res.status(400).json({
         success: false,
         error: {
-          code: 'NOT_FOUND',
-          message: `Clinic with id ${clinicName} not found`
+          code: 'VALIDATION_ERROR',
+          message: 'Clinic name is required'
         }
       });
     }
+
+    const { 
+      page, 
+      limit, 
+      startDate, 
+      endDate, 
+      status, 
+      resourceId, 
+      clientId 
+    } = req.query;
+
+    // Parse query parameters
+    const parsedPage = page ? parseInt(page as string) : 1;
+    const parsedLimit = limit ? parseInt(limit as string) : 20;
+    const parsedStatus = status ? parseInt(status as string) : undefined;
+    const parsedResourceId = resourceId ? parseInt(resourceId as string) : undefined;
     
-    // Map clinic name (same logic as working test)
-    const appointmentClinicName = clinicName === 'bodyblissphysio' ? 'BodyBlissPhysio' : clinicName;
-    
-    // Get appointments with pagination
-    const pageNum = parseInt(page as string) || 1;
-    const limitNum = parseInt(limit as string) || 20;
-    const skip = (pageNum - 1) * limitNum;
-    
-    const [appointments, total] = await Promise.all([
-      AppointmentModel.find({ 
-        clinicName: appointmentClinicName, 
-        isActive: true 
-      })
-      .sort({ startDate: 1 })
-      .skip(skip)
-      .limit(limitNum)
-      .lean(),
-      AppointmentModel.countDocuments({ 
-        clinicName: appointmentClinicName, 
-        isActive: true 
-      })
-    ]);
-    
-    // Format response to match expected structure
-    const response = {
-      success: true,
-      data: appointments,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        pages: Math.ceil(total / limitNum),
-        hasNext: pageNum * limitNum < total,
-        hasPrev: pageNum > 1
-      }
-    };
+    // Parse dates
+    const parsedStartDate = startDate ? new Date(startDate as string) : undefined;
+    const parsedEndDate = endDate ? new Date(endDate as string) : undefined;
+
+    // CRITICAL: Use service layer which includes clientId filtering
+    const result = await AppointmentService.getAppointmentsByClinic({
+      clinicName: clinicName as string, // Now guaranteed to be string
+      page: parsedPage,
+      limit: parsedLimit,
+      startDate: parsedStartDate,
+      endDate: parsedEndDate,
+      status: parsedStatus,
+      resourceId: parsedResourceId,
+      clientId: clientId as string  // CRITICAL: Pass clientId for filtering
+    });
+
+    // Format response using view layer - Fix argument order to match signature
+    const response = AppointmentView.formatAppointmentList(
+      result.appointments,
+      result.page,
+      result.limit, 
+      result.total
+    );
 
     return res.status(200).json(response);
   });

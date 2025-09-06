@@ -113,8 +113,8 @@ const AppointmentSchema = new Schema<IAppointment>({
   },
   resourceId: {
     type: Number,
-    required: true,
-    index: true
+    required: true
+    // Note: Index covered by compound index { resourceId: 1, startDate: 1 }
   },
   duration: {
     type: Number,
@@ -127,8 +127,8 @@ const AppointmentSchema = new Schema<IAppointment>({
   clientId: {
     type: String,
     required: true,
-    trim: true,
-    index: true
+    trim: true
+    // Note: Index covered by compound index { clientId: 1, startDate: 1 }
   },
   clientKey: {
     type: Number,
@@ -150,8 +150,8 @@ const AppointmentSchema = new Schema<IAppointment>({
   },
   readyToBill: {
     type: Boolean,
-    default: false,
-    index: true
+    default: false
+    // Note: Index covered by compound index { billDate: 1, readyToBill: 1 }
   },
   advancedBilling: {
     type: Boolean,
@@ -165,8 +165,8 @@ const AppointmentSchema = new Schema<IAppointment>({
   clinicName: {
     type: String,
     required: true,
-    trim: true,
-    index: true
+    trim: true
+    // Note: Index covered by compound index { clinicName: 1, startDate: 1 }
   },
   resourceName: {
     type: String,

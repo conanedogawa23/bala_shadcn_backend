@@ -74,8 +74,8 @@ const InsuranceCompanyAddressSchema = new Schema<IInsuranceCompanyAddress>({
     type: String,
     trim: true,
     maxlength: 7,
-    uppercase: true,
-    index: true
+    uppercase: true
+    // Note: Index created by schema-level index { fullPostalCode: 1 }
   },
   
   // Audit fields

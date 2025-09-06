@@ -62,8 +62,8 @@ export interface IOrder extends Document {
 const OrderLineItemSchema = new Schema<IOrderLineItem>({
   productKey: {
     type: Number,
-    required: true,
-    index: true
+    required: true
+    // Note: Index covered by compound index { 'items.productKey': 1 }
   },
   productName: {
     type: String,
@@ -98,8 +98,8 @@ const OrderSchema = new Schema<IOrder>({
   orderNumber: {
     type: String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
+    // Note: unique: true automatically creates index
   },
   appointmentId: {
     type: Number,
