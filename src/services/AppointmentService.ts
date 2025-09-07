@@ -53,8 +53,10 @@ export class AppointmentService {
         clientId
       });
 
-      // Verify clinic exists
-      const clinic = await ClinicModel.findOne({ name: clinicName });
+      // Verify clinic exists - use case-insensitive search due to naming inconsistencies
+      const clinic = await ClinicModel.findOne({ 
+        name: new RegExp(`^${clinicName}$`, 'i') 
+      });
       if (!clinic) {
         throw new NotFoundError('Clinic', clinicName);
       }
@@ -215,8 +217,10 @@ export class AppointmentService {
         throw new NotFoundError('Resource', appointmentData.resourceId.toString());
       }
 
-      // Verify clinic exists
-      const clinic = await ClinicModel.findOne({ name: appointmentData.clinicName });
+      // Verify clinic exists - use case-insensitive search due to naming inconsistencies
+      const clinic = await ClinicModel.findOne({ 
+        name: new RegExp(`^${appointmentData.clinicName}$`, 'i') 
+      });
       if (!clinic) {
         throw new NotFoundError('Clinic', appointmentData.clinicName);
       }
@@ -504,8 +508,10 @@ export class AppointmentService {
    */
   static async getClinicAppointmentStats(clinicName: string, startDate?: Date, endDate?: Date) {
     try {
-      // Verify clinic exists
-      const clinic = await ClinicModel.findOne({ name: clinicName });
+      // Verify clinic exists - use case-insensitive search due to naming inconsistencies
+      const clinic = await ClinicModel.findOne({ 
+        name: new RegExp(`^${clinicName}$`, 'i') 
+      });
       if (!clinic) {
         throw new NotFoundError('Clinic', clinicName);
       }

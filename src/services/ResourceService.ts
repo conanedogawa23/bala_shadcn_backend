@@ -113,7 +113,9 @@ export class ResourceService {
       // Validate clinic associations
       if (resourceData.clinics && resourceData.clinics.length > 0) {
         for (const clinicName of resourceData.clinics) {
-          const clinic = await ClinicModel.findOne({ name: clinicName });
+          const clinic = await ClinicModel.findOne({ 
+            name: new RegExp(`^${clinicName}$`, 'i') 
+          });
           if (!clinic) {
             throw new NotFoundError('Clinic', clinicName);
           }
@@ -183,7 +185,9 @@ export class ResourceService {
       // Validate clinic associations if being updated
       if (updateData.clinics && updateData.clinics.length > 0) {
         for (const clinicName of updateData.clinics) {
-          const clinic = await ClinicModel.findOne({ name: clinicName });
+          const clinic = await ClinicModel.findOne({ 
+            name: new RegExp(`^${clinicName}$`, 'i') 
+          });
           if (!clinic) {
             throw new NotFoundError('Clinic', clinicName);
           }
@@ -334,8 +338,10 @@ export class ResourceService {
    */
   static async getBookableResources(clinicName: string) {
     try {
-      // Verify clinic exists
-      const clinic = await ClinicModel.findOne({ name: clinicName });
+      // Verify clinic exists - use case-insensitive search due to naming inconsistencies
+      const clinic = await ClinicModel.findOne({ 
+        name: new RegExp(`^${clinicName}$`, 'i') 
+      });
       if (!clinic) {
         throw new NotFoundError('Clinic', clinicName);
       }

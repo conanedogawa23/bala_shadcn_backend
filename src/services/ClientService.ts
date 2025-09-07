@@ -163,40 +163,41 @@ export class ClientService {
       variations.add(actualClinicName);
     }
 
-    // Handle specific bodybliss variations
+    // Handle specific clinic variations more precisely
     const lowerRaw = rawClinicName.toLowerCase();
-    if (lowerRaw.includes('bodybliss')) {
-      variations.add('BodyBliss');
-      variations.add('BodyBlissPhysio'); 
+    
+    // BodyBlissPhysio specific variations (separate from BodyBliss)
+    if (rawClinicName === 'BodyBlissPhysio' || lowerRaw === 'bodyblissphysio' || 
+        (actualClinicName && actualClinicName.toLowerCase() === 'bodyblissphysio')) {
+      variations.add('BodyBlissPhysio');
+      variations.add('bodyblissphysio');
       variations.add('BodyBliss Physio');
       variations.add('BodyBliss Physiotherapy');
-      variations.add('bodyblissphysio');
-      variations.add('bodybliss');
-      
-      // If it's the physio clinic, also add OneCare variations
-      if (lowerRaw.includes('physio')) {
-        variations.add('BodyBlissOneCare');
-        variations.add('BodyBliss OneCare');
-      }
     }
-
+    // BodyBliss specific variations (separate clinic)
+    else if (rawClinicName === 'BodyBliss' || lowerRaw === 'bodybliss') {
+      variations.add('BodyBliss');
+      variations.add('bodybliss');
+    }
+    // BodyBlissOneCare specific variations  
+    else if (rawClinicName === 'BodyBlissOneCare' || lowerRaw.includes('onecare')) {
+      variations.add('BodyBlissOneCare');
+      variations.add('BodyBliss OneCare');
+    }
     // Handle other clinic variations
-    if (lowerRaw.includes('ortholine')) {
+    else if (lowerRaw.includes('ortholine')) {
       variations.add('Ortholine Duncan Mills');
       variations.add('ortholine-duncan-mills');
     }
-    
-    if (lowerRaw.includes('century')) {
+    else if (lowerRaw.includes('century')) {
       variations.add('Century Care');
       variations.add('centurycare');
     }
-    
-    if (lowerRaw.includes('cloud')) {
+    else if (lowerRaw.includes('cloud')) {
       variations.add('My Cloud');
       variations.add('mycloud');
     }
-    
-    if (lowerRaw.includes('physio') && !lowerRaw.includes('bodybliss')) {
+    else if (lowerRaw.includes('physio') && !lowerRaw.includes('bodybliss')) {
       variations.add('Physio Bliss');
       variations.add('physiobliss');
     }
