@@ -90,14 +90,33 @@ export class ClinicController {
         let lastActivity: Date | null = null;
 
         try {
-          // Get clinic names that might be used in client/appointment data
+          // Get clinic names that might be used in client/appointment data - using precise mapping
           const possibleClinicNames = [
             clinic.name,           // e.g., "bodyblissphysio"
-            clinic.displayName,    // e.g., "BodyBliss Physiotherapy"
-            // Handle common variations
-            clinic.name.toLowerCase().includes('bodybliss') ? 'BodyBliss' : null,
-            clinic.name.toLowerCase().includes('bodybliss') ? 'BodyBlissPhysio' : null
-          ].filter(Boolean);
+            clinic.displayName     // e.g., "BodyBliss Physiotherapy"
+          ];
+
+          // Add specific backend name mapping based on clinic identity (not inclusive matching)
+          const backendName = ClinicController.getBackendClinicName(clinic.name, clinic.displayName);
+          if (!possibleClinicNames.includes(backendName)) {
+            possibleClinicNames.push(backendName);
+          }
+
+          // Handle specific clinic variations - PRECISE matching to avoid cross-contamination
+          if (clinic.name === 'bodyblissphysio' || clinic.displayName === 'BodyBliss Physiotherapy') {
+            // Only add BodyBlissPhysio variations for the physio clinic
+            if (!possibleClinicNames.includes('BodyBlissPhysio')) {
+              possibleClinicNames.push('BodyBlissPhysio');
+            }
+            if (!possibleClinicNames.includes('BodyBliss Physio')) {
+              possibleClinicNames.push('BodyBliss Physio');
+            }
+          } else if (clinic.name === 'bodybliss' || clinic.displayName === 'BodyBliss') {
+            // Only add BodyBliss variations for the BodyBliss clinic
+            if (!possibleClinicNames.includes('BodyBliss')) {
+              possibleClinicNames.push('BodyBliss');
+            }
+          }
 
           // Count clients across all possible clinic name variations
           for (const clinicNameVariation of possibleClinicNames) {
