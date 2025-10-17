@@ -2,36 +2,36 @@ import { Schema, model, Document, Model } from 'mongoose';
 
 export interface IInsurance {
   type: '1st' | '2nd' | '3rd';
-  dpa: boolean; // Direct Payment Authorization
-  policyHolder: string; // 'self', 'spouse', 'none'
-  cob: string; // Coordination of Benefits
-  policyHolderName: string;
+  dpa: string; // sb_*_DPA field from MSSQL (char 20)
+  policyHolder: string; // sb_*_insurance_policy_holder from MSSQL
+  cob: string; // sb_*_insurance_cob from MSSQL
+  policyHolderName: string; // sb_*_insurance_policy_holder_name from MSSQL
   birthday: {
-    day?: string;
-    month?: string;
-    year?: string;
+    day?: string; // sb_*_insurance_birthday_day from MSSQL
+    month?: string; // sb_*_insurance_birthday_month from MSSQL
+    year?: string; // sb_*_insurance_birthday_year from MSSQL
   };
-  company: string;
-  companyAddress: string;
-  city: string;
-  province: string;
+  company: string; // sb_*_insurance_insurance_company from MSSQL
+  companyAddress: string; // sb_*_insurance_company_address from MSSQL
+  city: string; // sb_*_insurance_city from MSSQL
+  province: string; // sb_*_insurance_province from MSSQL
   postalCode: {
-    first3: string;
-    last3: string;
+    first3: string; // sb_*_insurance_postal_code_first3Digits from MSSQL
+    last3: string; // sb_*_insurance_postal_code_last3Digits from MSSQL
   };
-  groupNumber: string;
-  certificateNumber: string;
+  groupNumber: string; // sb_*_insurance_group_number from MSSQL
+  certificateNumber: string; // sb_*_insurance_certificate_number from MSSQL
   coverage: {
-    numberOfOrthotics: string;
-    totalAmountPerOrthotic: number;
-    totalAmountPerYear: number;
-    frequency: string;
-    numOrthoticsPerYear: string;
-    orthopedicShoes: number;
-    compressionStockings: number;
-    physiotherapy: number;
-    massage: number;
-    other: number;
+    numberOfOrthotics: string; // sb_*_coverage_numberOfOrthotics from MSSQL
+    totalAmountPerOrthotic: number; // sb_*_coverage_totalAmountPerOrthotic from MSSQL
+    totalAmountPerYear: number; // sb_*_coverage_totalAmountPerYear from MSSQL
+    frequency: string; // sb_*_coverage_frequency from MSSQL
+    numOrthoticsPerYear: string; // sb_*_coverage_num_orthotics_per_year from MSSQL
+    orthopedicShoes: number; // sb_*_coverage_orthopedic_shoes from MSSQL
+    compressionStockings: number; // sb_*_coverage_comp_stockings from MSSQL
+    physiotherapy: number; // sb_*_coverage_physiotherapy from MSSQL
+    massage: number; // sb_*_coverage_massage from MSSQL
+    other: number; // sb_*_coverage_other from MSSQL
   };
 }
 
@@ -39,17 +39,17 @@ export interface IClient extends Document {
   clientId: string; // sb_clients_id from MSSQL
   clientKey?: number; // sb_clients_key from MSSQL
   personalInfo: {
-    firstName: string;
-    lastName: string;
-    fullName: string;
-    fullNameForAutocomplete: string;
-    dateOfBirth?: Date;
+    firstName: string; // sb_clients_first_name from MSSQL
+    lastName: string; // sb_clients_last_name from MSSQL
+    fullName: string; // computed field
+    fullNameForAutocomplete: string; // sb_clients_full_name_for_autocomplete from MSSQL
+    dateOfBirth?: Date; // computed from birthday fields
     birthday: {
-      day: string;
-      month: string;
-      year: string;
+      day: string; // sb_clients_birthday_day from MSSQL
+      month: string; // sb_clients_birthday_month from MSSQL
+      year: string; // sb_clients_birthday_year from MSSQL
     };
-    gender: 'Male' | 'Female' | 'Other';
+    gender: string; // sb_clients_gender from MSSQL (char 20)
   };
   contact: {
     address: {
@@ -103,9 +103,12 @@ export interface IClient extends Document {
   dateModified: Date;
   
   // Referral tracking
-  referralType?: number;
-  referralSubtype?: number;
-  
+  referralTypeId?: number; // sb_referral_type_id from MSSQL
+  referralSubtypeId?: number; // sb_referral_subtype_id from MSSQL
+
+  // Additional fields from MSSQL
+  firstInsuranceBirthdayDayTmp?: string; // sb_clients_1st_insurance_birthday_day_tmp from MSSQL
+
   // Instance methods
   getFullName(): string;
   getAge(): number | null;
@@ -358,11 +361,16 @@ const ClientSchema = new Schema<IClient>({
     type: Date,
     default: Date.now
   },
-  referralType: {
-    type: Number
+  referralTypeId: {
+    type: Number // sb_referral_type_id from MSSQL
   },
-  referralSubtype: {
-    type: Number
+  referralSubtypeId: {
+    type: Number // sb_referral_subtype_id from MSSQL
+  },
+  firstInsuranceBirthdayDayTmp: {
+    type: String, // sb_clients_1st_insurance_birthday_day_tmp from MSSQL
+    trim: true,
+    maxlength: 500
   }
 }, {
   timestamps: { createdAt: 'dateCreated', updatedAt: 'dateModified' },

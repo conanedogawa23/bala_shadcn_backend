@@ -1,0 +1,70 @@
+,,,,
+VISIO USERS    ,CLINICS,RETAIN,REMOVE,
+,,,,
+,,Bodybliss Physiotherapy,Bodybliss,
+,,Bodybliss One Care,Bioform Health,
+,,Century Care,Orthopedic Orthotic Appliances,
+,,Duncan Mills Ortholine,Markham Orthopedic,
+,,My Cloud,Extreme  Physio,
+,,Physiobliss,Active Force,
+,,,,
+,ITEMS TO RETAIN,RETAIN,REMOVE,
+,,,,
+,CLIENT Page,Name,CSR Name,
+,,Address,,
+,,Birthday,Work no. and Extension,
+,,Cellphone No.,Family MD,
+,,Home No.,How did you hear about us,
+,,Email. Address,View Insuranc,
+,,Company Name,Generate PDF. Form (insurance),
+,,Referring MD,,
+,,Gender,,
+,,,,
+,INSURANCE PAGE ,Policy Holder Name,3rd Insurance Column,
+,( next page of Order ),Policy Holder Bday,,
+,,Insurance Company Name,,
+,,Group No.,,
+,,Certificate No.,,
+,,,,Product Name to be removedin order page
+,ORDER PAGE,Please see Fifth ( 5th ) column ,,"AC ,AC50, AC60 ,AC80"
+,,for the product name to remove,,"ALLE, ANX, ARTH, BNP"
+,SCHEDULE PAGE,,Remove this page,"BPH, CANPREV5HTP"
+,,,," CANPREVALA, CANPREVEP, CANPREVHH"
+,PAYMENT PAGE,Retain all Items,Remove Co-pay ( Ins. 3 ),"CANPREVHH, CANPREVHL"
+,,,,"CANPREVIBS, CANPREVNEM"
+,LAB Page,,Remove this page,"CANPREVPP, CANPREVTP"
+,,,,"(1) CFOS, CHRF, CHS, CP"
+,RELATIONS page,,Remove this page,"DeeP1, DLA300, DLFC, DLGMCM"
+,,,,"DLIG, DLLIV, DLMC, DLPSP, DLQ"
+,,,,"DLTQ, DLTS, DLUPRO, EVCO"
+,REPORTS Page,Account Summary report,Actual Value Report,"HB, HC, IND, INS, LB01,LB02"
+,,Account Summary report 2,Bank Deposit Summary,"LB03, LBCOS x 2, LCKK, LFB219"
+,,Payment Summary by Day Range,Lab Production,"LS, ME, MenoPrev, MI, MIG00"
+,,Time Sheet,New Lab. Order Sheet,"MIG01, MIG02, MIG03, MIG24"
+,,Order Status,Completed Order List,"MIGM0, MIGSG, MIGTR, "
+,,  Under Clinic Name,Final Payment DPA,"NATser, NATser125, NATser140"
+,,     retain the following:,List of Clients,"NATser180, NAtser25, NATser250,"
+,,     -  Bodybliss  Physio,Final Payment POP,"NATser30, NATSer49, NATser80"
+,,     -  Ortholine Duncan Mills,Referring CSR,"NSA, NSAUT, NSBA, NSFV1"
+,,     -  Bodyblis One Care,Referring MD,"NSFV10, NSFV15, NSFV20"
+,,     -  Century Care,Referring MD Details,"NSFV30, NSFV45, NSFV5, NSIV1"
+,,     -  My Cloud,Referring MD Orders,"NSIV30, NSMR, NSU, OCF63"
+,,,Reimbursement,"OS, OS135, OS200, OSTAS"
+,,  Under dropdown of order status,Repeat Patient,"OSTT30, OSTT45, OSTT60,PEB12"
+,,     retain the following:,Refer a friend,"PEEX,PEHE, PELG, PELGD"
+,,     -  Pending Sales Refund 1,Batch Payment,"PEOB, PEP, PEPB, PEV, PM, PR1"
+,,     -  Pending Sales Refund 1 & COB 1,Billing by Invoice Date,"PR1, PR2, SC, SFH, SFHCGS"
+,,,Billing by Final Paid,"SFHEDI, SH01, SHCOS, SlimPro"
+,,  Under dropdown of Date,Billing by Account Receivable,"UL, WH, WM, WSVB100, WSVB9995"
+,,      retain - Order Date ,Partial or unpaid Orders,
+,,                -  Invoice Date,Refunds,
+,,,How did you hear about us,
+,,,Phil - Can,
+,,Sales Refund Summary - Rename into,Flyer Promotion,
+,,  - Co Pay Summary,Client Revenue Staement,
+,,,Completed Lab Statement,
+,,Shoe Allowance Summary - Rename into,Daily Appointment Report,
+,,   - Marketing Budget Summary,Forecasting,
+,,,Total Dispensable Report,
+,,,Total Dispensable Report per patient,
+,,,Multi  Location,

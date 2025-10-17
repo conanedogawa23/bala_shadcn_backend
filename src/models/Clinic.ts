@@ -52,32 +52,23 @@ export interface IOrganizationContact {
 }
 
 export interface IClinic extends Document {
-  // FHIR Core Fields
-  resourceType: 'Organization';
-  identifier: IOrganizationIdentifier[];
-  
-  // Legacy Support
-  clinicId: number;
-  
-  // FHIR Organization Fields
-  active: boolean;
-  type: OrganizationType[];
-  name: string;
-  alias?: string[];
-  telecom: IOrganizationContactPoint[];
-  address: IOrganizationAddress[];
-  partOf?: string; // Reference to parent organization
-  contact?: IOrganizationContact[];
-  
-  // Business Fields
-  displayName: string;
-  completeName?: string;
-  services: string[];
-  status: OrganizationStatus;
-  clientCount: number;
+  // Primary key from MSSQL
+  clinicId: number; // ClinicId from MSSQL
+
+  // Core clinic information from MSSQL
+  clinicName: string; // ClinicName from MSSQL
+  clinicAddress: string; // ClinicAddress from MSSQL
+  city: string; // City from MSSQL
+  province: string; // Province from MSSQL
+  postalCode: string; // PostalCode from MSSQL
+
+  // Additional fields
+  completeName?: string; // CompleteName from MSSQL
+
+  // Business logic fields
   isRetainedClinic: boolean; // Business rule from VISIO requirements
-  
-  // Analytics
+
+  // Analytics (computed fields)
   stats: {
     totalOrders: number;
     totalRevenue: number;
@@ -85,19 +76,17 @@ export interface IClinic extends Document {
     lastActivity?: Date;
     averageOrderValue: number;
   };
-  
+
   // Audit Fields
-  dateCreated: Date;
-  dateModified: Date;
+  dateCreated: Date; // DateCreated from MSSQL
+  dateModified: Date; // DateModified from MSSQL
   createdBy?: string;
   updatedBy?: string;
-  
+
   // Instance Methods
   isActive(): boolean;
   getFullAddress(): string;
-  getPrimaryPhone(): string | null;
-  getPrimaryEmail(): string | null;
-  toFHIRResource(): any;
+  getDisplayName(): string;
   isBusinessRetained(): boolean;
 }
 
@@ -160,76 +149,62 @@ const OrganizationContactSchema = new Schema<IOrganizationContact>({
   address: OrganizationAddressSchema
 }, { _id: false });
 
-// Main Clinic Schema with FHIR alignment
+// Main Clinic Schema matching MSSQL structure
 const ClinicSchema = new Schema<IClinic>({
-  // FHIR Core Fields
-  resourceType: { 
-    type: String, 
-    default: 'Organization',
-    enum: ['Organization']
-  },
-  identifier: [OrganizationIdentifierSchema],
-  
-  // Legacy Support
+  // Primary key from MSSQL
   clinicId: {
     type: Number,
     required: true,
     unique: true,
     index: true
   },
-  
-  // FHIR Organization Fields
-  active: { 
-    type: Boolean, 
-    default: true,
-    index: true
-  },
-  type: [{
-    type: String,
-    enum: Object.values(OrganizationType),
-    default: OrganizationType.CLINIC
-  }],
-  name: {
+
+  // Core clinic information from MSSQL
+  clinicName: {
     type: String,
     required: true,
     unique: true,
     trim: true,
-    maxlength: 100,
+    maxlength: 50,
     index: true
   },
-  alias: [{ type: String, trim: true }],
-  telecom: [OrganizationContactPointSchema],
-  address: [OrganizationAddressSchema],
-  partOf: { type: String, trim: true }, // Reference to parent organization
-  contact: [OrganizationContactSchema],
-  
-  // Business Fields
-  displayName: {
+  clinicAddress: {
     type: String,
     required: true,
     trim: true,
-    maxlength: 100
+    maxlength: 500
   },
+  city: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 300,
+    index: true
+  },
+  province: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 300,
+    index: true
+  },
+  postalCode: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 50,
+    uppercase: true,
+    index: true
+  },
+
+  // Additional fields
   completeName: {
     type: String,
     trim: true,
-    maxlength: 200
+    maxlength: 100
   },
-  services: [{
-    type: String,
-    trim: true
-  }],
-  status: {
-    type: String,
-    enum: Object.values(OrganizationStatus),
-    default: OrganizationStatus.ACTIVE,
-    index: true
-  },
-  clientCount: {
-    type: Number,
-    default: 0,
-    min: 0
-  },
+
+  // Business logic fields
   isRetainedClinic: {
     type: Boolean,
     default: false,
@@ -265,130 +240,76 @@ const ClinicSchema = new Schema<IClinic>({
 
 // Indexes for optimal performance
 ClinicSchema.index({ clinicId: 1 }, { unique: true });
-ClinicSchema.index({ name: 1 }, { unique: true });
-ClinicSchema.index({ status: 1, active: 1 });
+ClinicSchema.index({ clinicName: 1 }, { unique: true });
 ClinicSchema.index({ isRetainedClinic: 1 });
-ClinicSchema.index({ 'address.city': 1 });
-ClinicSchema.index({ 'address.state': 1 });
-ClinicSchema.index({ 'identifier.system': 1, 'identifier.value': 1 });
+ClinicSchema.index({ city: 1 });
+ClinicSchema.index({ province: 1 });
+ClinicSchema.index({ postalCode: 1 });
 ClinicSchema.index({ dateCreated: -1 });
 
 // Pre-save middleware for business rules
 ClinicSchema.pre<IClinic>('save', async function(next) {
   this.dateModified = new Date();
-  
+
   // Auto-set retained clinic status based on business rules
-  if (RETAINED_CLINIC_NAMES.includes(this.name)) {
+  if (RETAINED_CLINIC_NAMES.includes(this.clinicName)) {
     this.isRetainedClinic = true;
-    this.active = true;
-    this.status = OrganizationStatus.ACTIVE;
   } else {
     this.isRetainedClinic = false;
     // Optionally set non-retained clinics as historical
     if (this.isNew) {
-      this.status = OrganizationStatus.HISTORICAL;
-      this.active = false;
+      // Keep as default values for non-retained clinics
     }
   }
-  
-  // FHIR identifier auto-generation
-  if (this.isNew && (!this.identifier || this.identifier.length === 0)) {
-    this.identifier = [{
-      system: 'http://bala-visio.com/fhir/organization-identifier',
-      value: `ORG-${this.clinicId}`,
-      use: 'official'
-    }];
-  }
-  
+
   // Calculate average order value
   if (this.stats.totalOrders > 0) {
     this.stats.averageOrderValue = this.stats.totalRevenue / this.stats.totalOrders;
   }
-  
+
   next();
 });
 
 // Instance Methods
 ClinicSchema.methods.isActive = function(): boolean {
-  return this.active && this.status === OrganizationStatus.ACTIVE;
+  return this.isRetainedClinic;
 };
 
 ClinicSchema.methods.getFullAddress = function(): string {
-  if (!this.address || this.address.length === 0) return '';
-  
-  const primaryAddress = this.address.find((addr: IOrganizationAddress) => addr.use === 'work') || this.address[0];
-  const addressLine = primaryAddress.line.join(', ');
-  return `${addressLine}, ${primaryAddress.city}, ${primaryAddress.state} ${primaryAddress.postalCode}`;
+  return `${this.clinicAddress}, ${this.city}, ${this.province} ${this.postalCode}`;
 };
 
-ClinicSchema.methods.getPrimaryPhone = function(): string | null {
-  const phoneContact = this.telecom.find((contact: IOrganizationContactPoint) => 
-    contact.system === 'phone' && contact.use === 'work'
-  );
-  return phoneContact ? phoneContact.value : null;
-};
-
-ClinicSchema.methods.getPrimaryEmail = function(): string | null {
-  const emailContact = this.telecom.find((contact: IOrganizationContactPoint) => 
-    contact.system === 'email' && contact.use === 'work'
-  );
-  return emailContact ? emailContact.value : null;
+ClinicSchema.methods.getDisplayName = function(): string {
+  return this.clinicName;
 };
 
 ClinicSchema.methods.isBusinessRetained = function(): boolean {
-  return this.isRetainedClinic && RETAINED_CLINIC_NAMES.includes(this.name);
-};
-
-ClinicSchema.methods.toFHIRResource = function(): any {
-  return {
-    resourceType: this.resourceType,
-    id: this._id.toString(),
-    identifier: this.identifier,
-    active: this.active,
-    type: this.type.map((t: OrganizationType) => ({
-      coding: [{
-        system: 'http://terminology.hl7.org/CodeSystem/organization-type',
-        code: t,
-        display: t === OrganizationType.CLINIC ? 'Hospital Department' : 'Healthcare Provider'
-      }]
-    })),
-    name: this.name,
-    alias: this.alias,
-    telecom: this.telecom,
-    address: this.address,
-    partOf: this.partOf ? {
-      reference: `Organization/${this.partOf}`
-    } : undefined,
-    contact: this.contact
-  };
+  return this.isRetainedClinic && RETAINED_CLINIC_NAMES.includes(this.clinicName);
 };
 
 // Static Methods with business filtering
 ClinicSchema.statics.findActiveClinic = function(): Promise<IClinic[]> {
-  return this.find({ 
-    active: true, 
-    status: OrganizationStatus.ACTIVE,
-    isRetainedClinic: true 
-  }).sort({ name: 1 });
+  return this.find({
+    isRetainedClinic: true
+  }).sort({ clinicName: 1 });
 };
 
 ClinicSchema.statics.findRetainedClinics = function(): Promise<IClinic[]> {
-  return this.find({ 
-    isRetainedClinic: true,
-    active: true
-  }).sort({ name: 1 });
+  return this.find({
+    isRetainedClinic: true
+  }).sort({ clinicName: 1 });
 };
 
 ClinicSchema.statics.findByBusinessStatus = function(status: OrganizationStatus): Promise<IClinic[]> {
-  const filter: any = { status };
-  
+  const filter: any = {};
+
   // For active status, only show retained clinics
   if (status === OrganizationStatus.ACTIVE) {
     filter.isRetainedClinic = true;
-    filter.name = { $in: RETAINED_CLINIC_NAMES };
+    filter.clinicName = { $in: RETAINED_CLINIC_NAMES };
   }
-  
-  return this.find(filter).sort({ name: 1 });
+
+  return this.find(filter).sort({ clinicName: 1 });
 };
 
 ClinicSchema.statics.getRetainedClinicNames = function(): string[] {

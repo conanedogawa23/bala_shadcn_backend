@@ -1,41 +1,37 @@
 import { Schema, model, Document, Model } from 'mongoose';
 
 export interface IAppointment extends Document {
-  appointmentId?: number; // ID from MSSQL
+  id: number; // ID from MSSQL (primary key)
   type: number; // Type from MSSQL
-  startDate: Date;
-  endDate: Date;
-  allDay?: boolean;
-  subject: string; // Often client name or service type
-  location?: string;
-  description?: string;
-  status: number; // 0 = scheduled, 1 = completed, 2 = cancelled, etc.
-  label: number; // Color/category label
-  resourceId: number; // Links to practitioner/service
-  duration: number; // in minutes
-  
+  startDate: Date; // StartDate from MSSQL
+  endDate: Date; // EndDate from MSSQL
+  allDay?: boolean; // AllDay from MSSQL
+  subject: string; // Subject from MSSQL (often client name or service type)
+  location?: string; // Location from MSSQL
+  description?: string; // Description from MSSQL
+  status: number; // Status from MSSQL (0 = scheduled, 1 = completed, 2 = cancelled, etc.)
+  label: number; // Label from MSSQL (color/category label)
+  resourceId: number; // ResourceID from MSSQL (links to practitioner/service)
+  duration?: number; // Duration from MSSQL (in minutes)
+
   // Client and billing information
-  clientId: string; // Links to Client
-  clientKey?: number; // MSSQL client key reference
-  productKey?: number; // Service/product being provided
-  
+  clientId: number; // ClientID from MSSQL (integer, not string)
+  productKey?: number; // ProductKey from MSSQL (service/product being provided)
+
   // Billing and invoice tracking
-  billDate?: Date;
-  invoiceDate?: Date;
-  readyToBill: boolean;
-  advancedBilling: boolean;
-  advancedBillingId?: number;
-  
-  // Clinic and practitioner
-  clinicName: string;
-  resourceName?: string; // Populated from Resource model
-  
+  billDate?: Date; // BillDate from MSSQL
+  readyToBill: boolean; // ReadyToBill from MSSQL
+  clinicName: string; // ClinicName from MSSQL
+  invoiceDate?: Date; // InvoiceDate from MSSQL
+  advancedBilling: boolean; // AdvancedBilling from MSSQL
+  shadowId?: number; // shadowID from MSSQL (for appointment shadows/copies)
+  advancedBillingId?: number; // AdvancedBillingId from MSSQL
+  groupId?: number; // GroupID from MSSQL (for grouped appointments)
+
   // Scheduling metadata
-  reminderInfo?: string; // JSON string for reminder settings
-  recurrenceInfo?: string; // JSON string for recurring appointments
-  isActive: boolean;
-  shadowId?: number; // For appointment shadows/copies
-  groupId?: string; // For grouped appointments
+  reminderInfo?: string; // ReminderInfo from MSSQL (JSON string for reminder settings)
+  recurrenceInfo?: string; // RecurrenceInfo from MSSQL (JSON string for recurring appointments)
+  isActive: boolean; // IsActive from MSSQL
   
   // Audit fields
   dateCreated: Date;
@@ -59,8 +55,10 @@ interface IAppointmentModel extends Model<IAppointment> {
 }
 
 const AppointmentSchema = new Schema<IAppointment>({
-  appointmentId: {
+  id: {
     type: Number,
+    required: true,
+    unique: true,
     index: true
   },
   type: {
@@ -87,18 +85,18 @@ const AppointmentSchema = new Schema<IAppointment>({
     type: String,
     required: true,
     trim: true,
-    maxlength: 200,
+    maxlength: 100, // Matches MSSQL nvarchar(100)
     index: true
   },
   location: {
     type: String,
     trim: true,
-    maxlength: 200
+    maxlength: 50 // Matches MSSQL nvarchar(50)
   },
   description: {
     type: String,
     trim: true,
-    maxlength: 1000
+    maxlength: 1073741823 // Matches MSSQL ntext max length
   },
   status: {
     type: Number,
@@ -118,33 +116,22 @@ const AppointmentSchema = new Schema<IAppointment>({
   },
   duration: {
     type: Number,
-    required: true,
-    default: 30,
     min: 0
   },
-  
+
   // Client and billing information
   clientId: {
-    type: String,
-    required: true,
-    trim: true
-    // Note: Index covered by compound index { clientId: 1, startDate: 1 }
-  },
-  clientKey: {
     type: Number,
-    index: true
+    required: true
+    // Note: Index covered by compound index { clientId: 1, startDate: 1 }
   },
   productKey: {
     type: Number,
     index: true
   },
-  
+
   // Billing and invoice tracking
   billDate: {
-    type: Date,
-    index: true
-  },
-  invoiceDate: {
     type: Date,
     index: true
   },
@@ -153,48 +140,47 @@ const AppointmentSchema = new Schema<IAppointment>({
     default: false
     // Note: Index covered by compound index { billDate: 1, readyToBill: 1 }
   },
-  advancedBilling: {
-    type: Boolean,
-    default: false
-  },
-  advancedBillingId: {
-    type: Number
-  },
-  
-  // Clinic and practitioner
   clinicName: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
+    maxlength: 100, // Matches MSSQL varchar(100)
     // Note: Index covered by compound index { clinicName: 1, startDate: 1 }
   },
-  resourceName: {
-    type: String,
-    trim: true,
-    maxlength: 100
-  },
-  
-  // Scheduling metadata
-  reminderInfo: {
-    type: String,
-    trim: true
-  },
-  recurrenceInfo: {
-    type: String,
-    trim: true
-  },
-  isActive: {
-    type: Boolean,
-    default: true,
+  invoiceDate: {
+    type: Date,
     index: true
+  },
+  advancedBilling: {
+    type: Boolean,
+    default: false
   },
   shadowId: {
     type: Number,
     default: 0
   },
+  advancedBillingId: {
+    type: Number
+  },
   groupId: {
+    type: Number,
+    index: true
+  },
+
+  // Scheduling metadata
+  reminderInfo: {
     type: String,
     trim: true,
+    maxlength: 1073741823 // Matches MSSQL ntext max length
+  },
+  recurrenceInfo: {
+    type: String,
+    trim: true,
+    maxlength: -1 // Matches MSSQL varchar(-1) max length
+  },
+  isActive: {
+    type: Boolean,
+    default: true,
     index: true
   },
   
@@ -281,40 +267,40 @@ AppointmentSchema.methods.getFormattedDuration = function(): string {
 
 // Static methods
 AppointmentSchema.statics.findByClinic = function(clinicName: string, startDate?: Date, endDate?: Date) {
-  const query: any = { 
+  const query: any = {
     clinicName: clinicName,
-    isActive: true 
+    isActive: true
   };
-  
+
   if (startDate && endDate) {
     query.startDate = { $gte: startDate, $lte: endDate };
   }
-  
+
   return this.find(query).sort({ startDate: 1 });
 };
 
-AppointmentSchema.statics.findByClient = function(clientId: string) {
-  return this.find({ 
+AppointmentSchema.statics.findByClient = function(clientId: number) {
+  return this.find({
     clientId: clientId,
-    isActive: true 
+    isActive: true
   }).sort({ startDate: -1 });
 };
 
 AppointmentSchema.statics.findByResource = function(resourceId: number, date?: Date) {
-  const query: any = { 
+  const query: any = {
     resourceId: resourceId,
-    isActive: true 
+    isActive: true
   };
-  
+
   if (date) {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
-    
+
     query.startDate = { $gte: startOfDay, $lte: endOfDay };
   }
-  
+
   return this.find(query).sort({ startDate: 1 });
 };
 
@@ -324,18 +310,18 @@ AppointmentSchema.statics.findReadyToBill = function(clinicName?: string) {
     invoiceDate: { $exists: false },
     isActive: true
   };
-  
+
   if (clinicName) {
     query.clinicName = clinicName;
   }
-  
+
   return this.find(query).sort({ billDate: 1 });
 };
 
 AppointmentSchema.statics.checkTimeSlotConflict = function(
-  resourceId: number, 
-  startDate: Date, 
-  endDate: Date, 
+  resourceId: number,
+  startDate: Date,
+  endDate: Date,
   excludeAppointmentId?: string
 ) {
   const query: any = {
@@ -350,11 +336,11 @@ AppointmentSchema.statics.checkTimeSlotConflict = function(
       { startDate: { $gte: startDate }, endDate: { $lte: endDate } }
     ]
   };
-  
+
   if (excludeAppointmentId) {
     query._id = { $ne: excludeAppointmentId };
   }
-  
+
   return this.find(query);
 };
 
