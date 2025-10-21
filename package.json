@@ -1,7 +1,7 @@
 {
-  "name": "bala-visio-backend",
-  "version": "1.0.0",
-  "description": "Backend API for Bala Visio clinic management system with MSSQL to MongoDB migration",
+  "name": "visio-health-backend",
+  "version": "1.0.1",
+  "description": "Backend API for Visio Health clinic management system with MSSQL to MongoDB migration",
   "main": "dist/app.js",
   "scripts": {
     "dev": "nodemon",
@@ -22,7 +22,7 @@
     "express",
     "typescript"
   ],
-  "author": "Bala Visio Team",
+  "author": "Visio Health",
   "license": "MIT",
   "dependencies": {
     "bcryptjs": "^2.4.3",

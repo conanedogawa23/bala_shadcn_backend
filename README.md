@@ -1,6 +1,6 @@
-# Bala Visio Backend
+# Visio Backend
 
-Node.js/Express/MongoDB backend API for the Bala Visio clinic management system, designed to replace mock APIs with real-time functionality and MSSQL to MongoDB migration capabilities.
+Node.js/Express/MongoDB backend API for the Visio clinic management system, designed to replace mock APIs with real-time functionality and MSSQL to MongoDB migration capabilities.
 
 ## 🏗️ Architecture
 
@@ -23,7 +23,7 @@ This project follows **strict MVC (Model-View-Controller)** architecture:
 
 1. **Clone and install dependencies:**
 ```bash
-cd bala_visio_backend
+cd visio_health_backend
 npm install
 ```
 
@@ -43,7 +43,7 @@ The API will be available at `http://localhost:5000`
 ## 📁 Project Structure
 
 ```
-bala_visio_backend/
+visio_health_backend/
 ├── src/
 │   ├── models/             # Mongoose schemas (MODEL layer)
 │   ├── views/              # Response formatters (VIEW layer)  
@@ -207,7 +207,7 @@ PORT=5000
 FRONTEND_URL=http://localhost:3000
 
 # MongoDB
-MONGODB_URI=mongodb://localhost:27017/bala_visio
+MONGODB_URI=mongodb://localhost:27017/visio
 
 # MSSQL (for migration)
 MSSQL_SERVER=localhost
