@@ -1,0 +1,148 @@
+---
+globs: src/models/*.ts
+---
+
+# Model Design Standards
+
+## MSSQL Field Mapping
+
+All models should map MSSQL source fields with comments:
+
+```typescript
+export interface IPayment extends Document {
+  paymentNumber?: string;          // sb_payment_number (auto-generated)
+  clientId: number;                // sb_client_id (matches MSSQL) ← TYPE CRITICAL
+  clinicName: string;              // sb_clinic_name
+  paymentDate: Date;               // sb_payment_date
+  paymentMethod: PaymentMethod;    // sb_payment_method
+}
+```
+
+## Type Consistency Rules
+
+### Critical Types (Non-Negotiable)
+
+- **clientId**: ALWAYS `number` across all models
+- **clinicName**: ALWAYS `string` 
+- **dates**: ALWAYS `Date` type
+- **monetary**: ALWAYS `number`
+
+### Never Mix Types
+
+```typescript
+// ❌ WRONG - Different types in different models
+// Client model
+clientId: string
+
+// Payment model  
+clientId: number
+
+// ✓ CORRECT - Consistent across all models
+clientId: number  // everywhere
+```
+
+## Nested Object Structures
+
+### Contact Information Pattern
+
+```typescript
+contact: {
+  address: {
+    street: string;
+    city: string;
+    postalCode: {
+      first3: string;
+      last3: string;
+      full: string;  // computed
+    }
+  };
+  phones: {
+    cell?: {
+      countryCode: string;
+      areaCode: string;
+      number: string;
+      full: string;  // computed
+    };
+    home?: {...};
+    work?: {...};
+  };
+}
+```
+
+### Payment Amounts Pattern
+
+```typescript
+amounts: {
+  totalPaymentAmount: number;
+  totalPaid: number;
+  totalOwed: number;
+  popAmount: number;
+  dpaAmount: number;
+  cob1Amount: number;
+  cob2Amount: number;
+  insurance1stAmount: number;
+  insurance2ndAmount: number;
+  // ... more fields
+}
+```
+
+### Line Items Pattern (Arrays)
+
+```typescript
+items: IOrderLineItem[];  // Use interface
+
+interface IOrderLineItem {
+  productKey: number;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+}
+```
+
+## Optional vs Required Fields
+
+Use `?` for truly optional fields:
+```typescript
+// ✓ CORRECT
+dateOfBirth?: Date;      // Optional - computed field
+familyMD?: string;       // Optional - may not exist
+
+// ❌ WRONG
+dateOfBirth: Date | undefined;  // Don't use union types for optionality
+```
+
+## Index Strategy
+
+Add indexes for common queries:
+```typescript
+clinicName: {
+  type: String,
+  index: true,           // For clinic filtering
+  required: true
+},
+clientId: {
+  type: Number,
+  index: true,           // For client lookups
+  required: true
+},
+createdAt: {
+  type: Date,
+  index: true,           // For sorting/filtering
+  default: Date.now
+}
+```
+
+## Computed Fields
+
+Mark computed/derived fields with comments:
+```typescript
+// computed field
+fullName: string;
+
+// computed field
+postal: string;  // Combines first3 + last3
+
+// computed field  
+full: string;    // Full phone number
+```

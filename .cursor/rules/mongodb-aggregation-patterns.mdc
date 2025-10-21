@@ -1,0 +1,74 @@
+---
+globs: src/services/*.ts
+---
+
+# MongoDB Aggregation Patterns
+
+## Service Layer Aggregations
+
+Use [src/services/PaymentService.ts](mdc:src/services/PaymentService.ts) and [src/services/OrderService.ts](mdc:src/services/OrderService.ts) as reference implementations.
+
+### Correct Field Access in Aggregations
+
+Always use nested dot notation for fields:
+```typescript
+// ✓ CORRECT
+$group: {
+  _id: '$clientId',
+  totalPaid: { $sum: '$amounts.totalPaid' },
+  totalOwed: { $sum: '$amounts.totalOwed' }
+}
+
+// ❌ WRONG
+totalPaid: { $sum: '$totalPaid' }  // Doesn't exist at root level
+```
+
+### Date Formatting
+
+For date-to-string conversions:
+```typescript
+// ✓ CORRECT
+$dateToString: { format: '%Y-%m-%d', date: '$paymentDate' }
+```
+
+### Sorting and Pagination
+
+Always apply $skip before $limit:
+```typescript
+const skip = (page - 1) * limit;
+
+$skip: skip,
+$limit: limit
+```
+
+### Counting Results
+
+Use separate aggregation pipeline for total count:
+```typescript
+// First pipeline: get paginated results
+PaymentModel.aggregate([
+  { $match: matchCriteria },
+  { $group: {...} },
+  { $skip: skip },
+  { $limit: limit }
+])
+
+// Second pipeline: get total count
+PaymentModel.aggregate([
+  { $match: matchCriteria },
+  { $group: { _id: '$clientId' } },
+  { $count: 'count' }
+])
+```
+
+### Conditional Sums
+
+Use $cond for conditional aggregations:
+```typescript
+completedOrders: {
+  $sum: { $cond: [{ $eq: ['$status', OrderStatus.COMPLETED] }, 1, 0] }
+},
+outstandingAmount: {
+  $sum: { $cond: [{ $ne: ['$paymentStatus', PaymentStatus.PAID] }, '$totalAmount', 0] }
+}
+```

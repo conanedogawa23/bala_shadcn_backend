@@ -1,0 +1,109 @@
+---
+alwaysApply: true
+---
+
+# Clinic Model Structure and Field Mappings
+
+## CRITICAL: Model Uses MSSQL Field Names
+
+The [src/models/Clinic.ts](mdc:src/models/Clinic.ts) uses MSSQL source field names directly:
+
+### Correct Field Access (MSSQL Aligned):
+```typescript
+clinic.clinicId           // ✓ Primary key from MSSQL
+clinic.clinicName         // ✓ Name - from MSSQL
+clinic.clinicAddress      // ✓ Street address
+clinic.city               // ✓ City from MSSQL
+clinic.province           // ✓ Province from MSSQL
+clinic.postalCode         // ✓ PostalCode from MSSQL
+clinic.completeName       // ✓ Full name
+clinic.isRetainedClinic   // ✓ Business rule flag
+clinic.stats              // ✓ Computed analytics
+
+// Instance methods
+clinic.getDisplayName()   // ✓ Get formatted name
+clinic.getFullAddress()   // ✓ Get complete address
+clinic.isActive()         // ✓ Check if active
+```
+
+### ❌ WRONG - Old field names (don't exist):
+```typescript
+clinic.name               // ❌ USE clinicName INSTEAD
+clinic.displayName        // ❌ USE getDisplayName() INSTEAD
+clinic.address            // ❌ Use clinicAddress + city + province + postalCode
+clinic.telecom            // ❌ Not in current model
+clinic.contact            // ❌ Not in current model
+clinic.services           // ❌ Not in current model
+clinic.status             // ❌ USE stats INSTEAD
+clinic.clientCount        // ❌ Access via stats.totalClients
+```
+
+## Controllers Must Use Correct Fields
+
+[src/controllers/ClinicController.ts](mdc:src/controllers/ClinicController.ts) accessing clinic properties:
+
+```typescript
+// ✓ CORRECT
+clinic.clinicName
+clinic.getDisplayName()
+clinic.clinicAddress
+clinic.city
+clinic.province
+clinic.isRetainedClinic
+
+// ❌ WRONG - These don't exist
+clinic.name
+clinic.displayName
+clinic.address
+clinic.telecom
+clinic.status
+clinic.clientCount
+```
+
+## Views Must Use Correct Fields
+
+[src/views/ClinicView.ts](mdc:src/views/ClinicView.ts) formatting clinic data:
+
+```typescript
+// ✓ CORRECT response format
+{
+  id: clinic.clinicId,
+  name: clinic.clinicName,              // Use clinicName from model
+  displayName: clinic.getDisplayName(),  // Use method
+  address: clinic.clinicAddress,        // Use clinicAddress
+  city: clinic.city,
+  province: clinic.province,
+  stats: clinic.stats
+}
+
+// ❌ WRONG
+{
+  name: clinic.name,                // Doesn't exist
+  displayName: clinic.displayName,  // Doesn't exist
+  address: clinic.address,          // Doesn't exist
+}
+```
+
+## Property Mapping Summary
+
+| Controller/View Access | Model Field | Type | Notes |
+|------------------------|------------|------|-------|
+| name | clinicName | string | Actual clinic name from MSSQL |
+| displayName() | getDisplayName() | method | Returns formatted name |
+| address | clinicAddress | string | Street address only |
+| city | city | string | City name |
+| province | province | string | Province/state |
+| status | stats.* | object | Use stats object |
+| clientCount | stats.totalClients | number | From stats object |
+| address array | N/A - Use individual fields | - | Model flattens address |
+
+## Required Fixes
+
+All references to these **must be updated**:
+- `clinic.name` → `clinic.clinicName`
+- `clinic.displayName` → `clinic.getDisplayName()`
+- `clinic.address` → `clinic.clinicAddress` (for street only)
+- `clinic.telecom` → REMOVED (not in model)
+- `clinic.contact` → REMOVED (not in model)
+- `clinic.status` → `clinic.stats`
+- `clinic.clientCount` → `clinic.stats.totalClients`

@@ -1,0 +1,103 @@
+---
+globs: src/**/*.ts
+---
+
+# File Naming Conventions
+
+## Route Files
+
+All route files MUST use kebab-case naming:
+
+**✓ CORRECT:**
+```
+src/routes/clinic-routes.ts
+src/routes/client-routes.ts
+src/routes/appointment-routes.ts
+src/routes/payment-routes.ts
+src/routes/contact-history-routes.ts
+src/routes/insurance-company-address-routes.ts
+```
+
+**❌ WRONG:**
+```
+src/routes/clinicRoutes.ts        (camelCase)
+src/routes/ClientRoutes.ts        (PascalCase)
+src/routes/clinic_routes.ts       (snake_case)
+```
+
+## Import Statement Pattern
+
+When importing routes in [src/routes/index.ts](mdc:src/routes/index.ts), always use kebab-case filenames:
+
+```typescript
+// ✓ CORRECT
+import clinicRoutes from './clinic-routes';
+import clientRoutes from './client-routes';
+import advancedBillingRoutes from './advanced-billing-routes';
+
+// ❌ WRONG
+import clinicRoutes from './clinicRoutes';
+import clientRoutes from './clientRoutes';
+import advancedBillingRoutes from './advancedBillingRoutes';
+```
+
+## Model Files
+
+Model files use PascalCase with .ts extension:
+
+**✓ CORRECT:**
+```
+src/models/Client.ts
+src/models/Payment.ts
+src/models/Order.ts
+src/models/Appointment.ts
+```
+
+## Service Files
+
+Service files use PascalCase ending with Service:
+
+**✓ CORRECT:**
+```
+src/services/ClientService.ts
+src/services/PaymentService.ts
+src/services/OrderService.ts
+src/services/ClinicService.ts
+```
+
+## Controller Files
+
+Controller files use PascalCase ending with Controller:
+
+**✓ CORRECT:**
+```
+src/controllers/ClientController.ts
+src/controllers/PaymentController.ts
+src/controllers/OrderController.ts
+```
+
+## Directory Structure
+
+Directory names use kebab-case:
+
+**✓ CORRECT:**
+```
+src/models/
+src/services/
+src/controllers/
+src/routes/
+src/utils/
+src/middleware/
+src/views/
+```
+
+## Summary
+
+| Component | Convention | Example |
+|-----------|-----------|---------|
+| Routes | kebab-case | `client-routes.ts` |
+| Models | PascalCase | `Client.ts` |
+| Services | PascalCase | `ClientService.ts` |
+| Controllers | PascalCase | `ClientController.ts` |
+| Utils/Helpers | camelCase | `mongooseHelpers.ts` |
+| Directories | kebab-case | `src/routes/` |

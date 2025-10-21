@@ -1,0 +1,100 @@
+---
+globs: src/controllers/*.ts
+---
+
+# Controller Type Safety
+
+## Parameter Type Conversions
+
+### ClientId Conversion
+
+Route parameters come as strings and MUST be converted:
+
+```typescript
+// ✓ CORRECT - convert string from params to number
+const result = await PaymentService.getClientPaymentHistory(
+  Number(clientId),  // Convert string to number
+  Number(page),
+  Number(limit)
+);
+
+// Alternative: parseInt
+const result = await OrderService.getClientOrderDetails(
+  parseInt(clientId),  // Also valid
+  parseInt(page as string)
+);
+```
+
+### Page and Limit Conversion
+
+Always validate and convert pagination parameters:
+```typescript
+const { page = 1, limit = 20 } = req.query;
+
+// ✓ CORRECT
+const skip = (Number(page) - 1) * Number(limit);
+const parsedLimit = Math.min(Number(limit), 100); // Cap at 100
+
+// ❌ WRONG
+const skip = (page - 1) * limit;  // String math!
+```
+
+## Clinic Name Conversion
+
+Use [src/services/ClinicService.ts](mdc:src/services/ClinicService.ts) to handle clinic name slugs:
+
+```typescript
+let actualClinicName: string = rawClinicName as string;
+try {
+  actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
+} catch (conversionError) {
+  actualClinicName = rawClinicName as string;  // Fall back to original
+}
+```
+
+## Error Handling Standards
+
+### Required Field Validation
+
+```typescript
+if (!clientId) {
+  return res.status(400).json({
+    success: false,
+    message: 'Client ID is required'
+  });
+}
+```
+
+### Try-Catch Pattern
+
+```typescript
+try {
+  const result = await SomeService.method(param);
+  res.json({ success: true, data: result });
+} catch (error) {
+  console.error('Error message:', error);
+  res.status(500).json({
+    success: false,
+    message: 'Failed to perform action',
+    error: error instanceof Error ? error.message : 'Unknown error'
+  });
+}
+```
+
+## Response Format
+
+Always return consistent response structure:
+```typescript
+{
+  success: true | false,
+  data?: any,
+  message?: string,
+  pagination?: {
+    currentPage: number,
+    totalPages: number,
+    totalItems: number,
+    itemsPerPage: number
+  },
+  error?: string
+}
+```

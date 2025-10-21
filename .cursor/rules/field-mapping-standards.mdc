@@ -1,0 +1,108 @@
+---
+alwaysApply: true
+---
+
+# Field Mapping Standards
+
+## Critical: clientId Type Consistency
+
+All models MUST use `clientId: number` to match MSSQL source:
+- [src/models/Client.ts](mdc:src/models/Client.ts) - clientId: number
+- [src/models/Payment.ts](mdc:src/models/Payment.ts) - clientId: number
+- [src/models/Order.ts](mdc:src/models/Order.ts) - clientId: number
+- [src/models/Appointment.ts](mdc:src/models/Appointment.ts) - clientId: number
+- [src/models/ContactHistory.ts](mdc:src/models/ContactHistory.ts) - clientId: number
+- [src/models/AdvancedBilling.ts](mdc:src/models/AdvancedBilling.ts) - clientId: number
+
+**NEVER** use `clientId: string` in any model.
+
+## Contact Information Structure
+
+Phone numbers use deep nested structure:
+```typescript
+client.contact.phones.cell.full      // ✓ CORRECT
+client.contact.phones.home.full      // ✓ CORRECT
+client.contact.phones.work.full      // ✓ CORRECT
+
+// ❌ WRONG - these don't exist
+client.phone
+client.phones
+client.contact.phone
+```
+
+Address structure:
+```typescript
+client.contact.address.street        // ✓ CORRECT
+client.contact.address.city          // ✓ CORRECT
+client.contact.address.postalCode.full // ✓ CORRECT
+
+// ❌ WRONG
+client.address
+client.contact.zipCode
+```
+
+## Insurance Data
+
+Insurance is an array, NOT an object:
+```typescript
+client.insurance[0]                  // ✓ CORRECT - array access
+client.insurance[0].company          // ✓ CORRECT
+client.insurance[0].coverage.physiotherapy // ✓ CORRECT
+
+// ❌ WRONG
+client.insurance.company
+client.insurance.type
+```
+
+## Payment Amounts Structure
+
+Always access via nested amounts object:
+```typescript
+payment.amounts.totalPaid            // ✓ CORRECT
+payment.amounts.totalOwed            // ✓ CORRECT
+payment.amounts.insurance1stAmount   // ✓ CORRECT
+
+// ❌ WRONG
+payment.totalPaid
+payment.paid
+```
+
+## Order Line Items
+
+Items is an array of line items:
+```typescript
+order.items[0].productKey            // ✓ CORRECT
+order.items.map(item => item.quantity) // ✓ CORRECT
+
+// ❌ WRONG
+order.items.productKey
+order.product
+```
+
+## Service Layer Type Conversions
+
+When querying Order/Payment/Appointment models from Client-based methods:
+```typescript
+const numericClientId = client.clientKey || Number(client.clientId);
+return await Order.find({ clientId: numericClientId });
+```
+
+Controllers must convert string parameters:
+```typescript
+const result = await PaymentService.getClientPaymentHistory(
+  Number(clientId),  // ✓ Convert to number
+  page, limit
+);
+```
+
+## CSV Export Safety
+
+Always use optional chaining with fallbacks:
+```typescript
+client.contact?.phones?.cell?.full ||
+client.contact?.phones?.home?.full ||
+client.contact?.phones?.work?.full ||
+''
+```
+
+Never assume nested properties exist - use defensive checks.
