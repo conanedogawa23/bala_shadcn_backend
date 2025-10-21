@@ -2,14 +2,14 @@
 alwaysApply: true
 ---
 
-# Bala Visio Backend Project Structure
+# Visio Backend Project Structure
 
 ## Core Architecture
-This is a **Node.js/Express/MongoDB** backend for the Bala Visio clinic management system, designed to replace mock APIs with real-time functionality.
+This is a **Node.js/Express/MongoDB** backend for the Visio clinic management system, designed to replace mock APIs with real-time functionality.
 
 ## Directory Structure
 ```
-bala_visio_backend/
+visio_health_backend/
 ├── src/
 │   ├── models/             # Data models (Mongoose schemas) - MODEL LAYER
 │   ├── views/              # Response formatters and serializers - VIEW LAYER  
