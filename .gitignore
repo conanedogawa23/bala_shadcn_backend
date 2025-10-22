@@ -81,3 +81,10 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Jest coverage
+coverage/
+*.lcov
+*.html
+.jest-cache/
+.playwright-mcp/
