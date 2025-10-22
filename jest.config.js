@@ -57,7 +57,7 @@ module.exports = {
   ],
   
   // Module path aliases (matching tsconfig.json)
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1'
   },
   
