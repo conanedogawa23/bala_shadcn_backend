@@ -18,7 +18,7 @@ const logFormat = winston.format.combine(
 export const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: logFormat,
-  defaultMeta: { service: 'bala-visio-backend' },
+  defaultMeta: { service: 'visio-health-backend' },
   transports: [
     // Console transport for development
     new winston.transports.Console({

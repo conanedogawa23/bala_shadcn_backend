@@ -152,4 +152,65 @@ router.post('/:id/refund',
   PaymentController.processRefund
 );
 
+/**
+ * @route   GET /api/v1/payments/report/account-summary
+ * @desc    Get account summary report for a clinic
+ * @access  Public
+ * @params  clinicName (query or param), page, limit, sortBy
+ */
+router.get('/report/account-summary/:clinicName',
+  PaymentController.getAccountSummary
+);
+router.get('/report/account-summary',
+  PaymentController.getAccountSummary
+);
+
+/**
+ * @route   GET /api/v1/payments/report/payment-summary
+ * @desc    Get payment summary by date range and payment type
+ * @access  Public
+ * @params  clinicName (query or param), startDate, endDate
+ */
+router.get('/report/payment-summary/:clinicName',
+  PaymentController.getPaymentSummary
+);
+router.get('/report/payment-summary',
+  PaymentController.getPaymentSummary
+);
+
+/**
+ * @route   GET /api/v1/payments/report/client-history/:clientId
+ * @desc    Get complete payment history for a client
+ * @access  Public
+ * @params  page, limit, sortBy
+ */
+router.get('/report/client-history/:clientId',
+  PaymentController.getClientPaymentHistory
+);
+
+/**
+ * @route   GET /api/v1/payments/report/aging
+ * @desc    Get aged accounts receivable report
+ * @access  Public
+ * @params  clinicName (query or param), page, limit
+ */
+router.get('/report/aging/:clinicName',
+  PaymentController.getAgingReport
+);
+router.get('/report/aging',
+  PaymentController.getAgingReport
+);
+
+/**
+ * @route   POST /api/v1/payments/:id/dispute
+ * @desc    Mark a payment as disputed
+ * @access  Private
+ */
+router.post('/:id/dispute',
+  authenticate,
+  requirePermission('canEditPayments'),
+  trackActivity,
+  PaymentController.disputePayment
+);
+
 export default router;

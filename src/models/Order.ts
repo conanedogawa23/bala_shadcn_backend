@@ -63,7 +63,6 @@ const OrderLineItemSchema = new Schema<IOrderLineItem>({
   productKey: {
     type: Number,
     required: true
-    // Note: Index covered by compound index { 'items.productKey': 1 }
   },
   productName: {
     type: String,
@@ -104,49 +103,41 @@ const OrderSchema = new Schema<IOrder>({
   appointmentId: {
     type: Number,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   clientId: {
     type: Number,
-    required: true,
-    index: true
+    required: true
   },
   clientName: {
     type: String,
     required: true,
-    maxlength: 200,
-    index: true
+    maxlength: 200
   },
   clinicName: {
     type: String,
     required: true,
-    maxlength: 100,
-    index: true
+    maxlength: 100
   },
   status: {
     type: String,
     enum: Object.values(OrderStatus),
     required: true,
-    default: OrderStatus.SCHEDULED,
-    index: true
+    default: OrderStatus.SCHEDULED
   },
   paymentStatus: {
     type: String,
     enum: Object.values(PaymentStatus),
     required: true,
-    default: PaymentStatus.PENDING,
-    index: true
+    default: PaymentStatus.PENDING
   },
   orderDate: {
     type: Date,
-    required: true,
-    index: true
+    required: true
   },
   serviceDate: {
     type: Date,
-    required: true,
-    index: true
+    required: true
   },
   endDate: {
     type: Date,
@@ -162,8 +153,7 @@ const OrderSchema = new Schema<IOrder>({
   readyToBill: {
     type: Boolean,
     required: true,
-    default: false,
-    index: true
+    default: false
   },
   invoiceDate: Date,
   location: {

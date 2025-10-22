@@ -6,7 +6,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 export class ClinicController {
 
   // Utility function to generate proper slugs
-  private static generateProperSlug = (clinicName: string, displayName: string): string => {
+  private static generateProperSlug = (clinicName: string, displayName?: string): string => {
     // Special mappings for known clinics to match frontend expectations
     const specialMappings: Record<string, string> = {
       'bodyblissphysio': 'bodybliss-physio',
@@ -22,12 +22,13 @@ export class ClinicController {
     if (specialMappings[clinicName]) {
       return specialMappings[clinicName];
     }
-    if (specialMappings[displayName]) {
+    if (displayName && specialMappings[displayName]) {
       return specialMappings[displayName];
     }
 
-    // Default slug generation from displayName
-    return displayName.toLowerCase()
+    // Default slug generation from displayName or clinicName
+    const nameToSlugify = displayName || clinicName || 'unknown-clinic';
+    return nameToSlugify.toLowerCase()
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-]/g, '')
       .replace(/-+/g, '-')
@@ -67,22 +68,15 @@ export class ClinicController {
 
       // Transform to frontend-compatible format with real stats
       const clinicsData = await Promise.all(retainedClinics.map(async (clinic) => {
-        // Handle Mongoose address structure: array of address documents
-        const addressArray = clinic.address || [];
-        const firstAddress = addressArray[0];
+        // Use MSSQL-aligned fields directly
+        const streetAddress = clinic.clinicAddress || '';
+        const cityName = clinic.city || '';
+        const provinceName = clinic.province || '';
+        const postalCode = clinic.postalCode || '';
         
-        // Access Mongoose document data via _doc or toObject() and cast to any
-        const addressData = firstAddress ? ((firstAddress as any)._doc || (firstAddress as any).toObject?.() || firstAddress) as any : {};
-        
-        // Extract properties from address document
-        const streetAddress = addressData.street || '';
-        const cityName = addressData.city || '';
-        const provinceName = addressData.province || '';
-        const postalCode = addressData.postalCode || '';
-        
-        // Extract phone and fax from telecom array if available
-        const phoneContact = clinic.telecom?.find(contact => contact.system === 'phone');
-        const faxContact = clinic.telecom?.find(contact => contact.system === 'fax');
+        // Phone/fax not in current model - set empty values
+        const phoneContact = null;
+        const faxContact = null;
 
         // Calculate real stats from database
         let clientCount = 0;
@@ -92,18 +86,18 @@ export class ClinicController {
         try {
           // Get clinic names that might be used in client/appointment data - using precise mapping
           const possibleClinicNames = [
-            clinic.name,           // e.g., "bodyblissphysio"
-            clinic.displayName     // e.g., "BodyBliss Physiotherapy"
+            clinic.clinicName,           // e.g., "bodyblissphysio"
+            clinic.getDisplayName()     // e.g., "BodyBliss Physiotherapy"
           ];
 
           // Add specific backend name mapping based on clinic identity (not inclusive matching)
-          const backendName = ClinicController.getBackendClinicName(clinic.name, clinic.displayName);
+          const backendName = ClinicController.getBackendClinicName(clinic.clinicName, clinic.getDisplayName());
           if (!possibleClinicNames.includes(backendName)) {
             possibleClinicNames.push(backendName);
           }
 
           // Handle specific clinic variations - PRECISE matching to avoid cross-contamination
-          if (clinic.name === 'bodyblissphysio' || clinic.displayName === 'BodyBliss Physiotherapy') {
+          if (clinic.clinicName === 'bodyblissphysio' || clinic.getDisplayName() === 'BodyBliss Physiotherapy') {
             // Only add BodyBlissPhysio variations for the physio clinic
             if (!possibleClinicNames.includes('BodyBlissPhysio')) {
               possibleClinicNames.push('BodyBlissPhysio');
@@ -111,7 +105,7 @@ export class ClinicController {
             if (!possibleClinicNames.includes('BodyBliss Physio')) {
               possibleClinicNames.push('BodyBliss Physio');
             }
-          } else if (clinic.name === 'bodybliss' || clinic.displayName === 'BodyBliss') {
+          } else if (clinic.clinicName === 'bodybliss' || clinic.getDisplayName() === 'BodyBliss') {
             // Only add BodyBliss variations for the BodyBliss clinic
             if (!possibleClinicNames.includes('BodyBliss')) {
               possibleClinicNames.push('BodyBliss');
@@ -149,26 +143,26 @@ export class ClinicController {
           }
 
         } catch (statsError) {
-          console.error(`Error calculating stats for clinic ${clinic.name}:`, statsError);
+          console.error(`Error calculating stats for clinic ${clinic.clinicName}:`, statsError);
           // Continue with zeros if stats calculation fails
         }
         
         return {
           id: clinic.clinicId,
-          name: ClinicController.generateProperSlug(clinic.name, clinic.displayName),
-          displayName: clinic.displayName,
-          backendName: ClinicController.getBackendClinicName(clinic.name, clinic.displayName), // For API calls to other services
+          name: ClinicController.generateProperSlug(clinic.clinicName, clinic.getDisplayName()),
+          displayName: clinic.getDisplayName(),
+          backendName: ClinicController.getBackendClinicName(clinic.clinicName, clinic.getDisplayName()), // For API calls to other services
           address: streetAddress,
           city: cityName,
           province: provinceName,
           postalCode: postalCode,
-          phone: phoneContact?.value || '',
-          fax: faxContact?.value || '',
+          phone: '',
+          fax: '',
           status: clinic.isActive() ? 'active' : 'inactive',
           lastActivity: lastActivity?.toISOString()?.split('T')[0] || null,
           totalAppointments: totalAppointments,
           clientCount: clientCount,
-          description: `${clinic.displayName} - Active retained clinic`
+          description: `${clinic.getDisplayName()} - Active retained clinic`
         };
       }));
 
@@ -219,7 +213,7 @@ export class ClinicController {
     if (!slug) {
       const retainedClinics = await ClinicModel.findRetainedClinics();
       const availableSlugs = retainedClinics.map(clinic => 
-        ClinicController.generateProperSlug(clinic.name, clinic.displayName)
+        ClinicController.generateProperSlug(clinic.clinicName, clinic.getDisplayName())
       );
       
       return res.status(400).json({
@@ -236,12 +230,12 @@ export class ClinicController {
     
     // Find clinic by matching generated slug
     const clinic = retainedClinics.find(c => 
-      ClinicController.generateProperSlug(c.name, c.displayName) === slug
+      ClinicController.generateProperSlug(c.clinicName, c.getDisplayName()) === slug
     );
     
     if (!clinic) {
       const availableSlugs = retainedClinics.map(c => 
-        ClinicController.generateProperSlug(c.name, c.displayName)
+        ClinicController.generateProperSlug(c.clinicName, c.getDisplayName())
       );
       
       return res.status(404).json({
@@ -259,11 +253,11 @@ export class ClinicController {
       data: {
         clinic: {
           id: clinic.clinicId,
-          name: ClinicController.generateProperSlug(clinic.name, clinic.displayName),
-          displayName: clinic.displayName,
-          backendName: ClinicController.getBackendClinicName(clinic.name, clinic.displayName)
+          name: ClinicController.generateProperSlug(clinic.clinicName, clinic.getDisplayName()),
+          displayName: clinic.getDisplayName(),
+          backendName: ClinicController.getBackendClinicName(clinic.clinicName, clinic.getDisplayName())
         },
-        backendName: ClinicController.getBackendClinicName(clinic.name, clinic.displayName)
+        backendName: ClinicController.getBackendClinicName(clinic.clinicName, clinic.getDisplayName())
       }
     });
   });

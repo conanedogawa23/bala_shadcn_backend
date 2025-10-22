@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Order, { IOrder, OrderStatus, PaymentStatus } from '../models/Order';
 import Product from '../models/Product';
 import { ClinicService } from '../services/ClinicService';
+import { OrderService } from '../services/OrderService';
 
 interface OrderQuery {
   page?: string;
@@ -629,9 +630,9 @@ export class OrderController {
   }
 
   /**
-   * Get overdue orders
+   * Get overdue orders report
    */
-  static async getOverdueOrders(req: Request, res: Response): Promise<void> {
+  static async getOrdersOverdueReport(req: Request, res: Response): Promise<void> {
     try {
       const { daysOverdue = '30' } = req.query;
       const days = parseInt(daysOverdue as string);
@@ -1063,6 +1064,266 @@ export class OrderController {
       res.status(400).json({
         success: false,
         message: error instanceof Error ? error.message : 'Failed to cancel order'
+      });
+    }
+  }
+
+  /**
+   * Get order status report
+   */
+  static async getOrderStatusReport(req: Request, res: Response): Promise<void> {
+    try {
+      const { clinicName: rawClinicName, startDate, endDate } = req.query;
+
+      if (!rawClinicName) {
+        res.status(400).json({
+          success: false,
+          message: 'Clinic name is required'
+        });
+        return;
+      }
+
+      let actualClinicName: string = rawClinicName as string;
+      try {
+        actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
+      } catch (conversionError) {
+        actualClinicName = rawClinicName as string;
+      }
+
+      const result = await OrderService.getOrderStatusReport(
+        actualClinicName,
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined
+      );
+
+      const response: OrderResponse = {
+        success: true,
+        data: result
+      };
+
+      res.status(200).json(response);
+    } catch (error) {
+      console.error('Error generating order status report:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to generate order status report',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Get orders by client with advanced details
+   */
+  static async getClientOrderDetails(req: Request, res: Response): Promise<void> {
+    try {
+      const { clientId } = req.params;
+      const { page = '1', limit = '50', status, paymentStatus } = req.query;
+
+      if (!clientId) {
+        res.status(400).json({
+          success: false,
+          message: 'Client ID is required'
+        });
+        return;
+      }
+
+      const result = await OrderService.getClientOrderDetails(
+        parseInt(clientId),
+        parseInt(page as string),
+        parseInt(limit as string),
+        status as string,
+        paymentStatus as string
+      );
+
+      const response: OrderResponse = {
+        success: true,
+        data: result.orders,
+        pagination: {
+          page: result.page,
+          limit: result.limit,
+          total: result.total,
+          totalPages: Math.ceil(result.total / result.limit)
+        }
+      };
+
+      (response as any).statistics = result.statistics;
+
+      res.status(200).json(response);
+    } catch (error) {
+      console.error('Error fetching client order details:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch client order details',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Mark multiple orders as ready for billing
+   */
+  static async bulkMarkReadyForBilling(req: Request, res: Response): Promise<void> {
+    try {
+      const { orderIds } = req.body;
+
+      if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'Order IDs array is required'
+        });
+        return;
+      }
+
+      const result = await OrderService.bulkMarkReadyForBilling(orderIds);
+
+      const response: OrderResponse = {
+        success: true,
+        data: result,
+        message: `${result.modifiedCount} order(s) marked ready for billing`
+      };
+
+      res.status(200).json(response);
+    } catch (error) {
+      console.error('Error marking orders for billing:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to mark orders for billing',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Get orders pending refund
+   */
+  static async getOrdersPendingRefund(req: Request, res: Response): Promise<void> {
+    try {
+      const { clinicName: rawClinicName, page = '1', limit = '20' } = req.query;
+
+      // Clinic name is optional - if not provided, get all pending refunds
+      let actualClinicName: string | undefined = undefined;
+      
+      if (rawClinicName) {
+        try {
+          actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
+        } catch (conversionError) {
+          actualClinicName = rawClinicName as string;
+        }
+      }
+
+      const result = await OrderService.getOrdersPendingRefund(
+        actualClinicName,
+        parseInt(page as string),
+        parseInt(limit as string)
+      );
+
+      const response: OrderResponse = {
+        success: true,
+        data: result.orders,
+        pagination: {
+          page: result.page,
+          limit: result.limit,
+          total: result.total,
+          totalPages: Math.ceil(result.total / result.limit)
+        }
+      };
+
+      res.status(200).json(response);
+    } catch (error) {
+      console.error('Error fetching orders pending refund:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch orders pending refund',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Get order service history for a product
+   */
+  static async getProductServiceHistory(req: Request, res: Response): Promise<void> {
+    try {
+      const { productKey } = req.params;
+      const { clinicName, startDate, endDate } = req.query;
+
+      if (!productKey) {
+        res.status(400).json({
+          success: false,
+          message: 'Product key is required'
+        });
+        return;
+      }
+
+      const history = await OrderService.getProductServiceHistory(
+        parseInt(productKey),
+        clinicName as string,
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined
+      );
+
+      const response: OrderResponse = {
+        success: true,
+        data: history
+      };
+
+      res.status(200).json(response);
+    } catch (error) {
+      console.error('Error fetching product service history:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch product service history',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Export orders report
+   */
+  static async exportOrdersReport(req: Request, res: Response): Promise<void> {
+    try {
+      const { clinicName: rawClinicName, format = 'json', startDate, endDate, limit = '1000' } = req.query;
+
+      // Clinic name is optional for export
+      let actualClinicName: string | undefined = undefined;
+      
+      if (rawClinicName) {
+        try {
+          actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
+        } catch (conversionError) {
+          actualClinicName = rawClinicName as string;
+        }
+      }
+
+      const data = await OrderService.exportOrdersReport(
+        actualClinicName,
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined,
+        format as string,
+        parseInt(limit as string)
+      );
+
+      if (format === 'csv') {
+        res.setHeader('Content-Type', 'text/csv');
+        const filename = `orders${actualClinicName ? '-' + actualClinicName : ''}-${new Date().toISOString().split('T')[0]}.csv`;
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(data);
+      } else {
+        const response: OrderResponse = {
+          success: true,
+          data,
+          message: `Exported ${Array.isArray(data) ? data.length : 0} order(s)`
+        };
+        res.status(200).json(response);
+      }
+    } catch (error) {
+      console.error('Error exporting orders report:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to export orders report',
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   }

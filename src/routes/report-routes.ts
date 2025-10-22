@@ -14,10 +14,12 @@ const router = Router();
  * TODO: Re-enable authentication when JWT system is fully implemented
  */
 
-// Get all available reports for a clinic
+// Get all available reports (with optional clinic filter)
+router.get('/', ReportController.getAvailableReports);
 router.get('/:clinicName/available', ReportController.getAvailableReports);
 
-// Account Summary Reports  
+// Account Summary Reports (with clinic as query param or path param)
+router.get('/account-summary', ReportController.getAccountSummary);
 router.get('/:clinicName/account-summary', ReportController.getAccountSummary);
 
 // Payment Summary by Day Range

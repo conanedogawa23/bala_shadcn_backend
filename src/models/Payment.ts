@@ -154,7 +154,6 @@ const PaymentSchema = new Schema<IPayment>({
     required: false, // Made optional since data uses paymentId
     unique: true,
     trim: true,
-    index: true,
     sparse: true // Allow multiple null values
   },
   paymentId: {
@@ -162,13 +161,11 @@ const PaymentSchema = new Schema<IPayment>({
     required: false, // Made optional for backwards compatibility
     unique: true,
     trim: true,
-    index: true,
     sparse: true // Allow multiple null values
   },
   orderNumber: {
     type: String,
-    trim: true,
-    index: true
+    trim: true
   },
   clientId: {
     type: Number,

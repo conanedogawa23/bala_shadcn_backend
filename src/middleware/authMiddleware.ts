@@ -342,52 +342,6 @@ export const requireSelfOrAdmin = (userIdParam: string = 'userId') => {
 };
 
 /**
- * Rate Limiting Middleware for Authentication Routes
- * Prevents brute force attacks
- */
-export const authRateLimit = (maxAttempts: number = 5, windowMs: number = 15 * 60 * 1000) => {
-  const attempts = new Map<string, { count: number; resetTime: number }>();
-
-  return (req: Request, res: Response, next: NextFunction): void | Response => {
-    const clientId = req.ip || req.connection.remoteAddress || 'unknown';
-    const now = Date.now();
-    
-    // Clean up expired entries
-    for (const [key, value] of attempts.entries()) {
-      if (now > value.resetTime) {
-        attempts.delete(key);
-      }
-    }
-    
-    const attempt = attempts.get(clientId);
-    
-    if (!attempt) {
-      attempts.set(clientId, { count: 1, resetTime: now + windowMs });
-      return next();
-    }
-    
-    if (now > attempt.resetTime) {
-      attempts.set(clientId, { count: 1, resetTime: now + windowMs });
-      return next();
-    }
-    
-    if (attempt.count >= maxAttempts) {
-      return res.status(429).json({
-        success: false,
-        error: {
-          message: 'Too many authentication attempts. Please try again later.',
-          code: 'TOO_MANY_ATTEMPTS',
-          statusCode: 429
-        }
-      });
-    }
-    
-    attempt.count++;
-    next();
-  };
-};
-
-/**
  * Activity Tracking Middleware
  * Updates user's last activity timestamp
  */
@@ -472,7 +426,6 @@ export default {
   requireManager,
   requireStaff,
   requireSelfOrAdmin,
-  authRateLimit,
   trackActivity,
   verifyClinicExists
 };

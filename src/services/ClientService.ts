@@ -755,7 +755,8 @@ export class ClientService {
       let nextNumber = 1000; // Starting number
       
       if (lastClient) {
-        const lastNumber = parseInt(lastClient.clientId.substring(clinicId.toString().length));
+        const clientIdStr = lastClient.clientId.toString();
+        const lastNumber = parseInt(clientIdStr.substring(clinicId.toString().length));
         if (!isNaN(lastNumber)) {
           nextNumber = lastNumber + 1;
         }
@@ -853,6 +854,414 @@ export class ClientService {
       }
       logger.error('Error in getClientStats:', error);
       throw new DatabaseError('Failed to retrieve client statistics', error as Error);
+    }
+  }
+
+  /**
+   * Advanced search with multiple criteria (legacy feature)
+   */
+  static async advancedSearch(criteria: {
+    firstName?: string;
+    lastName?: string;
+    dateOfBirth?: string;
+    phone?: string;
+    email?: string;
+    clinic?: string;
+    insuranceCompany?: string;
+    limit?: number;
+  }): Promise<IClient[]> {
+    try {
+      const query: any = { isActive: true };
+
+      if (criteria.firstName) {
+        query['personalInfo.firstName'] = new RegExp(criteria.firstName, 'i');
+      }
+
+      if (criteria.lastName) {
+        query['personalInfo.lastName'] = new RegExp(criteria.lastName, 'i');
+      }
+
+      if (criteria.phone) {
+        query.$or = [
+          { 'contact.phones.home.full': new RegExp(criteria.phone, 'i') },
+          { 'contact.phones.cell.full': new RegExp(criteria.phone, 'i') },
+          { 'contact.phones.work.full': new RegExp(criteria.phone, 'i') }
+        ];
+      }
+
+      if (criteria.email) {
+        query['contact.email'] = new RegExp(criteria.email, 'i');
+      }
+
+      if (criteria.clinic) {
+        query.defaultClinic = criteria.clinic;
+      }
+
+      if (criteria.insuranceCompany) {
+        query['insurance.company'] = new RegExp(criteria.insuranceCompany, 'i');
+      }
+
+      const clients = await ClientModel.find(query)
+        .limit(criteria.limit || 50)
+        .sort({ 'personalInfo.lastName': 1, 'personalInfo.firstName': 1 });
+
+      logger.info(`Advanced search completed with ${clients.length} results`, { criteria });
+      return clients;
+    } catch (error) {
+      logger.error('Error in advancedSearch:', error);
+      throw new DatabaseError('Failed to perform advanced search', error as Error);
+    }
+  }
+
+  /**
+   * Get client account summary (orders, payments, insurance)
+   */
+  static async getClientAccountSummary(clientId: string): Promise<any> {
+    try {
+      const client = await this.getClientById(clientId);
+
+      // Get related data from other services
+      const [orders, payments] = await Promise.all([
+        this.getClientOrders(clientId),
+        this.getClientPayments(clientId)
+      ]);
+
+      // Calculate summary
+      const totalRevenue = orders.reduce((sum: number, order: any) => sum + (order.totalAmount || 0), 0);
+      const totalPaid = payments.reduce((sum: number, payment: any) => sum + (payment.amounts?.totalPaid || 0), 0);
+      const totalOwed = orders.reduce((sum: number, order: any) => {
+        if (order.paymentStatus === 'pending' || order.paymentStatus === 'partial') {
+          return sum + (order.totalAmount || 0);
+        }
+        return sum;
+      }, 0);
+
+      return {
+        client: {
+          id: client._id,
+          name: client.getFullName(),
+          email: client.contact?.email,
+          phone: client.contact?.phones?.cell?.full
+        },
+        insurance: client.insurance || [],
+        orders: {
+          total: orders.length,
+          totalRevenue,
+          pending: orders.filter((o: any) => o.status === 'scheduled').length,
+          completed: orders.filter((o: any) => o.status === 'completed').length
+        },
+        payments: {
+          total: payments.length,
+          totalPaid,
+          totalOwed,
+          lastPaymentDate: payments.length > 0 ? payments[0].paymentDate : null
+        },
+        financial: {
+          totalInvoiced: totalRevenue,
+          totalPaid,
+          amountDue: totalOwed,
+          balance: totalRevenue - totalPaid
+        }
+      };
+    } catch (error) {
+      logger.error('Error in getClientAccountSummary:', error);
+      throw new DatabaseError('Failed to get client account summary', error as Error);
+    }
+  }
+
+  /**
+   * Get clients by insurance company
+   */
+  static async getClientsByInsuranceCompany(companyName: string, clinicName?: string): Promise<IClient[]> {
+    try {
+      const query: any = {
+        'insurance.company': new RegExp(companyName, 'i'),
+        isActive: true
+      };
+
+      if (clinicName) {
+        await ClinicService.getClinicByName(clinicName);
+        query.defaultClinic = clinicName;
+      }
+
+      const clients = await ClientModel.find(query)
+        .sort({ 'personalInfo.lastName': 1, 'personalInfo.firstName': 1 });
+
+      logger.info(`Found ${clients.length} clients with insurance company: ${companyName}`);
+      return clients;
+    } catch (error) {
+      logger.error('Error in getClientsByInsuranceCompany:', error);
+      throw new DatabaseError('Failed to get clients by insurance company', error as Error);
+    }
+  }
+
+  /**
+   * Get client with comprehensive data (appointments, orders, payments)
+   */
+  static async getClientComprehensive(clientId: string): Promise<any> {
+    try {
+      const client = await this.getClientById(clientId);
+
+      const [orders, payments, appointments] = await Promise.all([
+        this.getClientOrders(clientId),
+        this.getClientPayments(clientId),
+        this.getClientAppointments(clientId)
+      ]);
+
+      return {
+        client,
+        orders,
+        payments,
+        appointments,
+        summary: {
+          totalOrders: orders.length,
+          totalPayments: payments.length,
+          totalAppointments: appointments.length,
+          totalSpent: payments.reduce((sum: number, p: any) => sum + (p.amounts?.totalPaid || 0), 0)
+        }
+      };
+    } catch (error) {
+      logger.error('Error in getClientComprehensive:', error);
+      throw new DatabaseError('Failed to get comprehensive client data', error as Error);
+    }
+  }
+
+  /**
+   * Get client contact history
+   */
+  static async getClientContactHistory(clientId: string, limit = 50): Promise<any[]> {
+    try {
+      const client = await this.getClientById(clientId);
+
+      // Query contact history from ContactHistory model if it exists
+      const ContactHistoryModel = mongoose.model('ContactHistory');
+      const history = await ContactHistoryModel
+        .find({ clientId: client._id })
+        .sort({ createdAt: -1 })
+        .limit(limit);
+
+      return history;
+    } catch (error) {
+      logger.error('Error in getClientContactHistory:', error);
+      throw new DatabaseError('Failed to get client contact history', error as Error);
+    }
+  }
+
+  /**
+   * Update client insurance information
+   */
+  static async updateClientInsurance(clientId: string, insurance: any[]): Promise<IClient> {
+    try {
+      if (!Array.isArray(insurance) || insurance.length === 0) {
+        throw new ValidationError('Insurance must be a non-empty array');
+      }
+
+      // Validate insurance data
+      for (const ins of insurance) {
+        if (!ins.type || !['1st', '2nd', '3rd'].includes(ins.type)) {
+          throw new ValidationError('Invalid insurance type. Must be 1st, 2nd, or 3rd');
+        }
+        if (!ins.company) {
+          throw new ValidationError('Insurance company is required');
+        }
+      }
+
+      const client = await ClientModel.findOneAndUpdate(
+        { clientId },
+        { 
+          insurance,
+          dateModified: new Date()
+        },
+        { new: true, runValidators: true }
+      );
+
+      if (!client) {
+        throw new NotFoundError(`Client with ID ${clientId} not found`);
+      }
+
+      logger.info(`Insurance updated for client: ${client.getFullName()}`);
+      return client;
+    } catch (error) {
+      if (error instanceof ValidationError || error instanceof NotFoundError) {
+        throw error;
+      }
+      logger.error('Error in updateClientInsurance:', error);
+      throw new DatabaseError('Failed to update client insurance', error as Error);
+    }
+  }
+
+  /**
+   * Get clients with DPA (Direct Payment Authorization)
+   */
+  static async getClientsWithDPA(clinicName: string, page = 1, limit = 20): Promise<{ clients: IClient[]; page: number; limit: number; total: number }> {
+    try {
+      await ClinicService.getClinicByName(clinicName);
+
+      const skip = (page - 1) * limit;
+
+      const [clients, total] = await Promise.all([
+        ClientModel.find({
+          defaultClinic: clinicName,
+          'insurance.dpa': true,
+          isActive: true
+        })
+          .skip(skip)
+          .limit(limit)
+          .sort({ 'personalInfo.lastName': 1, 'personalInfo.firstName': 1 }),
+        ClientModel.countDocuments({
+          defaultClinic: clinicName,
+          'insurance.dpa': true,
+          isActive: true
+        })
+      ]);
+
+      return { clients, page, limit, total };
+    } catch (error) {
+      logger.error('Error in getClientsWithDPA:', error);
+      throw new DatabaseError('Failed to get clients with DPA', error as Error);
+    }
+  }
+
+  /**
+   * Bulk update clients
+   */
+  static async bulkUpdateClients(updates: Array<{ id: string; data: any }>): Promise<{ updatedCount: number; errors: any[] }> {
+    try {
+      const results: { updatedCount: number; errors: Array<{ clientId: string; error: string }> } = { updatedCount: 0, errors: [] };
+
+      for (const update of updates) {
+        try {
+          await this.updateClient(update.id, update.data);
+          results.updatedCount++;
+        } catch (error) {
+          results.errors.push({
+            clientId: update.id,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      logger.info(`Bulk update completed: ${results.updatedCount} successful, ${results.errors.length} failed`);
+      return results;
+    } catch (error) {
+      logger.error('Error in bulkUpdateClients:', error);
+      throw new DatabaseError('Failed to bulk update clients', error as Error);
+    }
+  }
+
+  /**
+   * Export clients data
+   */
+  static async exportClients(clinicName?: string, format = 'json', limit = 1000): Promise<any> {
+    try {
+      const query: any = { isActive: true };
+
+      if (clinicName) {
+        await ClinicService.getClinicByName(clinicName);
+        query.defaultClinic = clinicName;
+      }
+
+      const clients = await ClientModel.find(query)
+        .sort({ 'personalInfo.lastName': 1, 'personalInfo.firstName': 1 })
+        .limit(limit)
+        .lean();
+
+      if (format === 'csv') {
+        return this.convertToCsv(clients);
+      }
+
+      return clients;
+    } catch (error) {
+      logger.error('Error in exportClients:', error);
+      throw new DatabaseError('Failed to export clients', error as Error);
+    }
+  }
+
+  /**
+   * Helper: Convert clients to CSV format
+   */
+  private static convertToCsv(clients: IClient[]): string {
+    const headers = [
+      'Client ID',
+      'First Name',
+      'Last Name',
+      'Email',
+      'Phone',
+      'City',
+      'Province',
+      'Clinic',
+      'Gender'
+    ];
+
+    const rows = clients.map(client => [
+      client.clientId,
+      client.personalInfo?.firstName || '',
+      client.personalInfo?.lastName || '',
+      client.contact?.email || '',
+      // ✓ FIXED: Safely handle nested phone structure with proper null checks
+      client.contact?.phones?.cell?.full || 
+      client.contact?.phones?.home?.full || 
+      client.contact?.phones?.work?.full || 
+      '',
+      client.contact?.address?.city || '',
+      client.contact?.address?.province || '',
+      client.defaultClinic || '',
+      client.personalInfo?.gender || ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell)}"`).join(','))
+    ].join('\n');
+
+    return csvContent;
+  }
+
+  /**
+   * Helper: Get client orders
+   */
+  private static async getClientOrders(clientId: string): Promise<any[]> {
+    try {
+      const Order = mongoose.model('Order');
+      const client = await this.getClientById(clientId);
+      // ✓ FIXED: Convert numeric clientId (client.clientKey or client.clientId) for Order model
+      const numericClientId = client.clientKey || Number(client.clientId);
+      return await Order.find({ clientId: numericClientId }).sort({ createdAt: -1 });
+    } catch (error) {
+      logger.warn('Could not retrieve client orders:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Helper: Get client payments
+   */
+  private static async getClientPayments(clientId: string): Promise<any[]> {
+    try {
+      const Payment = mongoose.model('Payment');
+      const client = await this.getClientById(clientId);
+      // ✓ FIXED: Convert numeric clientId (client.clientKey or client.clientId) for Payment model
+      const numericClientId = client.clientKey || Number(client.clientId);
+      return await Payment.find({ clientId: numericClientId }).sort({ paymentDate: -1 });
+    } catch (error) {
+      logger.warn('Could not retrieve client payments:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Helper: Get client appointments
+   */
+  private static async getClientAppointments(clientId: string): Promise<any[]> {
+    try {
+      const Appointment = mongoose.model('Appointment');
+      const client = await this.getClientById(clientId);
+      // ✓ FIXED: Convert numeric clientId (client.clientKey or client.clientId) for Appointment model
+      const numericClientId = client.clientKey || Number(client.clientId);
+      return await Appointment.find({ clientId: numericClientId }).sort({ startDate: -1 });
+    } catch (error) {
+      logger.warn('Could not retrieve client appointments:', error);
+      return [];
     }
   }
 }

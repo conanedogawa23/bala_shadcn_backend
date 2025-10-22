@@ -51,15 +51,14 @@ interface IAppointmentModel extends Model<IAppointment> {
   checkTimeSlotConflict(resourceId: number, startDate: Date, endDate: Date, excludeId?: string): any;
   findReadyToBill(clinicName?: string): any;
   findByResource(resourceId: number, date: Date): any;
-  findByClient(clientId: string): any;
+  findByClient(clientId: number): any; // Changed from string to number for consistency
 }
 
 const AppointmentSchema = new Schema<IAppointment>({
   id: {
     type: Number,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   type: {
     type: Number,

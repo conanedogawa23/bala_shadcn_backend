@@ -71,21 +71,18 @@ const ResourceSchema = new Schema<IResource>({
   resourceId: {
     type: Number,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   resourceName: {
     type: String,
     required: true,
     trim: true,
-    maxlength: 100,
-    index: true
+    maxlength: 100
   },
   type: {
     type: String,
     enum: ['practitioner', 'service', 'equipment', 'room'],
-    required: true,
-    index: true
+    required: true
   },
   color: {
     type: String,
@@ -211,15 +208,13 @@ const ResourceSchema = new Schema<IResource>({
   }],
   defaultClinic: {
     type: String,
-    trim: true,
-    index: true
+    trim: true
   },
   
   // Status and metadata
   isActive: {
     type: Boolean,
-    default: true,
-    index: true
+    default: true
   },
   isBookable: {
     type: Boolean,
@@ -255,8 +250,7 @@ const ResourceSchema = new Schema<IResource>({
   // Audit fields
   dateCreated: {
     type: Date,
-    default: Date.now,
-    index: true
+    default: Date.now
   },
   dateModified: {
     type: Date,
@@ -273,7 +267,7 @@ const ResourceSchema = new Schema<IResource>({
 });
 
 // Indexes
-ResourceSchema.index({ resourceId: 1 }, { unique: true });
+// Note: resourceId already has unique index from unique: true in schema
 ResourceSchema.index({ type: 1, isActive: 1 });
 ResourceSchema.index({ defaultClinic: 1, isActive: 1 });
 ResourceSchema.index({ 'practitioner.specialties': 1 });

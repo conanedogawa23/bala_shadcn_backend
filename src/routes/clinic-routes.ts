@@ -18,6 +18,7 @@ const slugValidation = [
 router.get('/frontend-compatible', ClinicController.getClinicsFrontendCompatible);
 router.get('/available', ClinicController.getAvailableClinics);
 router.get('/mapping', ClinicController.getClinicMapping);
+router.get('/slug-to-name', ClinicController.getClinicMapping); // Alias for mapping endpoint
 router.get('/validate/:slug', slugValidation, ClinicController.validateClinicSlug);
 router.get('/slug-to-name/:slug', slugValidation, ClinicController.slugToClinicName);
 

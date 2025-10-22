@@ -12,20 +12,20 @@ const router = Router();
 router.get('/', OrderController.getAllOrders);
 
 /**
- * @route   GET /api/v1/orders/billing/ready
+ * @route   GET /api/v1/orders/ready-for-billing
  * @desc    Get orders ready for billing
  * @access  Public
- * @params  clinicName
+ * @params  clinicName, page, limit
  */
-router.get('/billing/ready', OrderController.getOrdersReadyForBilling);
+router.get('/ready-for-billing', OrderController.getOrdersReadyForBilling);
 
 /**
- * @route   GET /api/v1/orders/billing/overdue
- * @desc    Get overdue orders
+ * @route   GET /api/v1/orders/report/overdue
+ * @desc    Get overdue orders report
  * @access  Public
- * @params  daysOverdue
+ * @params  clinicName, days, page, limit
  */
-router.get('/billing/overdue', OrderController.getOverdueOrders);
+router.get('/report/overdue', OrderController.getOrdersOverdueReport);
 
 /**
  * @route   GET /api/v1/orders/analytics/revenue
@@ -42,6 +42,14 @@ router.get('/analytics/revenue', OrderController.getRevenueAnalytics);
  * @params  startDate, endDate
  */
 router.get('/analytics/products', OrderController.getProductPerformance);
+
+/**
+ * @route   GET /api/v1/orders/export
+ * @desc    Export orders report
+ * @access  Public
+ * @params  clinicName, format (json|csv), startDate, endDate, limit
+ */
+router.get('/export', OrderController.exportOrdersReport);
 
 /**
  * @route   GET /api/v1/orders/client/:clientId
@@ -107,5 +115,44 @@ router.post('/:id/payment', OrderController.processPayment);
  * @access  Private
  */
 router.put('/:id/cancel', OrderController.cancelOrder);
+
+/**
+ * @route   GET /api/v1/orders/report/status
+ * @desc    Get order status report
+ * @access  Public
+ * @params  clinicName (required), startDate, endDate
+ */
+router.get('/report/status', OrderController.getOrderStatusReport);
+
+/**
+ * @route   GET /api/v1/orders/client/:clientId/details
+ * @desc    Get orders by client with advanced details
+ * @access  Public
+ * @params  page, limit, status, paymentStatus
+ */
+router.get('/client/:clientId/details', OrderController.getClientOrderDetails);
+
+/**
+ * @route   POST /api/v1/orders/bulk/ready-for-billing
+ * @desc    Mark multiple orders as ready for billing
+ * @access  Private
+ */
+router.post('/bulk/ready-for-billing', OrderController.bulkMarkReadyForBilling);
+
+/**
+ * @route   GET /api/v1/orders/report/pending-refund
+ * @desc    Get orders pending refund
+ * @access  Public
+ * @params  clinicName (required), page, limit
+ */
+router.get('/report/pending-refund', OrderController.getOrdersPendingRefund);
+
+/**
+ * @route   GET /api/v1/orders/product/:productKey/history
+ * @desc    Get order service history for a product
+ * @access  Public
+ * @params  clinicName, startDate, endDate
+ */
+router.get('/product/:productKey/history', OrderController.getProductServiceHistory);
 
 export default router;

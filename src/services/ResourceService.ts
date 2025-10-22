@@ -340,7 +340,7 @@ export class ResourceService {
     try {
       // Verify clinic exists - use case-insensitive search due to naming inconsistencies
       const clinic = await ClinicModel.findOne({ 
-        name: new RegExp(`^${clinicName}$`, 'i') 
+        clinicName: new RegExp(`^${clinicName}$`, 'i') 
       });
       if (!clinic) {
         throw new NotFoundError('Clinic', clinicName);
@@ -357,10 +357,10 @@ export class ResourceService {
         return acc;
       }, {});
 
-      return {
+      return {  
         clinic: {
-          name: clinic.name,
-          displayName: clinic.displayName
+          name: clinic.clinicName,
+          displayName: clinic.clinicName
         },
         resources,
         resourcesByType

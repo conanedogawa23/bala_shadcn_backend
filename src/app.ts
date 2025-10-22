@@ -25,17 +25,17 @@ app.set('trust proxy', 1);
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
+      defaultSrc: ['\'self\''],
+      styleSrc: ['\'self\'', '\'unsafe-inline\''],
+      scriptSrc: ['\'self\''],
+      imgSrc: ['\'self\'', 'data:', 'https:']
+    }
+  }
 }));
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://a40918f3f86d.ngrok.app',
+  origin: '*',
   credentials: true,
   optionsSuccessStatus: 200
 }));
@@ -53,7 +53,7 @@ const limiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: process.env.NODE_ENV === 'development' ? () => false : undefined, // Never skip in dev, but allow override in production
+  skip: process.env.NODE_ENV === 'development' ? () => false : undefined // Never skip in dev, but allow override in production
 });
 
 // Only apply rate limiting in production or when explicitly enabled
@@ -79,7 +79,7 @@ if (process.env.NODE_ENV !== 'test') {
 app.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'Bala Visio Backend API is running',
+    message: 'Visio Health Backend API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
     version: process.env.npm_package_version || '1.0.0'
@@ -105,7 +105,7 @@ async function startServer() {
     
     // Start listening
     const server = app.listen(PORT, () => {
-      logger.info(`🚀 Bala Visio Backend running on port ${PORT}`);
+      logger.info(`🚀Visio Health Backend running on port ${PORT}`);
       logger.info(`📍 Environment: ${process.env.NODE_ENV}`);
       logger.info(`🔗 Health check: http://localhost:${PORT}/health`);
     });

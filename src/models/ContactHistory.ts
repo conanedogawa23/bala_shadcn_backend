@@ -2,7 +2,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IContactHistory extends Document {
   id: number;
-  clientId?: string;
+  clientId?: number; // Changed from string to number for consistency with other models
   clinicName?: string;
   contactType: 'call' | 'email' | 'sms' | 'visit' | 'note' | 'appointment' | 'other';
   direction: 'inbound' | 'outbound' | 'internal';
@@ -54,7 +54,7 @@ const ContactHistorySchema = new Schema<IContactHistory>({
     index: true
   },
   clientId: {
-    type: String,
+    type: Number,
     index: true,
     sparse: true
   },

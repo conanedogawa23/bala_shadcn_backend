@@ -2,7 +2,7 @@ import { Schema, model, Document, Model } from 'mongoose';
 
 export interface IInsurance {
   type: '1st' | '2nd' | '3rd';
-  dpa: string; // sb_*_DPA field from MSSQL (char 20)
+  dpa: boolean; // sb_*_DPA field from MSSQL (converted to boolean)
   policyHolder: string; // sb_*_insurance_policy_holder from MSSQL
   cob: string; // sb_*_insurance_cob from MSSQL
   policyHolderName: string; // sb_*_insurance_policy_holder_name from MSSQL
@@ -36,7 +36,7 @@ export interface IInsurance {
 }
 
 export interface IClient extends Document {
-  clientId: string; // sb_clients_id from MSSQL
+  clientId: number; // sb_clients_id from MSSQL (now NUMBER for consistency)
   clientKey?: number; // sb_clients_key from MSSQL
   personalInfo: {
     firstName: string; // sb_clients_first_name from MSSQL
@@ -198,10 +198,9 @@ const InsuranceSchema = new Schema<IInsurance>({
 
 const ClientSchema = new Schema<IClient>({
   clientId: {
-    type: String,
+    type: Number,
     required: true,
-    unique: true,
-    trim: true
+    unique: true
   },
   clientKey: {
     type: Number
@@ -383,7 +382,7 @@ const ClientSchema = new Schema<IClient>({
 });
 
 // Indexes for performance
-ClientSchema.index({ clientId: 1 }, { unique: true });
+// Note: clientId already has unique index from unique: true in schema
 ClientSchema.index({ clientKey: 1 });
 ClientSchema.index({ defaultClinic: 1 });
 ClientSchema.index({ 'personalInfo.lastName': 1, 'personalInfo.firstName': 1 });

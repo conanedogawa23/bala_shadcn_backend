@@ -15,22 +15,22 @@ export class InsuranceCompanyAddressController {
       city,
       province,
       postalCode,
-      page = 1,
-      limit = 50
+      page = '1',
+      limit = '50'
     } = req.query as any;
 
     const result = await InsuranceCompanyAddressService.getAllAddresses({
-      company,
-      city,
-      province,
-      postalCode,
-      page: parseInt(page),
-      limit: parseInt(limit)
+      company: company as string | undefined,
+      city: city as string | undefined,
+      province: province as string | undefined,
+      postalCode: postalCode as string | undefined,
+      page: parseInt(page as string, 10),
+      limit: parseInt(limit as string, 10)
     });
 
     const response = InsuranceCompanyAddressView.formatAddressList({
       ...result,
-      limit: parseInt(limit)
+      limit: parseInt(limit as string, 10)
     });
 
     res.json({

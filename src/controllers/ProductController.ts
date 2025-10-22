@@ -266,7 +266,8 @@ export class ProductController {
    */
   static async searchProducts(req: Request, res: Response): Promise<void> {
     try {
-      const { q: searchTerm } = req.query;
+      const { q, query } = req.query;
+      const searchTerm = q || query; // Accept both q and query params
       
       if (!searchTerm || typeof searchTerm !== 'string') {
         res.status(400).json({
@@ -320,6 +321,39 @@ export class ProductController {
         return;
       }
 
+      // Validate field types
+      if (typeof productData.productKey !== 'number' || productData.productKey <= 0) {
+        res.status(400).json({
+          success: false,
+          message: 'productKey must be a positive number'
+        });
+        return;
+      }
+
+      if (typeof productData.price !== 'number' || productData.price < 0) {
+        res.status(400).json({
+          success: false,
+          message: 'price must be a non-negative number'
+        });
+        return;
+      }
+
+      if (typeof productData.duration !== 'number' || productData.duration <= 0) {
+        res.status(400).json({
+          success: false,
+          message: 'duration must be a positive number'
+        });
+        return;
+      }
+
+      if (!Object.values(ProductCategory).includes(productData.category)) {
+        res.status(400).json({
+          success: false,
+          message: `Invalid category. Must be one of: ${Object.values(ProductCategory).join(', ')}`
+        });
+        return;
+      }
+
       // Check if productKey already exists
       const existingProduct = await Product.findOne({ productKey: productData.productKey });
       if (existingProduct) {
@@ -330,7 +364,16 @@ export class ProductController {
         return;
       }
 
-      const product = new Product(productData);
+      // Set defaults for optional fields
+      const newProductData = {
+        ...productData,
+        isActive: productData.isActive !== false,
+        status: productData.status || ProductStatus.ACTIVE,
+        clinics: productData.clinics || [],
+        applicableClinics: productData.applicableClinics || []
+      };
+
+      const product = new Product(newProductData);
       await product.save();
 
       const response: ProductResponse = {
@@ -342,6 +385,26 @@ export class ProductController {
       res.status(201).json(response);
     } catch (error) {
       console.error('Error creating product:', error);
+      
+      // Handle Mongoose validation errors
+      if (error instanceof Error) {
+        if (error.name === 'ValidationError') {
+          res.status(400).json({
+            success: false,
+            message: 'Product validation failed',
+            error: error.message
+          });
+          return;
+        }
+        if (error.name === 'MongoServerError' && (error as any).code === 11000) {
+          res.status(409).json({
+            success: false,
+            message: 'Product with this productKey already exists'
+          });
+          return;
+        }
+      }
+
       res.status(500).json({
         success: false,
         message: 'Failed to create product',

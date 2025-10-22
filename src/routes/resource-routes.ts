@@ -299,6 +299,37 @@ router.get(
 );
 
 /**
+ * @route   GET /api/v1/resources/practitioners
+ * @desc    Get practitioners with optional filtering
+ * @access  Public
+ */
+router.get(
+  '/practitioners',
+  [
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 100 }),
+    query('clinicName').optional().trim(),
+    query('specialty').optional().trim()
+  ],
+  ResourceController.getPractitioners
+);
+
+/**
+ * @route   GET /api/v1/resources/services
+ * @desc    Get services with optional category filtering
+ * @access  Public
+ */
+router.get(
+  '/services',
+  [
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 100 }),
+    query('category').optional().trim()
+  ],
+  ResourceController.getServices
+);
+
+/**
  * @route   GET /api/v1/resources/:id
  * @desc    Get resource by ID
  * @access  Public

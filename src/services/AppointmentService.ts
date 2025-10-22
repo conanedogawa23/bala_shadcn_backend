@@ -61,7 +61,7 @@ export class AppointmentService {
         throw new NotFoundError('Clinic', clinicName);
       }
 
-      logger.info('Clinic found:', { name: clinic.name, displayName: clinic.displayName });
+      logger.info('Clinic found:', { name: clinic.clinicName, displayName: clinic.getDisplayName() });
 
       // Map to appointment collection clinic name due to data inconsistency
       const appointmentClinicName = AppointmentService.getAppointmentClinicName(clinicName);
@@ -137,7 +137,7 @@ export class AppointmentService {
       // Populate resource information manually (populate was causing issues)
       const resource = await ResourceModel.findOne({ resourceId: appointment.resourceId });
       if (resource) {
-        appointment.resourceName = resource.getFullName() || resource.resourceName;
+        (appointment as any).resourceName = resource.getFullName() || resource.resourceName;
       }
 
       return appointment;
@@ -166,7 +166,7 @@ export class AppointmentService {
       try {
         const resource = await ResourceModel.findOne({ resourceId: appointment.resourceId });
         if (resource) {
-          appointment.resourceName = resource.getFullName() || resource.resourceName;
+          (appointment as any).resourceName = resource.getFullName() || resource.resourceName;
         }
       } catch (resourceError) {
         logger.warn('Could not populate resource information:', resourceError);
@@ -473,7 +473,7 @@ export class AppointmentService {
         throw new NotFoundError('Client', clientId);
       }
 
-      const appointments = await AppointmentModel.findByClient(clientId);
+      const appointments = await AppointmentModel.findByClient(Number(clientId));
 
       // Populate resource information
       const populatedAppointments = await Promise.all(
@@ -543,8 +543,8 @@ export class AppointmentService {
 
       return {
         clinic: {
-          name: clinic.name,
-          displayName: clinic.displayName
+          name: clinic.clinicName,
+          displayName: clinic.getDisplayName()
         },
         dateRange: {
           startDate: startDate?.toISOString().split('T')[0],

@@ -97,17 +97,58 @@ interface IClinicModel extends Model<IClinic> {
   getRetainedClinicNames(): string[];
 }
 
-// BUSINESS RULE: Retained Clinics (from MongoDB analysis)
-const RETAINED_CLINIC_NAMES = [
-  'BodyBliss',
-  'bodyblissphysio',
-  'BodyBlissPhysio', // Alternative spelling
-  'BodyBlissOneCare',
-  'Century Care',
-  'Ortholine Duncan Mills',
-  'My Cloud',
-  'Physio Bliss'
-];
+// BUSINESS RULE: Retained Clinics (from MSSQL verification)
+// Total MSSQL clinics: 13
+// Retained for new system: 6 clinics
+// Mapping MSSQL ClinicName → MongoDB clinic structure
+
+export const RETAINED_CLINICS_CONFIG = {
+  'bodyblissphysio': {
+    mssqlName: 'bodyblissphysio',
+    mongoName: 'bodyblissphysio',
+    displayName: 'BodyBliss Physiotherapy',
+    slug: 'bodybliss-physio',
+    status: OrganizationStatus.ACTIVE
+  },
+  'BodyBlissOneCare': {
+    mssqlName: 'BodyBlissOneCare ',
+    mongoName: 'BodyBlissOneCare',
+    displayName: 'BodyBliss OneCare',
+    slug: 'bodybliss-onecare',
+    status: OrganizationStatus.ACTIVE
+  },
+  'Century Care': {
+    mssqlName: 'Century Care',
+    mongoName: 'Century Care',
+    displayName: 'Century Care',
+    slug: 'century-care',
+    status: OrganizationStatus.ACTIVE
+  },
+  'Ortholine Duncan Mills': {
+    mssqlName: 'Ortholine Duncan Mills',
+    mongoName: 'Ortholine Duncan Mills',
+    displayName: 'Ortholine Duncan Mills',
+    slug: 'ortholine-duncan-mills',
+    status: OrganizationStatus.ACTIVE
+  },
+  'My Cloud': {
+    mssqlName: 'My Cloud',
+    mongoName: 'My Cloud',
+    displayName: 'My Cloud',
+    slug: 'my-cloud',
+    status: OrganizationStatus.ACTIVE
+  },
+  'Physio Bliss': {
+    mssqlName: 'Physio Bliss',
+    mongoName: 'Physio Bliss',
+    displayName: 'Physio Bliss',
+    slug: 'physio-bliss',
+    status: OrganizationStatus.ACTIVE
+  }
+} as const;
+
+export const RETAINED_CLINIC_NAMES = Object.keys(RETAINED_CLINICS_CONFIG) as Array<string>;
+export type RetainedClinicName = typeof RETAINED_CLINIC_NAMES[number];
 
 // Sub-schemas
 const OrganizationIdentifierSchema = new Schema<IOrganizationIdentifier>({
@@ -155,8 +196,7 @@ const ClinicSchema = new Schema<IClinic>({
   clinicId: {
     type: Number,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
 
   // Core clinic information from MSSQL
@@ -165,8 +205,7 @@ const ClinicSchema = new Schema<IClinic>({
     required: true,
     unique: true,
     trim: true,
-    maxlength: 50,
-    index: true
+    maxlength: 50
   },
   clinicAddress: {
     type: String,
@@ -178,23 +217,20 @@ const ClinicSchema = new Schema<IClinic>({
     type: String,
     required: true,
     trim: true,
-    maxlength: 300,
-    index: true
+    maxlength: 300
   },
   province: {
     type: String,
     required: true,
     trim: true,
-    maxlength: 300,
-    index: true
+    maxlength: 300
   },
   postalCode: {
     type: String,
     required: true,
     trim: true,
     maxlength: 50,
-    uppercase: true,
-    index: true
+    uppercase: true
   },
 
   // Additional fields
@@ -207,8 +243,7 @@ const ClinicSchema = new Schema<IClinic>({
   // Business logic fields
   isRetainedClinic: {
     type: Boolean,
-    default: false,
-    index: true
+    default: false
   },
   
   // Analytics
@@ -239,8 +274,7 @@ const ClinicSchema = new Schema<IClinic>({
 });
 
 // Indexes for optimal performance
-ClinicSchema.index({ clinicId: 1 }, { unique: true });
-ClinicSchema.index({ clinicName: 1 }, { unique: true });
+// Note: clinicId and clinicName already have unique indexes from unique: true in schema
 ClinicSchema.index({ isRetainedClinic: 1 });
 ClinicSchema.index({ city: 1 });
 ClinicSchema.index({ province: 1 });

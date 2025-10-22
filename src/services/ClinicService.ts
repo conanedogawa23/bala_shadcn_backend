@@ -13,16 +13,16 @@ export interface ClinicMapping {
 export class ClinicService {
   /**
    * CSV Requirement: Only retained clinics allowed
-   * Updated to match actual MongoDB clinic names
+   * Updated to match MSSQL verified clinics (6 retained)
+   * MSSQL VERIFIED: Total 13 clinics, Retained 6
    */
   private static readonly RETAINED_CLINICS = [
-    'BodyBliss',           // MongoDB: name="BodyBliss", displayName="BodyBliss"
-    'BodyBlissOneCare',    // MongoDB: name="BodyBlissOneCare", displayName="BodyBlissOneCare"
-    'bodyblissphysio',     // MongoDB: name="bodyblissphysio", displayName="BodyBliss Physiotherapy"
-    'Century Care',
-    'Ortholine Duncan Mills',
-    'My Cloud',
-    'Physio Bliss'
+    'bodyblissphysio',           // MSSQL: "bodyblissphysio"
+    'BodyBlissOneCare',          // MSSQL: "BodyBlissOneCare " (trimmed)
+    'Century Care',              // MSSQL: "Century Care"
+    'Ortholine Duncan Mills',    // MSSQL: "Ortholine Duncan Mills"
+    'My Cloud',                  // MSSQL: "My Cloud"
+    'Physio Bliss'               // MSSQL: "Physio Bliss"
   ];
 
   /**

@@ -1,19 +1,20 @@
 import { Router, Request, Response } from 'express';
-import clinicRoutes from './clinicRoutes';
-import clientRoutes from './clientRoutes';
-import appointmentRoutes from './appointmentRoutes';
-import resourceRoutes from './resourceRoutes';
-import contactHistoryRoutes from './contactHistoryRoutes';
-import insuranceCompanyAddressRoutes from './insuranceCompanyAddressRoutes';
-import eventRoutes from './eventRoutes';
-import advancedBillingRoutes from './advancedBillingRoutes';
-import insuranceReferenceRoutes from './insuranceReferenceRoutes';
-import productRoutes from './productRoutes';
-import orderRoutes from './orderRoutes';
-import paymentRoutes from './paymentRoutes';
-import authRoutes from './authRoutes';
-import userRoutes from './userRoutes';
-import reportRoutes from './reportRoutes';
+import clinicRoutes from './clinic-routes';
+import clientRoutes from './client-routes';
+import appointmentRoutes from './appointment-routes';
+import resourceRoutes from './resource-routes';
+import contactHistoryRoutes from './contact-history-routes';
+import insuranceCompanyAddressRoutes from './insurance-company-address-routes';
+import eventRoutes from './event-routes';
+import advancedBillingRoutes from './advanced-billing-routes';
+import insuranceReferenceRoutes from './insurance-reference-routes';
+import productRoutes from './product-routes';
+import orderRoutes from './order-routes';
+import paymentRoutes from './payment-routes';
+import authRoutes from './auth-routes';
+import userRoutes from './user-routes';
+import reportRoutes from './report-routes';
+import invoiceRoutes from './invoice-routes';
 import { authenticate, optionalAuthenticate, trackActivity } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -22,7 +23,7 @@ const router = Router();
 router.get('/health', (req: Request, res: Response) => {
   res.status(200).json({
     success: true,
-    message: 'Bala Visio Backend API is running',
+    message: 'Visio Health Backend API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     version: '1.0.0'
@@ -33,7 +34,7 @@ router.get('/health', (req: Request, res: Response) => {
 router.get('/', (req: Request, res: Response) => {
   res.json({
     success: true,
-    message: 'Bala Visio Healthcare Management API',
+    message: 'Visio Health Healthcare Management API',
     description: 'RESTful API for healthcare appointment and clinic management system',
     version: '1.0.0',
     documentation: '/api/v1/docs',
@@ -86,7 +87,7 @@ router.get('/status', (req: Request, res: Response) => {
 router.get('/docs', (req: Request, res: Response) => {
   res.json({
     success: true,
-    message: 'Bala Visio Healthcare Management API Documentation',
+    message: 'Visio Healthcare Management API Documentation',
     version: '1.0.0',
     baseUrl: `${req.protocol}://${req.get('host')}/api/v1`,
     
@@ -337,24 +338,24 @@ router.get('/docs', (req: Request, res: Response) => {
 router.use('/auth', authRoutes);
 
 // Admin routes (authentication + admin permissions required)
-router.use('/users', userRoutes);
+router.use('/users', authenticate, userRoutes);
 
-// Temporarily public routes until authentication is implemented
-router.use('/clinics', clinicRoutes); // Public routes for clinic validation and discovery
-router.use('/clients', clientRoutes); // Core business functionality
-router.use('/appointments', appointmentRoutes); // Core business functionality
-router.use('/products', productRoutes); // Core business functionality  
-router.use('/orders', orderRoutes); // Core business functionality
-router.use('/payments', paymentRoutes); // Core business functionality
-router.use('/events', eventRoutes); // Core business functionality
-router.use('/reports', reportRoutes); // Core business functionality
+// Protected routes - ENFORCED authentication for core business functionality
+router.use('/clinics', clinicRoutes); // Keep public for clinic discovery/validation
+router.use('/clients', authenticate, trackActivity, clientRoutes); // PROTECTED - Client management
+router.use('/appointments', authenticate, trackActivity, appointmentRoutes); // PROTECTED - Appointment scheduling
+router.use('/products', authenticate, trackActivity, productRoutes); // PROTECTED - Product management  
+router.use('/orders', authenticate, trackActivity, orderRoutes); // PROTECTED - Order management
+router.use('/payments', authenticate, trackActivity, paymentRoutes); // PROTECTED - Payment processing
+router.use('/events', authenticate, trackActivity, eventRoutes); // PROTECTED - Event management
+router.use('/reports', authenticate, trackActivity, reportRoutes); // PROTECTED - Reporting
 
-// Still protected routes (less commonly used) 
-// Temporarily public routes until authentication is implemented
-router.use('/resources', resourceRoutes); // Core business functionality - needed for appointment forms
+// Protected routes (less commonly used but still require authentication) 
+router.use('/resources', authenticate, trackActivity, resourceRoutes); // PROTECTED - Resource management
 router.use('/contact-history', authenticate, trackActivity, contactHistoryRoutes);
 router.use('/insurance-addresses', authenticate, trackActivity, insuranceCompanyAddressRoutes);
 router.use('/advanced-billing', authenticate, trackActivity, advancedBillingRoutes);
 router.use('/insurance-reference', authenticate, trackActivity, insuranceReferenceRoutes);
+router.use('/invoices', authenticate, trackActivity, invoiceRoutes);
 
 export default router;

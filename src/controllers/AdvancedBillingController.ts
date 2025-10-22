@@ -21,27 +21,27 @@ export class AdvancedBillingController {
       productKey,
       startDate,
       endDate,
-      page = 1,
-      limit = 50
+      page = '1',
+      limit = '50'
     } = req.query as any;
 
     const filters = {
-      clientId,
-      clinicName,
-      status: status as BillingStatus,
+      clientId: clientId as string | undefined,
+      clinicName: clinicName as string | undefined,
+      status: status as BillingStatus | undefined,
       isActive: isActive !== undefined ? isActive === 'true' : undefined,
       isOverdue: isOverdue !== undefined ? isOverdue === 'true' : undefined,
-      productKey: productKey ? parseInt(productKey) : undefined,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
-      page: parseInt(page),
-      limit: parseInt(limit)
+      productKey: productKey ? parseInt(productKey as string, 10) : undefined,
+      startDate: startDate ? new Date(startDate as string) : undefined,
+      endDate: endDate ? new Date(endDate as string) : undefined,
+      page: parseInt(page as string, 10),
+      limit: parseInt(limit as string, 10)
     };
 
     const result = await AdvancedBillingService.getAllBillings(filters);
     const response = AdvancedBillingView.formatBillingList({
       ...result,
-      limit: parseInt(limit)
+      limit: parseInt(limit as string, 10)
     });
 
     res.json({

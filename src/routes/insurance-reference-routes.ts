@@ -3,6 +3,10 @@ import { InsuranceReferenceController } from '../controllers/InsuranceReferenceC
 
 const router = Router();
 
+// Legacy API compatibility routes (for testing)
+router.get('/companies', InsuranceReferenceController.getAllPolicyHolders);
+router.get('/types', InsuranceReferenceController.getAllFrequencies);
+
 // Combined Reference Data Endpoints
 router.get('/all', InsuranceReferenceController.getAllInsuranceReferenceData);
 router.get('/form-data', InsuranceReferenceController.getInsuranceFormData);

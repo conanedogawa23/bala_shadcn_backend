@@ -178,8 +178,8 @@ export class UserController {
         data: {
           users: users.map(user => ({
             ...user,
-            // Add computed fields
-            fullName: `${user.profile.firstName} ${user.profile.lastName}`.trim(),
+            // Add computed fields with safe null checks
+            fullName: user.profile ? `${user.profile.firstName || ''} ${user.profile.lastName || ''}`.trim() : '',
             isLocked: !!(user.lockUntil && user.lockUntil > new Date())
           })),
           pagination: {

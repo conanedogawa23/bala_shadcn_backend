@@ -1,18 +1,11 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/AuthController';
 import { 
-  authenticate, 
-  authRateLimit, 
-  trackActivity,
-  requireSelfOrAdmin 
+  authenticate,  
+  trackActivity 
 } from '../middleware/authMiddleware';
 
 const router = Router();
-
-// Rate limiting for authentication routes
-const loginRateLimit = authRateLimit(5, 15 * 60 * 1000); // 5 attempts per 15 minutes
-const registerRateLimit = authRateLimit(3, 60 * 60 * 1000); // 3 attempts per hour
-const forgotPasswordRateLimit = authRateLimit(3, 15 * 60 * 1000); // 3 attempts per 15 minutes
 
 /**
  * Public Authentication Routes
@@ -20,14 +13,12 @@ const forgotPasswordRateLimit = authRateLimit(3, 15 * 60 * 1000); // 3 attempts 
  */
 
 // User Registration
-router.post('/register', 
-  registerRateLimit,
+router.post('/register',
   AuthController.register
 );
 
 // User Login
-router.post('/login', 
-  loginRateLimit,
+router.post('/login',
   AuthController.login
 );
 
@@ -38,7 +29,6 @@ router.post('/refresh',
 
 // Forgot Password - Send reset email
 router.post('/forgot-password', 
-  forgotPasswordRateLimit,
   AuthController.forgotPassword
 );
 

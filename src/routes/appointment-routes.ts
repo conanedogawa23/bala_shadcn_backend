@@ -378,18 +378,29 @@ router.put(
 );
 
 /**
- * @route   GET /api/v1/appointments/billing/ready
+ * @route   GET /api/v1/appointments/ready-for-billing
  * @desc    Get appointments ready for billing
  * @access  Public
  */
 router.get(
-  '/billing/ready',
+  '/ready-for-billing',
   [
     query('clinicName')
       .optional()
       .trim()
   ],
   AppointmentController.getAppointmentsReadyToBill
+);
+
+/**
+ * @route   GET /api/v1/appointments/stats/clinic/:clinicName
+ * @desc    Get clinic appointment statistics
+ * @access  Public
+ */
+router.get(
+  '/stats/clinic/:clinicName',
+  clinicNameValidation.concat(dateRangeValidation),
+  AppointmentController.getClinicAppointmentStats
 );
 
 /**
@@ -412,17 +423,6 @@ router.get(
   '/client/:clientId/history',
   clientIdValidation,
   AppointmentController.getClientAppointmentHistory
-);
-
-/**
- * @route   GET /api/v1/appointments/clinic/:clinicName/stats
- * @desc    Get clinic appointment statistics
- * @access  Public
- */
-router.get(
-  '/clinic/:clinicName/stats',
-  clinicNameValidation.concat(dateRangeValidation),
-  AppointmentController.getClinicAppointmentStats
 );
 
 export default router;

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Types } from 'mongoose';
 import PaymentModel, { IPayment, PaymentStatus, PaymentType, PaymentMethod } from '../models/Payment';
 import { ClinicService } from '../services/ClinicService';
+import { PaymentService } from '../services/PaymentService';
 
 // Extend Request interface to include user property
 interface AuthenticatedRequest extends Request {
@@ -336,10 +337,19 @@ export class PaymentController {
   /**
    * @route   POST /api/v1/payments
    * @desc    Create new payment
-   * @access  Private
+   * @access  Private - Requires 'canCreatePayments' permission
    */
   static async createPayment(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
+      // Verify user is authenticated
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          message: 'Authentication required to create payment'
+        });
+        return;
+      }
+
       const {
         orderNumber,
         clientId,
@@ -362,10 +372,29 @@ export class PaymentController {
         return;
       }
 
+      // Validate amounts structure
+      if (typeof amounts !== 'object' || !amounts.totalPaymentAmount) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid amounts object. Must contain totalPaymentAmount'
+        });
+        return;
+      }
+
+      // Validate clientId is a valid number
+      const numericClientId = Number(clientId);
+      if (isNaN(numericClientId) || numericClientId <= 0) {
+        res.status(400).json({
+          success: false,
+          message: 'clientId must be a positive number'
+        });
+        return;
+      }
+
       // Create payment
       const payment = new PaymentModel({
         orderNumber,
-        clientId: Number(clientId),
+        clientId: numericClientId,
         clientName,
         clinicName,
         paymentMethod,
@@ -374,8 +403,9 @@ export class PaymentController {
         orderId: orderId ? new Types.ObjectId(orderId) : undefined,
         notes,
         referringNo,
-        createdBy: req.user?._id,
-        userLoginName: req.user?.username
+        createdBy: req.user._id,
+        userLoginName: req.user.username,
+        paymentDate: new Date()
       });
 
       const savedPayment = await payment.save();
@@ -387,6 +417,26 @@ export class PaymentController {
       });
     } catch (error) {
       console.error('Error creating payment:', error);
+
+      // Handle validation errors
+      if (error instanceof Error) {
+        if (error.name === 'ValidationError') {
+          res.status(400).json({
+            success: false,
+            message: 'Payment validation failed',
+            error: error.message
+          });
+          return;
+        }
+        if (error.name === 'MongoServerError' && (error as any).code === 11000) {
+          res.status(409).json({
+            success: false,
+            message: 'Payment with this identifier already exists'
+          });
+          return;
+        }
+      }
+
       res.status(500).json({
         success: false,
         message: 'Failed to create payment',
@@ -737,6 +787,234 @@ export class PaymentController {
       res.status(500).json({
         success: false,
         message: 'Failed to fetch revenue data',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * @route   GET /api/v1/payments/report/account-summary/:clinicName
+   * @desc    Get account summary report for a clinic with client-level details
+   * @access  Private
+   */
+  static async getAccountSummary(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { clinicName: rawClinicName } = req.params;
+      const { page = 1, limit = 20, sortBy = 'clientName' } = req.query;
+
+      if (!rawClinicName) {
+        res.status(400).json({
+          success: false,
+          message: 'Clinic name is required'
+        });
+        return;
+      }
+
+      let actualClinicName: string = rawClinicName as string;
+      try {
+        actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
+      } catch (conversionError) {
+        actualClinicName = rawClinicName as string;
+      }
+
+      const result = await PaymentService.getAccountSummary(
+        actualClinicName,
+        Number(page),
+        Number(limit),
+        sortBy as string
+      );
+
+      res.json({
+        success: true,
+        data: result.data,
+        pagination: {
+          currentPage: result.page,
+          totalPages: Math.ceil(result.total / result.limit),
+          totalItems: result.total,
+          itemsPerPage: result.limit
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching account summary:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch account summary',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * @route   GET /api/v1/payments/report/payment-summary/:clinicName
+   * @desc    Get payment summary by date range and payment type
+   * @access  Private
+   */
+  static async getPaymentSummary(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { clinicName: rawClinicName } = req.params;
+      const { startDate, endDate } = req.query;
+
+      if (!rawClinicName) {
+        res.status(400).json({
+          success: false,
+          message: 'Clinic name is required'
+        });
+        return;
+      }
+
+      let actualClinicName: string = rawClinicName as string;
+      try {
+        actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
+      } catch (conversionError) {
+        actualClinicName = rawClinicName as string;
+      }
+
+      const result = await PaymentService.getPaymentSummary(
+        actualClinicName,
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined
+      );
+
+      res.json({
+        success: true,
+        data: {
+          paymentTypeSummary: result.paymentTypeSummary,
+          dailySummary: result.dailySummary,
+          dateRange: {
+            startDate: startDate || 'All time',
+            endDate: endDate || 'All time'
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching payment summary:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch payment summary',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * @route   GET /api/v1/payments/report/client-history/:clientId
+   * @desc    Get complete payment history for a client
+   * @access  Private
+   */
+  static async getClientPaymentHistory(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { clientId } = req.params;
+      const { page = 1, limit = 50, sortBy = 'paymentDate' } = req.query;
+
+      if (!clientId) {
+        res.status(400).json({
+          success: false,
+          message: 'Client ID is required'
+        });
+        return;
+      }
+
+      const result = await PaymentService.getClientPaymentHistory(
+        Number(clientId),
+        Number(page),
+        Number(limit),
+        sortBy as string
+      );
+
+      res.json({
+        success: true,
+        data: result.payments,
+        statistics: result.stats,
+        pagination: {
+          currentPage: result.page,
+          totalPages: Math.ceil(result.total / result.limit),
+          totalItems: result.total,
+          itemsPerPage: result.limit
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching client payment history:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch client payment history',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * @route   GET /api/v1/payments/report/aging/:clinicName
+   * @desc    Get aged accounts receivable report
+   * @access  Private
+   */
+  static async getAgingReport(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { clinicName: rawClinicName } = req.params;
+
+      if (!rawClinicName) {
+        res.status(400).json({
+          success: false,
+          message: 'Clinic name is required'
+        });
+        return;
+      }
+
+      let actualClinicName: string = rawClinicName as string;
+      try {
+        actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
+      } catch (conversionError) {
+        actualClinicName = rawClinicName as string;
+      }
+
+      const result = await PaymentService.getAgingReport(actualClinicName);
+
+      res.json({
+        success: true,
+        data: {
+          agingByClient: result.agingByClient,
+          summary: result.summary
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching aging report:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch aging report',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * @route   POST /api/v1/payments/:id/dispute
+   * @desc    Mark a payment as disputed
+   * @access  Private
+   */
+  static async disputePayment(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { reason, resolutionNotes } = req.body;
+
+      if (!id) {
+        res.status(400).json({
+          success: false,
+          message: 'Payment ID is required'
+        });
+        return;
+      }
+
+      const payment = await PaymentService.disputePayment(id, reason, resolutionNotes);
+
+      res.json({
+        success: true,
+        message: 'Payment marked as disputed',
+        data: payment
+      });
+    } catch (error) {
+      console.error('Error disputing payment:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to dispute payment',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }

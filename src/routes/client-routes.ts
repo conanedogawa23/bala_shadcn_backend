@@ -156,12 +156,45 @@ const searchValidation = [
 ];
 
 // Routes
+
 /**
  * @route   GET /api/v1/clients/search
  * @desc    Search clients across all clinics
  * @access  Public
  */
 router.get('/search', searchValidation, ClientController.searchClients);
+
+/**
+ * @route   GET /api/v1/clients/advanced-search
+ * @desc    Advanced search with multiple criteria (legacy feature)
+ * @access  Public
+ * @params  firstName, lastName, dateOfBirth, phone, email, clinic, insuranceCompany, limit
+ */
+router.get('/advanced-search', ClientController.advancedSearch);
+
+/**
+ * @route   GET /api/v1/clients/export
+ * @desc    Export clients data (JSON or CSV)
+ * @access  Public
+ * @params  clinicName, format (json|csv), limit
+ */
+router.get('/export', ClientController.exportClients);
+
+/**
+ * @route   GET /api/v1/clients/dpa
+ * @desc    Get clients with DPA (Direct Payment Authorization) - query param version
+ * @access  Public
+ * @params  clinicName (query), page, limit
+ */
+router.get('/dpa', ClientController.getClientsWithDPA);
+
+/**
+ * @route   GET /api/v1/clients/insurance/company
+ * @desc    Get clients by insurance company
+ * @access  Public
+ * @params  companyName or insuranceCompany (required), clinicName
+ */
+router.get('/insurance/company', ClientController.getClientsByInsuranceCompany);
 
 /**
  * @route   GET /api/v1/clients/:id
@@ -225,5 +258,49 @@ router.get('/clinic/:clinicName/frontend-compatible', clinicNameValidation.conca
  * @access  Public
  */
 router.get('/:id/frontend-compatible', clientIdValidation, ClientController.getClientByIdCompatible);
+
+/**
+ * @route   GET /api/v1/clients/:id/account-summary
+ * @desc    Get client account summary (orders, payments, insurance)
+ * @access  Public
+ */
+router.get('/:id/account-summary', clientIdValidation, ClientController.getClientAccountSummary);
+
+/**
+ * @route   GET /api/v1/clients/:id/comprehensive
+ * @desc    Get client with all related data (appointments, orders, payments)
+ * @access  Public
+ */
+router.get('/:id/comprehensive', clientIdValidation, ClientController.getClientComprehensive);
+
+/**
+ * @route   GET /api/v1/clients/:id/contact-history
+ * @desc    Get client contact history
+ * @access  Public
+ * @params  limit
+ */
+router.get('/:id/contact-history', clientIdValidation, ClientController.getClientContactHistory);
+
+/**
+ * @route   PUT /api/v1/clients/:id/insurance
+ * @desc    Update client insurance information
+ * @access  Public
+ */
+router.put('/:id/insurance', clientIdValidation, ClientController.updateClientInsurance);
+
+/**
+ * @route   GET /api/v1/clients/clinic/:clinicName/dpa
+ * @desc    Get clients with DPA (Direct Payment Authorization) - path param version
+ * @access  Public
+ * @params  page, limit
+ */
+router.get('/clinic/:clinicName/dpa', clinicNameValidation, ClientController.getClientsWithDPA);
+
+/**
+ * @route   POST /api/v1/clients/bulk-update
+ * @desc    Bulk update clients (batch operation)
+ * @access  Public
+ */
+router.post('/bulk-update', ClientController.bulkUpdateClients);
 
 export default router;

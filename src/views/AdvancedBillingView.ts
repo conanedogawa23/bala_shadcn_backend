@@ -61,15 +61,23 @@ export class AdvancedBillingView {
    * Format single advanced billing for response
    */
   static formatBilling(billing: IAdvancedBilling): AdvancedBillingResponse {
+    // Helper to safely format dates
+    const formatDate = (date: any): string => {
+      if (!date) return new Date().toISOString();
+      if (typeof date === 'string') return date;
+      if (date instanceof Date) return date.toISOString();
+      return new Date(date).toISOString();
+    };
+
     return {
       id: toObjectIdString(billing._id),
       billingId: billing.billingId,
-      clientId: billing.clientId?.trim() || '',
+      clientId: billing.clientId?.toString() || '',
       clientKey: billing.clientKey,
-      startDate: billing.startDate.toISOString(),
-      endDate: billing.endDate.toISOString(),
+      startDate: formatDate(billing.startDate),
+      endDate: formatDate(billing.endDate),
       productKey: billing.productKey,
-      billDate: billing.billDate.toISOString(),
+      billDate: formatDate(billing.billDate),
       isActive: billing.isActive,
       status: billing.status,
       clinicName: billing.clinicName?.trim() || '',
@@ -77,8 +85,8 @@ export class AdvancedBillingView {
       daysRemaining: billing.daysRemaining || 0,
       billingCycleDays: billing.billingCycleDays || 0,
       isOverdue: billing.isOverdue || false,
-      dateCreated: billing.dateCreated.toISOString(),
-      dateModified: billing.dateModified.toISOString()
+      dateCreated: formatDate(billing.dateCreated || (billing as any).createdAt),
+      dateModified: formatDate(billing.dateModified || (billing as any).updatedAt)
     };
   }
 
@@ -124,23 +132,23 @@ export class AdvancedBillingView {
     statusDistribution: Array<{ status: string; count: number }>;
   }): AdvancedBillingStatsResponse {
     return {
-      totalBillings: stats.totalBillings,
-      activeBillings: stats.activeBillings,
-      overdueBillings: stats.overdueBillings,
-      upcomingBillings: stats.upcomingBillings,
-      totalRevenue: stats.totalRevenue,
-      topClients: stats.topClients.map(client => ({
-        clientId: client.clientId?.trim() || 'Unknown',
-        billingCount: client.billingCount,
-        totalCycles: client.totalCycles
+      totalBillings: stats.totalBillings || 0,
+      activeBillings: stats.activeBillings || 0,
+      overdueBillings: stats.overdueBillings || 0,
+      upcomingBillings: stats.upcomingBillings || 0,
+      totalRevenue: stats.totalRevenue || 0,
+      topClients: (stats.topClients || []).map(client => ({
+        clientId: (typeof client?.clientId === 'string' ? client.clientId : String(client?.clientId || 'Unknown')).trim() || 'Unknown',
+        billingCount: client?.billingCount || 0,
+        totalCycles: client?.totalCycles || 0
       })),
-      topClinics: stats.topClinics.map(clinic => ({
-        clinic: clinic.clinic?.trim() || 'Unknown',
-        billingCount: clinic.billingCount
+      topClinics: (stats.topClinics || []).map(clinic => ({
+        clinic: (typeof clinic?.clinic === 'string' ? clinic.clinic : String(clinic?.clinic || 'Unknown')).trim() || 'Unknown',
+        billingCount: clinic?.billingCount || 0
       })),
-      statusDistribution: stats.statusDistribution.map(item => ({
-        status: item.status || 'Unknown',
-        count: item.count
+      statusDistribution: (stats.statusDistribution || []).map(item => ({
+        status: item?.status || 'Unknown',
+        count: item?.count || 0
       }))
     };
   }
@@ -175,21 +183,36 @@ export class AdvancedBillingView {
    * Format for frontend compatibility (if needed for mock data replacement)
    */
   static formatBillingForFrontend(billing: IAdvancedBilling): any {
+    // Helper to safely format dates
+    const formatDate = (date: any): string | undefined => {
+      if (!date) return new Date().toISOString().split('T')[0];
+      if (typeof date === 'string') return date.split('T')[0];
+      if (date instanceof Date) return date.toISOString().split('T')[0];
+      try {
+        return new Date(date).toISOString().split('T')[0];
+      } catch {
+        return new Date().toISOString().split('T')[0];
+      }
+    };
+
+    const createdDate = formatDate(billing.dateCreated || (billing as any).createdAt) || new Date().toISOString().split('T')[0];
+    const updatedDate = formatDate(billing.dateModified || (billing as any).updatedAt) || new Date().toISOString().split('T')[0];
+
     return {
       id: toObjectIdString(billing._id),
       billingId: billing.billingId,
       client: {
-        id: billing.clientId?.trim() || '',
+        id: billing.clientId?.toString() || '',
         key: billing.clientKey
       },
       cycle: {
-        startDate: billing.startDate.toISOString().split('T')[0], // YYYY-MM-DD format
-        endDate: billing.endDate.toISOString().split('T')[0],
+        startDate: formatDate(billing.startDate) || new Date().toISOString().split('T')[0],
+        endDate: formatDate(billing.endDate) || new Date().toISOString().split('T')[0],
         duration: billing.billingCycleDays || 0,
         daysRemaining: billing.daysRemaining || 0
       },
       billing: {
-        date: billing.billDate.toISOString().split('T')[0],
+        date: formatDate(billing.billDate) || new Date().toISOString().split('T')[0],
         isOverdue: billing.isOverdue || false,
         productKey: billing.productKey
       },
@@ -200,8 +223,8 @@ export class AdvancedBillingView {
       },
       clinic: billing.clinicName?.trim() || '',
       metadata: {
-        created: billing.dateCreated.toISOString(),
-        updated: billing.dateModified.toISOString()
+        created: createdDate + 'T00:00:00Z',
+        updated: updatedDate + 'T00:00:00Z'
       }
     };
   }
@@ -304,7 +327,7 @@ export class AdvancedBillingView {
       color: this.getBillingColor(billing),
       extendedProps: {
         billingId: billing.billingId,
-        clientId: billing.clientId?.trim() || '',
+        clientId: billing.clientId?.toString() || '',
         status: billing.status,
         isOverdue: billing.isOverdue || false,
         daysRemaining: billing.daysRemaining || 0

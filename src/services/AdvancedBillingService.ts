@@ -137,7 +137,7 @@ export class AdvancedBillingService {
    */
   static async getBillingsByClient(clientId: string): Promise<IAdvancedBilling[]> {
     try {
-      const billings = await AdvancedBillingModel.getBillingsByClient(clientId).lean();
+      const billings = await AdvancedBillingModel.getBillingsByClient(Number(clientId)).lean();
       
       logger.info(`Retrieved ${billings.length} billings for client: ${clientId}`);
       return billings;
