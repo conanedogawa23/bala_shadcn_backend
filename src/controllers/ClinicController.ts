@@ -5,34 +5,10 @@ import { asyncHandler } from '../utils/asyncHandler';
 
 export class ClinicController {
 
-  // Utility function to generate proper slugs
+  // Return clinic name as-is to match MongoDB exactly (no slug transformation)
   private static generateProperSlug = (clinicName: string, displayName?: string): string => {
-    // Special mappings for known clinics to match frontend expectations
-    const specialMappings: Record<string, string> = {
-      'bodyblissphysio': 'bodybliss-physio',
-      'BodyBliss': 'bodybliss',
-      'BodyBlissOneCare': 'bodybliss-onecare',
-      'Ortholine Duncan Mills': 'ortholine-duncan-mills',
-      'Physio Bliss': 'physio-bliss',
-      'My Cloud': 'my-cloud',
-      'Century Care': 'century-care'
-    };
-
-    // Check if we have a special mapping first
-    if (specialMappings[clinicName]) {
-      return specialMappings[clinicName];
-    }
-    if (displayName && specialMappings[displayName]) {
-      return specialMappings[displayName];
-    }
-
-    // Default slug generation from displayName or clinicName
-    const nameToSlugify = displayName || clinicName || 'unknown-clinic';
-    return nameToSlugify.toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-]/g, '')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
+    // Return the exact MongoDB clinic name without any transformation
+    return clinicName;
   };
 
   // Utility function to get backend clinic names
@@ -68,11 +44,11 @@ export class ClinicController {
 
       // Transform to frontend-compatible format with real stats
       const clinicsData = await Promise.all(retainedClinics.map(async (clinic) => {
-        // Use MSSQL-aligned fields directly
-        const streetAddress = clinic.clinicAddress || '';
-        const cityName = clinic.city || '';
-        const provinceName = clinic.province || '';
-        const postalCode = clinic.postalCode || '';
+        // Use MongoDB fields directly
+        const streetAddress = clinic.address?.street || '';
+        const cityName = clinic.address?.city || '';
+        const provinceName = clinic.address?.province || '';
+        const postalCode = clinic.address?.postalCode || '';
         
         // Phone/fax not in current model - set empty values
         const phoneContact = null;
@@ -86,18 +62,18 @@ export class ClinicController {
         try {
           // Get clinic names that might be used in client/appointment data - using precise mapping
           const possibleClinicNames = [
-            clinic.clinicName,           // e.g., "bodyblissphysio"
+            clinic.name,                // e.g., "bodyblissphysio"
             clinic.getDisplayName()     // e.g., "BodyBliss Physiotherapy"
           ];
 
           // Add specific backend name mapping based on clinic identity (not inclusive matching)
-          const backendName = ClinicController.getBackendClinicName(clinic.clinicName, clinic.getDisplayName());
+          const backendName = ClinicController.getBackendClinicName(clinic.name, clinic.getDisplayName());
           if (!possibleClinicNames.includes(backendName)) {
             possibleClinicNames.push(backendName);
           }
 
           // Handle specific clinic variations - PRECISE matching to avoid cross-contamination
-          if (clinic.clinicName === 'bodyblissphysio' || clinic.getDisplayName() === 'BodyBliss Physiotherapy') {
+          if (clinic.name === 'bodyblissphysio' || clinic.getDisplayName() === 'BodyBliss Physiotherapy') {
             // Only add BodyBlissPhysio variations for the physio clinic
             if (!possibleClinicNames.includes('BodyBlissPhysio')) {
               possibleClinicNames.push('BodyBlissPhysio');
@@ -105,7 +81,7 @@ export class ClinicController {
             if (!possibleClinicNames.includes('BodyBliss Physio')) {
               possibleClinicNames.push('BodyBliss Physio');
             }
-          } else if (clinic.clinicName === 'bodybliss' || clinic.getDisplayName() === 'BodyBliss') {
+          } else if (clinic.name === 'bodybliss' || clinic.getDisplayName() === 'BodyBliss') {
             // Only add BodyBliss variations for the BodyBliss clinic
             if (!possibleClinicNames.includes('BodyBliss')) {
               possibleClinicNames.push('BodyBliss');
@@ -143,15 +119,15 @@ export class ClinicController {
           }
 
         } catch (statsError) {
-          console.error(`Error calculating stats for clinic ${clinic.clinicName}:`, statsError);
+          console.error(`Error calculating stats for clinic ${clinic.name}:`, statsError);
           // Continue with zeros if stats calculation fails
         }
         
         return {
           id: clinic.clinicId,
-          name: ClinicController.generateProperSlug(clinic.clinicName, clinic.getDisplayName()),
+          name: ClinicController.generateProperSlug(clinic.name, clinic.getDisplayName()),
           displayName: clinic.getDisplayName(),
-          backendName: ClinicController.getBackendClinicName(clinic.clinicName, clinic.getDisplayName()), // For API calls to other services
+          backendName: ClinicController.getBackendClinicName(clinic.name, clinic.getDisplayName()), // For API calls to other services
           address: streetAddress,
           city: cityName,
           province: provinceName,
@@ -213,7 +189,7 @@ export class ClinicController {
     if (!slug) {
       const retainedClinics = await ClinicModel.findRetainedClinics();
       const availableSlugs = retainedClinics.map(clinic => 
-        ClinicController.generateProperSlug(clinic.clinicName, clinic.getDisplayName())
+        ClinicController.generateProperSlug(clinic.name, clinic.getDisplayName())
       );
       
       return res.status(400).json({
@@ -230,12 +206,12 @@ export class ClinicController {
     
     // Find clinic by matching generated slug
     const clinic = retainedClinics.find(c => 
-      ClinicController.generateProperSlug(c.clinicName, c.getDisplayName()) === slug
+      ClinicController.generateProperSlug(c.name, c.getDisplayName()) === slug
     );
     
     if (!clinic) {
       const availableSlugs = retainedClinics.map(c => 
-        ClinicController.generateProperSlug(c.clinicName, c.getDisplayName())
+        ClinicController.generateProperSlug(c.name, c.getDisplayName())
       );
       
       return res.status(404).json({
@@ -253,11 +229,11 @@ export class ClinicController {
       data: {
         clinic: {
           id: clinic.clinicId,
-          name: ClinicController.generateProperSlug(clinic.clinicName, clinic.getDisplayName()),
+          name: ClinicController.generateProperSlug(clinic.name, clinic.getDisplayName()),
           displayName: clinic.getDisplayName(),
-          backendName: ClinicController.getBackendClinicName(clinic.clinicName, clinic.getDisplayName())
+          backendName: ClinicController.getBackendClinicName(clinic.name, clinic.getDisplayName())
         },
-        backendName: ClinicController.getBackendClinicName(clinic.clinicName, clinic.getDisplayName())
+        backendName: ClinicController.getBackendClinicName(clinic.name, clinic.getDisplayName())
       }
     });
   });

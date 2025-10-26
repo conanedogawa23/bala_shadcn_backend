@@ -9,7 +9,6 @@ export class ClinicView {
       id: clinic.clinicId,
       name: clinic.clinicName,
       displayName: clinic.getDisplayName(),
-      completeName: clinic.completeName,
       address: {
         street: clinic.clinicAddress || '',
         city: clinic.city || '',
@@ -19,7 +18,6 @@ export class ClinicView {
       },
       isActive: clinic.isActive(),
       isRetainedClinic: clinic.isRetainedClinic,
-      stats: clinic.stats,
       createdAt: clinic.dateCreated,
       updatedAt: clinic.dateModified
     };
@@ -39,10 +37,7 @@ export class ClinicView {
       postalCode: clinic.postalCode || '',
       isActive: clinic.isActive(),
       isRetainedClinic: clinic.isRetainedClinic,
-      lastActivity: clinic.stats.lastActivity?.toISOString().split('T')[0],
-      totalAppointments: clinic.stats.totalOrders, // Map orders to appointments
-      clientCount: clinic.stats.totalClients,
-      description: clinic.completeName
+      description: clinic.getDisplayName()
     };
   }
 
@@ -74,7 +69,6 @@ export class ClinicView {
       displayName: clinic.getDisplayName(),
       status: clinic.isActive(),
       isActive: clinic.isActive(),
-      clientCount: clinic.stats.totalClients,
       city: clinic.city || '',
       province: clinic.province || ''
     };
@@ -91,13 +85,11 @@ export class ClinicView {
         displayName: clinic.getDisplayName()
       },
       statistics: {
-        clientCount: clinic.stats.totalClients,
-        totalOrders: clinic.stats.totalOrders,
-        totalRevenue: clinic.stats.totalRevenue,
-        lastActivity: clinic.stats.lastActivity,
-        averageRevenuePerClient: clinic.stats.totalClients > 0 
-          ? Math.round((clinic.stats.totalRevenue / clinic.stats.totalClients) * 100) / 100 
-          : 0
+        clientCount: 0,
+        totalOrders: 0,
+        totalRevenue: 0,
+        lastActivity: null,
+        averageRevenuePerClient: 0
       },
       status: clinic.isActive(),
       isActive: clinic.isActive()

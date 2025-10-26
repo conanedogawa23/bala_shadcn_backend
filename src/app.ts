@@ -11,6 +11,7 @@ import { logger } from '@/utils/logger';
 import { errorHandler } from '@/middleware/errorHandler';
 import { notFound } from '@/middleware/notFound';
 import routes from '@/routes';
+import { seedAllPaymentLookups } from '@/utils/paymentSeeder';
 
 // Load environment variables
 dotenv.config();
@@ -102,6 +103,9 @@ async function startServer() {
   try {
     // Connect to database
     await connectDatabase();
+    
+    // Seed payment lookup tables
+    await seedAllPaymentLookups();
     
     // Start listening
     const server = app.listen(PORT, () => {
