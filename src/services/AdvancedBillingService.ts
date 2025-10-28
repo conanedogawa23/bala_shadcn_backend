@@ -139,7 +139,14 @@ export class AdvancedBillingService {
   static async getBillingsByClient(clientId: string): Promise<IAdvancedBilling[]> {
     try {
       // Get client to obtain clientKey (advancedbillings uses clientKey, not clientId string)
-      const client = await ClientModel.findOne({ clientId });
+      const numericClientId = Number(clientId);
+      const client = await ClientModel.findOne({
+        $or: [
+          { clientId: numericClientId },
+          { clientId: clientId },
+          { clientKey: numericClientId }
+        ]
+      });
       if (!client) {
         logger.warn(`Client ${clientId} not found when retrieving billings`);
         return [];

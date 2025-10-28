@@ -133,9 +133,13 @@ export class ContactHistoryService {
 
       // Validate client exists if provided
       if (contactData.clientId) {
+        const numericClientId = Number(contactData.clientId);
         const clientExists = await ClientModel.findOne({ 
-          clientId: contactData.clientId, 
-          isActive: true 
+          $or: [
+            { clientId: numericClientId, isActive: true },
+            { clientId: contactData.clientId, isActive: true },
+            { clientKey: numericClientId, isActive: true }
+          ]
         }).lean();
 
         if (!clientExists) {

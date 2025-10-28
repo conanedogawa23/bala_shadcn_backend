@@ -136,9 +136,13 @@ export class ClientClinicRelationshipService {
       }
 
       // Validate client exists
+      const numericClientId = Number(relationshipData.clientId);
       const clientExists = await ClientModel.findOne({ 
-        clientId: relationshipData.clientId, 
-        isActive: true 
+        $or: [
+          { clientId: numericClientId, isActive: true },
+          { clientId: relationshipData.clientId, isActive: true },
+          { clientKey: numericClientId, isActive: true }
+        ]
       }).lean();
 
       if (!clientExists) {

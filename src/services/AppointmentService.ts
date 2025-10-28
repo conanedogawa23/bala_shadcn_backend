@@ -206,7 +206,14 @@ export class AppointmentService {
       }
 
       // Verify client exists
-      const client = await ClientModel.findOne({ clientId: appointmentData.clientId });
+      const numericClientId = Number(appointmentData.clientId);
+      const client = await ClientModel.findOne({
+        $or: [
+          { clientId: numericClientId },
+          { clientId: appointmentData.clientId },
+          { clientKey: numericClientId }
+        ]
+      });
       if (!client) {
         throw new NotFoundError('Client', appointmentData.clientId);
       }
@@ -468,7 +475,14 @@ export class AppointmentService {
   static async getClientAppointmentHistory(clientId: string) {
     try {
       // Verify client exists
-      const client = await ClientModel.findOne({ clientId });
+      const numericClientId = Number(clientId);
+      const client = await ClientModel.findOne({
+        $or: [
+          { clientId: numericClientId },
+          { clientId: clientId },
+          { clientKey: numericClientId }
+        ]
+      });
       if (!client) {
         throw new NotFoundError('Client', clientId);
       }

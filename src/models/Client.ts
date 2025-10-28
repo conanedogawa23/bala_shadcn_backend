@@ -198,7 +198,7 @@ const InsuranceSchema = new Schema<IInsurance>({
 
 const ClientSchema = new Schema<IClient>({
   clientId: {
-    type: Number,
+    type: Schema.Types.Mixed, // Accept both String and Number for legacy data compatibility
     required: true,
     unique: true
   },

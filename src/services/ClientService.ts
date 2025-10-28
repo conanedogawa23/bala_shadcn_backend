@@ -371,14 +371,16 @@ export class ClientService {
    */
   static async getClientById(clientId: string): Promise<IClient> {
     try {
-      // Query for clientId as string (MongoDB stores it as string)
-      // Also try clientKey as a fallback (stored as number)
+      // Try multiple approaches to handle both string and number types in MongoDB
+      // Some data may have clientId as string, others as number (due to migration)
+      const numericClientId = Number(clientId);
+      
       const client = await ClientModel.findOne({
         $or: [
-          { clientId: clientId },
-          { clientId: String(clientId) },
-          { clientKey: !isNaN(Number(clientId)) ? Number(clientId) : undefined }
-        ].filter(q => q.clientKey !== undefined || q.clientId !== undefined)
+          { clientId: numericClientId },     // Try as number (schema type)
+          { clientId: clientId },             // Try as string (legacy data)
+          { clientKey: numericClientId }      // Try clientKey fallback
+        ]
       });
       
       if (!client) {
@@ -430,7 +432,14 @@ export class ClientService {
 
       // Check for duplicate client ID if provided
       if (clientData.clientId) {
-        const existingClient = await ClientModel.findOne({ clientId: clientData.clientId });
+        const numericClientId = Number(clientData.clientId);
+        const existingClient = await ClientModel.findOne({
+          $or: [
+            { clientId: numericClientId },
+            { clientId: clientData.clientId },
+            { clientKey: numericClientId }
+          ]
+        });
         if (existingClient) {
           throw new ValidationError('Client with this ID already exists');
         }
@@ -634,8 +643,15 @@ export class ClientService {
         await this.updateClinicClientCount(updateData.defaultClinic);
       }
 
+      const numericClientId = Number(clientId);
       const updatedClient = await ClientModel.findOneAndUpdate(
-        { clientId },
+        { 
+          $or: [
+            { clientId: numericClientId },
+            { clientId: clientId },
+            { clientKey: numericClientId }
+          ]
+        },
         {
           ...updateData,
           dateModified: new Date()
@@ -678,9 +694,16 @@ export class ClientService {
   static async deleteClient(clientId: string): Promise<void> {
     try {
       const client = await this.getClientById(clientId);
+      const numericClientId = Number(clientId);
       
       await ClientModel.findOneAndUpdate(
-        { clientId },
+        { 
+          $or: [
+            { clientId: numericClientId },
+            { clientId: clientId },
+            { clientKey: numericClientId }
+          ]
+        },
         { 
           isActive: false,
           dateModified: new Date()
@@ -1074,8 +1097,16 @@ export class ClientService {
         }
       }
 
+      const numericClientId = Number(clientId);
+      
       const client = await ClientModel.findOneAndUpdate(
-        { clientId },
+        { 
+          $or: [
+            { clientId: numericClientId },
+            { clientId: clientId },
+            { clientKey: numericClientId }
+          ]
+        },
         { 
           insurance,
           dateModified: new Date()
