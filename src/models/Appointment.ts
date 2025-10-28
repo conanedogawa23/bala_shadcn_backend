@@ -51,7 +51,7 @@ interface IAppointmentModel extends Model<IAppointment> {
   checkTimeSlotConflict(resourceId: number, startDate: Date, endDate: Date, excludeId?: string): any;
   findReadyToBill(clinicName?: string): any;
   findByResource(resourceId: number, date: Date): any;
-  findByClient(clientId: number): any; // Changed from string to number for consistency
+  findByClient(clientId: string): any; // MongoDB stores clientId as string
 }
 
 const AppointmentSchema = new Schema<IAppointment>({
@@ -278,12 +278,8 @@ AppointmentSchema.statics.findByClinic = function(clinicName: string, startDate?
   return this.find(query).sort({ startDate: 1 });
 };
 
-AppointmentSchema.statics.findByClient = function(clientId: number) {
-  return this.find({
-    clientId: clientId,
-    isActive: true
-  }).sort({ startDate: -1 });
-};
+// Note: findByClient is defined later in the file (line ~390) with correct string type
+// Removed duplicate definition here to avoid confusion
 
 AppointmentSchema.statics.findByResource = function(resourceId: number, date?: Date) {
   const query: any = {

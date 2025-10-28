@@ -1,4 +1,5 @@
 import { AdvancedBillingModel, IAdvancedBilling, BillingStatus } from '../models/AdvancedBilling';
+import { ClientModel } from '../models/Client';
 import { logger } from '../utils/logger';
 import { AppError } from '../utils/errors';
 
@@ -137,9 +138,18 @@ export class AdvancedBillingService {
    */
   static async getBillingsByClient(clientId: string): Promise<IAdvancedBilling[]> {
     try {
-      const billings = await AdvancedBillingModel.getBillingsByClient(Number(clientId)).lean();
+      // Get client to obtain clientKey (advancedbillings uses clientKey, not clientId string)
+      const client = await ClientModel.findOne({ clientId });
+      if (!client) {
+        logger.warn(`Client ${clientId} not found when retrieving billings`);
+        return [];
+      }
+
+      // Use clientKey for querying advancedbillings (which stores it as clientId number)
+      const clientKey = client.clientKey || Number(clientId);
+      const billings = await AdvancedBillingModel.getBillingsByClient(clientKey).lean();
       
-      logger.info(`Retrieved ${billings.length} billings for client: ${clientId}`);
+      logger.info(`Retrieved ${billings.length} billings for client: ${clientId} (clientKey: ${clientKey})`);
       return billings;
     } catch (error) {
       logger.error(`Error getting billings for client ${clientId}:`, error);

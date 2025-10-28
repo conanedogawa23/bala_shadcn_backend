@@ -371,7 +371,15 @@ export class ClientService {
    */
   static async getClientById(clientId: string): Promise<IClient> {
     try {
-      const client = await ClientModel.findOne({ clientId });
+      // Query for clientId as string (MongoDB stores it as string)
+      // Also try clientKey as a fallback (stored as number)
+      const client = await ClientModel.findOne({
+        $or: [
+          { clientId: clientId },
+          { clientId: String(clientId) },
+          { clientKey: !isNaN(Number(clientId)) ? Number(clientId) : undefined }
+        ].filter(q => q.clientKey !== undefined || q.clientId !== undefined)
+      });
       
       if (!client) {
         throw new NotFoundError('Client', clientId);

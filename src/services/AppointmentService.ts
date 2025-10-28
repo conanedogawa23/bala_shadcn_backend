@@ -473,7 +473,8 @@ export class AppointmentService {
         throw new NotFoundError('Client', clientId);
       }
 
-      const appointments = await AppointmentModel.findByClient(Number(clientId));
+      // MongoDB stores clientId as string, so don't convert to Number
+      const appointments = await AppointmentModel.findByClient(clientId);
 
       // Populate resource information
       const populatedAppointments = await Promise.all(

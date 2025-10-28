@@ -5,8 +5,34 @@ export class ClientView {
    * Format single client for API response
    */
   static formatClient(client: IClient) {
+    // Build formatted address string
+    const addressParts = [];
+    if (client.contact?.address?.street) {
+      addressParts.push(client.contact.address.street);
+    }
+    if (client.contact?.address?.apartment) {
+      addressParts.push(`Apt ${client.contact.address.apartment}`);
+    }
+    if (client.contact?.address?.city) {
+      addressParts.push(client.contact.address.city);
+    }
+    if (client.contact?.address?.province) {
+      addressParts.push(client.contact.address.province);
+    }
+    if (client.contact?.address?.postalCode?.full) {
+      addressParts.push(client.contact.address.postalCode.full);
+    }
+    const formattedAddress = addressParts.join(', ');
+
+    // Extract primary phone number
+    const primaryPhone = client.contact?.phones?.cell?.full || 
+                        client.contact?.phones?.home?.full || 
+                        client.contact?.phones?.work?.full || 
+                        '';
+
     return {
       id: client.clientId,
+      clientId: client.clientId,
       personalInfo: {
         firstName: client.personalInfo.firstName,
         lastName: client.personalInfo.lastName,
@@ -17,7 +43,9 @@ export class ClientView {
       },
       contact: {
         address: client.contact.address,
+        formattedAddress, // Add formatted address for easy display
         phones: client.contact.phones,
+        primaryPhone, // Add primary phone for easy access
         email: client.contact.email,
         company: client.contact.company,
         companyOther: client.contact.companyOther
@@ -57,6 +85,8 @@ export class ClientView {
       phone = client.contact.phones.cell.full;
     } else if (client.contact?.phones?.home?.full) {
       phone = client.contact.phones.home.full;
+    } else if (client.contact?.phones?.work?.full) {
+      phone = client.contact.phones.work.full;
     } else if (typeof client.contact?.phones?.cell === 'string') {
       // Handle legacy string format
       phone = client.contact.phones.cell;
@@ -64,6 +94,28 @@ export class ClientView {
       // Handle legacy string format
       phone = client.contact.phones.home;
     }
+
+    // Build address string from components
+    let address = '';
+    const addressParts = [];
+    
+    if (client.contact?.address?.street) {
+      addressParts.push(client.contact.address.street);
+    }
+    if (client.contact?.address?.apartment) {
+      addressParts.push(`Apt ${client.contact.address.apartment}`);
+    }
+    if (client.contact?.address?.city) {
+      addressParts.push(client.contact.address.city);
+    }
+    if (client.contact?.address?.province) {
+      addressParts.push(client.contact.address.province);
+    }
+    if (client.contact?.address?.postalCode?.full) {
+      addressParts.push(client.contact.address.postalCode.full);
+    }
+    
+    address = addressParts.join(', ');
 
     // Determine clinic name from multiple possible fields
     let clinic = '';
@@ -78,6 +130,7 @@ export class ClientView {
 
     return {
       id: client.clientId,
+      clientId: client.clientId, // Add explicit clientId field
       name: client.getFullName(),
       firstName: client.personalInfo.firstName,
       lastName: client.personalInfo.lastName,
@@ -85,11 +138,13 @@ export class ClientView {
       gender: client.personalInfo.gender,
       city: client.contact?.address?.city || '',
       province: client.contact?.address?.province || '',
+      address, // Full formatted address for display
       phone,
       email: client.contact?.email || '',
       clinic,
       status: client.isActive ? 'active' : 'inactive',
       dateOfBirth: dateOfBirth ? dateOfBirth.toISOString() : '',
+      insurance: client.insurance || [], // Include full insurance array
       createdAt: client.dateCreated ? client.dateCreated.toISOString() : '',
       updatedAt: client.dateModified ? client.dateModified.toISOString() : ''
     };
@@ -99,13 +154,20 @@ export class ClientView {
    * Format client summary (minimal data for lists)
    */
   static formatClientSummary(client: IClient) {
+    // Extract phone number safely
+    const phone = client.contact?.phones?.cell?.full || 
+                 client.contact?.phones?.home?.full || 
+                 client.contact?.phones?.work?.full || 
+                 '';
+
     return {
       id: client.clientId,
+      clientId: client.clientId,
       name: client.getFullName(),
       firstName: client.personalInfo.firstName,
       lastName: client.personalInfo.lastName,
-      email: client.contact.email,
-      phone: client.contact.phones.cell || client.contact.phones.home,
+      email: client.contact?.email || '',
+      phone,
       age: client.getAge(),
       gender: client.personalInfo.gender,
       hasInsurance: client.hasInsurance(),
@@ -154,11 +216,18 @@ export class ClientView {
    * Format client for autocomplete/search results
    */
   static formatClientSearch(client: IClient) {
+    // Extract phone number safely
+    const phone = client.contact?.phones?.cell?.full || 
+                 client.contact?.phones?.home?.full || 
+                 client.contact?.phones?.work?.full || 
+                 '';
+
     return {
       id: client.clientId,
+      clientId: client.clientId,
       name: client.getFullName(),
-      email: client.contact.email,
-      phone: client.contact.phones.cell || client.contact.phones.home,
+      email: client.contact?.email || '',
+      phone,
       clinic: client.defaultClinic,
       isActive: client.isActive
     };
