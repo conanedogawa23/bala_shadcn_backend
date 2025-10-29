@@ -1,5 +1,8 @@
 import Order from '../models/Order';
 import mongoose from 'mongoose';
+import PDFDocument from 'pdfkit';
+import { ClinicModel } from '../models/Clinic';
+import { InvoiceTemplateModel } from '../models/InvoiceTemplate';
 
 interface InvoiceData {
   invoiceNumber: string;
@@ -604,10 +607,16 @@ export class InvoiceService {
       
       if (!client || !clinic) {return null;}
       
-      // Get invoice template for clinic
-      const invoiceTemplate = await mongoose.connection.collection('invoice_templates').findOne({
-        clinicName: clinic.name
-      });
+      // Get enhanced invoice template with styling and HTML templates
+      const invoiceTemplate = await InvoiceTemplateModel.findActiveByClinicId(clinic.clinicId);
+      
+      // Fallback to native collection if enhanced template not found
+      if (!invoiceTemplate) {
+        const fallbackTemplate = await mongoose.connection.collection('invoice_templates').findOne({
+          clinicName: clinic.name
+        });
+        console.warn(`Using fallback template for clinic: ${clinic.name}`);
+      }
       
       // Generate invoice number
       const invoiceNumber = this.generateInvoiceNumber(
@@ -685,6 +694,195 @@ export class InvoiceService {
     const year = date.getFullYear();
     
     return `${month}/${day}/${year}`;
+  }
+  
+  /**
+   * Generate PDF invoice using PDFKit with template and logo
+   */
+  static async generatePdfInvoice(order: any): Promise<Buffer> {
+    const client = order.clientId;
+    const clinic = order.clinicId;
+    
+    if (!client || !clinic) {
+      throw new Error('Client or clinic data missing');
+    }
+    
+    // Fetch clinic with logo
+    const clinicWithLogo = await ClinicModel.findOne({ clinicId: clinic.clinicId });
+    
+    // Fetch enhanced invoice template
+    const template = await InvoiceTemplateModel.findActiveByClinicId(clinic.clinicId);
+    
+    if (!template) {
+      throw new Error(`Invoice template not found for clinic: ${clinic.name}`);
+    }
+    
+    // Create PDF document with template layout
+    const doc = new PDFDocument({
+      size: template.styling.layout.pageSize,
+      margins: template.styling.layout.margins
+    });
+    
+    // Collect PDF chunks
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+    
+    // Generate invoice number
+    const invoiceNumber = this.generateInvoiceNumber(
+      clinic.name,
+      new Date(order.createdAt || Date.now())
+    );
+    
+    // Add clinic logo if available
+    if (clinicWithLogo?.logo?.data) {
+      try {
+        const logoBuffer = Buffer.from(clinicWithLogo.logo.data, 'base64');
+        doc.image(logoBuffer, 50, 50, { width: 150, fit: [150, 80] });
+      } catch (error) {
+        console.error('Error embedding logo:', error);
+      }
+    }
+    
+    // Header - Clinic name and info
+    doc
+      .font('Helvetica')
+      .fontSize(template.styling.fonts.header.size)
+      .fillColor(template.styling.colors.primary)
+      .text(template.displayName, 50, clinicWithLogo?.logo?.data ? 140 : 50);
+    
+    // Clinic contact info
+    doc
+      .fontSize(template.styling.fonts.body.size)
+      .fillColor(template.styling.colors.text)
+      .text(template.address, 50, doc.y + 10)
+      .text(`${template.city}, ${template.province} ${template.postalCode}`, 50, doc.y + 5);
+    
+    if (template.phone) {
+      doc.text(`Phone: ${template.phone}`, 50, doc.y + 5);
+    }
+    
+    // Invoice title
+    doc
+      .fontSize(28)
+      .fillColor('#000000')
+      .text('INVOICE', 400, 50, { align: 'right' });
+    
+    // Invoice metadata
+    doc
+      .fontSize(10)
+      .text(`Invoice No: ${invoiceNumber}`, 400, 90, { align: 'right' })
+      .text(`Date: ${this.formatDate(new Date())}`, 400, 105, { align: 'right' });
+    
+    // Client information
+    doc
+      .fontSize(12)
+      .text('Bill To:', 50, 200)
+      .fontSize(10)
+      .text(`${client.firstName} ${client.lastName}`, 50, 220)
+      .text(client.contact?.address?.street || 'N/A', 50, 235)
+      .text(
+        `${client.contact?.address?.city || ''}, ${client.contact?.address?.province || ''} ${client.contact?.address?.postalCode?.full || ''}`,
+        50,
+        250
+      );
+    
+    // Service table
+    const tableTop = 300;
+    const tableHeaders = ['Description', 'Qty', 'Price', 'Total'];
+    const columnWidths = [250, 80, 100, 100];
+    let xPos = 50;
+    
+    // Table headers
+    doc
+      .fontSize(10)
+      .fillColor('#000000');
+    
+    tableHeaders.forEach((header, i) => {
+      const colWidth = columnWidths[i] || 100;
+      doc.text(header, xPos, tableTop, { width: colWidth, align: i === 0 ? 'left' : 'right' });
+      xPos += colWidth;
+    });
+    
+    // Table line
+    doc
+      .moveTo(50, tableTop + 15)
+      .lineTo(530, tableTop + 15)
+      .stroke();
+    
+    // Table rows
+    let yPos = tableTop + 25;
+    if (order.products && Array.isArray(order.products)) {
+      for (const product of order.products) {
+        xPos = 50;
+        const qty = product.quantity || 1;
+        const price = product.price || 0;
+        const total = qty * price;
+        
+        const col0Width = columnWidths[0] || 250;
+        const col1Width = columnWidths[1] || 80;
+        const col2Width = columnWidths[2] || 100;
+        const col3Width = columnWidths[3] || 100;
+        
+        doc
+          .text(product.name || 'Service', xPos, yPos, { width: col0Width });
+        xPos += col0Width;
+        
+        doc.text(qty.toString(), xPos, yPos, { width: col1Width, align: 'right' });
+        xPos += col1Width;
+        
+        doc.text(`${template.currencySymbol}${price.toFixed(2)}`, xPos, yPos, { width: col2Width, align: 'right' });
+        xPos += col2Width;
+        
+        doc.text(`${template.currencySymbol}${total.toFixed(2)}`, xPos, yPos, { width: col3Width, align: 'right' });
+        
+        yPos += 20;
+      }
+    }
+    
+    // Totals
+    const subtotal = order.products?.reduce((sum: number, p: any) => sum + ((p.quantity || 1) * (p.price || 0)), 0) || 0;
+    const tax = subtotal * (template.taxRate / 100);
+    const total = subtotal + tax;
+    
+    yPos += 20;
+    doc
+      .fontSize(10)
+      .text(`Subtotal:`, 400, yPos, { width: 80, align: 'left' })
+      .text(`${template.currencySymbol}${subtotal.toFixed(2)}`, 480, yPos, { width: 50, align: 'right' });
+    
+    yPos += 20;
+    doc
+      .text(`Tax (${template.taxRate}%):`, 400, yPos, { width: 80, align: 'left' })
+      .text(`${template.currencySymbol}${tax.toFixed(2)}`, 480, yPos, { width: 50, align: 'right' });
+    
+    yPos += 25;
+    doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text(`Total:`, 400, yPos, { width: 80, align: 'left' })
+      .text(`${template.currencySymbol}${total.toFixed(2)}`, 480, yPos, { width: 50, align: 'right' });
+    
+    // Footer
+    yPos += 60;
+    doc
+      .fontSize(10)
+      .font('Helvetica')
+      .fillColor(template.styling.colors.secondary)
+      .text(template.paymentTerms || 'Thank you for your business!', 50, yPos, { 
+        width: 480, 
+        align: 'center' 
+      });
+    
+    // Finalize PDF
+    doc.end();
+    
+    // Return PDF buffer
+    return new Promise((resolve, reject) => {
+      doc.on('end', () => {
+        resolve(Buffer.concat(chunks));
+      });
+      doc.on('error', reject);
+    });
   }
   
   /**

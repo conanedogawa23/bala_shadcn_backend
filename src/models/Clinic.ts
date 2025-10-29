@@ -78,6 +78,14 @@ export interface IClinic extends Document {
   // Business logic fields
   isRetainedClinic: boolean; // Business rule from VISIO requirements
 
+  // Logo storage
+  logo?: {
+    data: string;        // Base64 encoded image
+    contentType: string; // 'image/png' or 'image/jpeg'
+    filename: string;    // Original filename
+    uploadedAt: Date;    // Upload timestamp
+  };
+
   // Audit Fields
   dateCreated: Date;
   dateModified: Date;
@@ -271,6 +279,14 @@ const ClinicSchema = new Schema<IClinic>({
     type: Boolean,
     default: false,
     index: true
+  },
+  
+  // Logo storage
+  logo: {
+    data: { type: String },
+    contentType: { type: String },
+    filename: { type: String },
+    uploadedAt: { type: Date }
   },
   
   // Audit Fields
