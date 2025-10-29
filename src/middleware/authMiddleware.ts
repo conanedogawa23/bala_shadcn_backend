@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User, { IUser, UserRole, IUserPermissions } from '../models/User';
+import { ClinicModel } from '../models/Clinic';
 import { AuthRequest } from '../controllers/AuthController';
 import { Types } from 'mongoose';
 
@@ -386,9 +387,8 @@ export const verifyClinicExists = async (
       return next(); // Skip validation if no clinic name provided
     }
 
-    // Import Clinic model to verify clinic exists
-    const { ClinicModel: Clinic } = await import('../models/Clinic');
-    const clinic = await Clinic.findOne({ name: clinicName });
+    // Verify clinic exists
+    const clinic = await ClinicModel.findOne({ name: clinicName });
 
     if (!clinic) {
       return res.status(404).json({

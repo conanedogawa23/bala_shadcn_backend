@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { Types } from 'mongoose';
 import PaymentModel, { IPayment, PaymentStatus, PaymentType, PaymentMethod } from '../models/Payment';
+import { ClientModel } from '../models/Client';
+import { ClinicModel } from '../models/Clinic';
 import { ClinicService } from '../services/ClinicService';
 import { PaymentService } from '../services/PaymentService';
 
@@ -190,7 +192,7 @@ export class PaymentController {
         return;
       }
 
-            // Transform payment data for frontend compatibility
+      // Transform payment data for frontend compatibility
       const paymentData = payment.toObject();
       
       // Handle both data formats: direct fields vs nested amounts object
@@ -211,6 +213,76 @@ export class PaymentController {
         paymentData.paymentId = paymentData._id; // Fallback to _id if no paymentId
       }
       paymentData.invoiceNumber = paymentData.invoiceNumber || paymentData.paymentNumber;
+
+      // Fetch associated client data
+      let clientData = null;
+      try {
+        const client = await ClientModel.findOne({ clientId: payment.clientId });
+        if (client) {
+          clientData = {
+            name: client.personalInfo?.fullName || `${client.personalInfo?.firstName || ''} ${client.personalInfo?.lastName || ''}`.trim(),
+            address: client.contact?.address?.street || '',
+            city: client.contact?.address?.city || '',
+            province: client.contact?.address?.province || '',
+            postalCode: client.contact?.address?.postalCode?.full || '',
+            phone: client.contact?.phones?.cell?.full || client.contact?.phones?.home?.full || client.contact?.phones?.work?.full || '',
+            email: client.contact?.email || ''
+          };
+        }
+      } catch (clientError) {
+        console.error('Error fetching client data for invoice:', clientError);
+        // Continue with null clientData - will use fallback
+      }
+
+      // Fetch associated clinic data
+      let clinicData = null;
+      try {
+        // Use case-insensitive regex to handle clinic name variations (e.g., BodyBlissPhysio vs bodyblissphysio)
+        // Explicitly select logo field to ensure it's included
+        const clinic = await ClinicModel.findOne({ 
+          name: { $regex: new RegExp(`^${payment.clinicName}$`, 'i') } 
+        }).select('+logo');
+        if (clinic) {
+          // Set default phone/fax based on clinic (phone/fax not stored in clinic model)
+          let defaultPhone = '(416) 555-0123';
+          let defaultFax = '(416) 555-0124';
+          
+          // Clinic-specific defaults if needed
+          if (clinic.name === 'bodyblissphysio') {
+            defaultPhone = '(416) 555-0123';
+            defaultFax = '(416) 555-0124';
+          }
+          
+          // Log to verify logo exists
+          console.log(`Clinic ${clinic.name} has logo:`, !!clinic.logo);
+          if (clinic.logo) {
+            console.log(`Logo details - contentType: ${clinic.logo.contentType}, filename: ${clinic.logo.filename}, data length: ${clinic.logo.data?.length || 0}`);
+          }
+          
+          clinicData = {
+            name: clinic.name || '',
+            displayName: clinic.displayName || clinic.name || '',
+            address: clinic.address?.street || '',
+            city: clinic.address?.city || '',
+            province: clinic.address?.province || '',
+            postalCode: clinic.address?.postalCode || '',
+            phone: defaultPhone,
+            fax: defaultFax,
+            logo: clinic.logo ? {
+              data: clinic.logo.data,
+              contentType: clinic.logo.contentType,
+              filename: clinic.logo.filename
+            } : undefined
+          };
+        }
+      } catch (clinicError) {
+        console.error('Error fetching clinic data for invoice:', clinicError);
+        // Continue with null clinicData - will use fallback
+      }
+
+      // Add client and clinic data to response
+      paymentData.clientData = clientData;
+      paymentData.clinicData = clinicData;
 
       console.log(`Successfully found payment: ${paymentData.paymentNumber}`);
 

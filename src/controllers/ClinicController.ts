@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { ClinicService } from '../services/ClinicService';
 import { ClinicModel } from '../models/Clinic';
+import { ClientModel } from '../models/Client';
+import { AppointmentModel } from '../models/Appointment';
+import Order from '../models/Order';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export class ClinicController {
@@ -13,18 +16,24 @@ export class ClinicController {
 
   // Utility function to get backend clinic names
   private static getBackendClinicName = (clinicName: string, displayName: string): string => {
-    // Map to actual clinic names used in client documents
+    // Map to actual clinic names used in client/appointment documents
+    // Based on MongoDB data analysis:
+    // - Clients collection uses: BodyBlissPhysio, BodyBlissOneCare, etc.
+    // - Appointments collection uses: BodyBlissPhysio, Physio Bliss, etc.
     const backendNameMappings: Record<string, string> = {
-      'bodyblissphysio': 'BodyBlissPhysio',
-      'BodyBliss': 'BodyBliss',
-      'BodyBlissOneCare': 'BodyBlissOneCare',
-      'Ortholine Duncan Mills': 'Ortholine Duncan Mills',
-      'Physio Bliss': 'Physio Bliss',
-      'My Cloud': 'My Cloud',
-      'Century Care': 'Century Care'
+      // Primary mapping - clinic.name to actual data collection names
+      'bodyblissphysio': 'BodyBlissPhysio',           // 3,664 clients, 59,058 appointments
+      'BodyBlissOneCare': 'BodyBlissOneCare',         // 14,846 clients, 10,169 appointments
+      'Ortholine Duncan Mills': 'Ortholine Duncan Mills', // 11,369 clients, 14,291 appointments
+      'Physio Bliss': 'Physio Bliss',                 // 711 clients, 51,922 appointments
+      'My Cloud': 'My Cloud',                         // 379 clients, 1,425 appointments
+      'Century Care': 'Century Care',                 // 203 clients
+      
+      // Fallback mappings by displayName
+      'BodyBliss Physiotherapy': 'BodyBlissPhysio'
     };
 
-    return backendNameMappings[clinicName] || backendNameMappings[displayName] || displayName;
+    return backendNameMappings[clinicName] || backendNameMappings[displayName] || clinicName;
   };
 
   /**
@@ -35,12 +44,6 @@ export class ClinicController {
     try {
       // Get retained clinics from MongoDB with full data
       const retainedClinics = await ClinicModel.findRetainedClinics();
-
-      // Import services for stats calculation
-      const { ClientService } = await import('../services/ClientService');
-      const { AppointmentService } = await import('../services/AppointmentService');
-      const { ClientModel } = await import('../models/Client');
-      const { AppointmentModel } = await import('../models/Appointment');
 
       // Transform to frontend-compatible format with real stats
       const clinicsData = await Promise.all(retainedClinics.map(async (clinic) => {
@@ -57,65 +60,38 @@ export class ClinicController {
         // Calculate real stats from database
         let clientCount = 0;
         let totalAppointments = 0;
+        let totalOrders = 0;
         let lastActivity: Date | null = null;
 
         try {
-          // Get clinic names that might be used in client/appointment data - using precise mapping
-          const possibleClinicNames = [
-            clinic.name,                // e.g., "bodyblissphysio"
-            clinic.getDisplayName()     // e.g., "BodyBliss Physiotherapy"
-          ];
-
-          // Add specific backend name mapping based on clinic identity (not inclusive matching)
+          // Get the correct backend clinic name used in client/appointment collections
           const backendName = ClinicController.getBackendClinicName(clinic.name, clinic.getDisplayName());
-          if (!possibleClinicNames.includes(backendName)) {
-            possibleClinicNames.push(backendName);
-          }
+          
+          // Count clients using the mapped backend name
+          clientCount = await ClientModel.countDocuments({ 
+            defaultClinic: backendName, 
+            isActive: true 
+          });
 
-          // Handle specific clinic variations - PRECISE matching to avoid cross-contamination
-          if (clinic.name === 'bodyblissphysio' || clinic.getDisplayName() === 'BodyBliss Physiotherapy') {
-            // Only add BodyBlissPhysio variations for the physio clinic
-            if (!possibleClinicNames.includes('BodyBlissPhysio')) {
-              possibleClinicNames.push('BodyBlissPhysio');
-            }
-            if (!possibleClinicNames.includes('BodyBliss Physio')) {
-              possibleClinicNames.push('BodyBliss Physio');
-            }
-          } else if (clinic.name === 'bodybliss' || clinic.getDisplayName() === 'BodyBliss') {
-            // Only add BodyBliss variations for the BodyBliss clinic
-            if (!possibleClinicNames.includes('BodyBliss')) {
-              possibleClinicNames.push('BodyBliss');
-            }
-          }
+          // Count appointments using the mapped backend name
+          totalAppointments = await AppointmentModel.countDocuments({ 
+            clinicName: backendName, 
+            isActive: true 
+          });
 
-          // Count clients across all possible clinic name variations
-          for (const clinicNameVariation of possibleClinicNames) {
-            const count = await ClientModel.countDocuments({ 
-              defaultClinic: clinicNameVariation, 
-              isActive: true 
-            });
-            clientCount += count;
-          }
+          // Count orders using the mapped backend name
+          totalOrders = await Order.countDocuments({ 
+            clinicName: backendName
+          });
 
-          // Count appointments across all possible clinic name variations
-          for (const clinicNameVariation of possibleClinicNames) {
-            const count = await AppointmentModel.countDocuments({ 
-              clinicName: clinicNameVariation, 
-              isActive: true 
-            });
-            totalAppointments += count;
-
-            // Get latest activity
-            const latestAppointment = await AppointmentModel.findOne({ 
-              clinicName: clinicNameVariation, 
-              isActive: true 
-            }).sort({ startDate: -1 }).limit(1);
-            
-            if (latestAppointment && latestAppointment.startDate) {
-              if (!lastActivity || latestAppointment.startDate > lastActivity) {
-                lastActivity = latestAppointment.startDate;
-              }
-            }
+          // Get latest activity from appointments
+          const latestAppointment = await AppointmentModel.findOne({ 
+            clinicName: backendName, 
+            isActive: true 
+          }).sort({ startDate: -1 }).limit(1);
+          
+          if (latestAppointment && latestAppointment.startDate) {
+            lastActivity = latestAppointment.startDate;
           }
 
         } catch (statsError) {
@@ -137,6 +113,7 @@ export class ClinicController {
           status: clinic.isActive() ? 'active' : 'inactive',
           lastActivity: lastActivity?.toISOString()?.split('T')[0] || null,
           totalAppointments: totalAppointments,
+          totalOrders: totalOrders,
           clientCount: clientCount,
           description: `${clinic.getDisplayName()} - Active retained clinic`
         };
