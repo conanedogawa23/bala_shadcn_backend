@@ -1262,10 +1262,14 @@ export class ClientService {
   private static async getClientOrders(clientId: string): Promise<any[]> {
     try {
       const Order = mongoose.model('Order');
-      const client = await this.getClientById(clientId);
-      // ✓ FIXED: Convert numeric clientId (client.clientKey or client.clientId) for Order model
-      const numericClientId = client.clientKey || Number(client.clientId);
-      return await Order.find({ clientId: numericClientId }).sort({ createdAt: -1 });
+      const numericClientId = Number(clientId);
+      // Use defensive $or query to handle both string and numeric clientId types in MongoDB
+      return await Order.find({
+        $or: [
+          { clientId: numericClientId },
+          { clientId: clientId }
+        ]
+      }).sort({ createdAt: -1 });
     } catch (error) {
       logger.warn('Could not retrieve client orders:', error);
       return [];

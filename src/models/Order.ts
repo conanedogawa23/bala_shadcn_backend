@@ -185,8 +185,14 @@ OrderSchema.index({ 'items.productKey': 1 });
 // Static methods for business logic
 OrderSchema.statics = {
   // Find orders by client
-  findByClient: function(clientId: number, limit: number = 50) {
-    return this.find({ clientId })
+  findByClient: function(clientId: number | string, limit: number = 50) {
+    const numericClientId = typeof clientId === 'string' ? Number(clientId) : clientId;
+    return this.find({
+      $or: [
+        { clientId: numericClientId },
+        { clientId: String(clientId) }
+      ]
+    })
       .sort({ orderDate: -1 })
       .limit(limit)
       .populate('items');

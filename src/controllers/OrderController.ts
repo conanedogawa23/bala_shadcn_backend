@@ -200,7 +200,14 @@ export class OrderController {
 
       const limitNum = Math.min(100, Math.max(1, parseInt(limit as string)));
 
-      const orders = await Order.find({ clientId: parseInt(clientId) })
+      // Use defensive $or query to handle both string and numeric clientId types in MongoDB
+      const numericClientId = parseInt(clientId);
+      const orders = await Order.find({
+        $or: [
+          { clientId: numericClientId },
+          { clientId: clientId }
+        ]
+      })
         .sort({ serviceDate: -1 })
         .limit(limitNum);
 

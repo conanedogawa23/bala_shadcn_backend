@@ -67,7 +67,16 @@ export class OrderService {
   ): Promise<{ orders: IOrder[]; statistics: any; page: number; limit: number; total: number }> {
     try {
       const skip = (page - 1) * limit;
-      const filter: any = { clientId };
+      
+      // Use defensive $or query to handle both string and numeric clientId types in MongoDB
+      const clientIdQuery = {
+        $or: [
+          { clientId: clientId },
+          { clientId: String(clientId) }
+        ]
+      };
+      
+      const filter: any = { ...clientIdQuery };
 
       if (status) filter.status = status;
       if (paymentStatus) filter.paymentStatus = paymentStatus;
@@ -79,7 +88,7 @@ export class OrderService {
           .limit(limit),
         Order.countDocuments(filter),
         Order.aggregate([
-          { $match: { clientId } },
+          { $match: clientIdQuery },
           {
             $group: {
               _id: null,
