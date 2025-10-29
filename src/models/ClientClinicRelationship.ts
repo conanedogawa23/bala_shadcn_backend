@@ -84,7 +84,7 @@ const ClientClinicRelationshipSchema = new Schema<IClientClinicRelationship>({
     index: true
   },
   clientId: {
-    type: String,
+    type: Schema.Types.Mixed, // Accept both String and Number for legacy data compatibility (matches Client model)
     required: true,
     index: true
   },

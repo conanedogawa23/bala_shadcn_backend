@@ -120,7 +120,7 @@ const AppointmentSchema = new Schema<IAppointment>({
 
   // Client and billing information
   clientId: {
-    type: Number,
+    type: Schema.Types.Mixed, // Accept both String and Number for legacy data compatibility (matches Client model)
     required: true
     // Note: Index covered by compound index { clientId: 1, startDate: 1 }
   },

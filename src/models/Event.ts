@@ -173,9 +173,7 @@ const EventSchema = new Schema<IEvent>({
   
   // Client relationship
   clientId: {
-    type: String,
-    trim: true,
-    maxlength: 30,
+    type: Schema.Types.Mixed, // Accept both String and Number for legacy data compatibility (matches Client model)
     index: true
   },
   clientFullName: {

@@ -106,7 +106,7 @@ const OrderSchema = new Schema<IOrder>({
     unique: true
   },
   clientId: {
-    type: Number,
+    type: Schema.Types.Mixed, // Accept both String and Number for legacy data compatibility (matches Client model)
     required: true
   },
   clientName: {
