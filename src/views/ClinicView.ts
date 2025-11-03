@@ -37,7 +37,8 @@ export class ClinicView {
       postalCode: clinic.postalCode || '',
       isActive: clinic.isActive(),
       isRetainedClinic: clinic.isRetainedClinic,
-      description: clinic.getDisplayName()
+      description: clinic.getDisplayName(),
+      logo: clinic.logo || null
     };
   }
 

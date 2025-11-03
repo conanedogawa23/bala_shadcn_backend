@@ -5,6 +5,7 @@ import { ClientModel } from '../models/Client';
 import { AppointmentModel } from '../models/Appointment';
 import Order from '../models/Order';
 import { asyncHandler } from '../utils/asyncHandler';
+import { ClinicView } from '../views/ClinicView';
 
 export class ClinicController {
 
@@ -44,6 +45,12 @@ export class ClinicController {
     try {
       // Get retained clinics from MongoDB with full data
       const retainedClinics = await ClinicModel.findRetainedClinics();
+
+      // Debug: Log clinic count and logo status
+      console.log(`📊 Processing ${retainedClinics.length} retained clinics`);
+      for (const c of retainedClinics) {
+        console.log(`  - ${c.name}: hasLogo=${!!c.logo?.data}, logoType=${c.logo?.contentType}`);
+      }
 
       // Transform to frontend-compatible format with real stats
       const clinicsData = await Promise.all(retainedClinics.map(async (clinic) => {
@@ -115,7 +122,8 @@ export class ClinicController {
           totalAppointments: totalAppointments,
           totalOrders: totalOrders,
           clientCount: clientCount,
-          description: `${clinic.getDisplayName()} - Active retained clinic`
+          description: `${clinic.getDisplayName()} - Active retained clinic`,
+          logo: clinic.logo || null
         };
       }));
 
