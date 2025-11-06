@@ -34,9 +34,12 @@ app.use(helmet({
   }
 }));
 
-// CORS configuration
+// CORS configuration - Allow all origins with credentials
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow all origins (including undefined for same-origin requests)
+    callback(null, true);
+  },
   credentials: true,
   optionsSuccessStatus: 200
 }));
