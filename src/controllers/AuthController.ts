@@ -285,15 +285,25 @@ export class AuthController {
       
       await user.save();
 
-      // Set HTTP-only cookie for refresh token
-      const cookieOptions = {
+      // Set HTTP-only cookies for both access and refresh tokens
+      const accessTokenCookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict' as const,
-        maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000 // 7 days or 1 day
+        sameSite: 'lax' as const,
+        maxAge: 15 * 60 * 1000, // 15 minutes
+        path: '/'
       };
 
-      res.cookie('refreshToken', refreshToken, cookieOptions);
+      const refreshTokenCookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax' as const,
+        maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000, // 7 days or 1 day
+        path: '/'
+      };
+
+      res.cookie('accessToken', accessToken, accessTokenCookieOptions);
+      res.cookie('refreshToken', refreshToken, refreshTokenCookieOptions);
 
       return res.status(200).json({
         success: true,
@@ -383,6 +393,17 @@ export class AuthController {
       user.lastActivity = new Date();
       await user.save();
 
+      // Set HTTP-only cookie for new access token
+      const accessTokenCookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax' as const,
+        maxAge: 15 * 60 * 1000, // 15 minutes
+        path: '/'
+      };
+
+      res.cookie('accessToken', newAccessToken, accessTokenCookieOptions);
+
       return res.status(200).json({
         success: true,
         message: 'Token refreshed successfully',
@@ -427,7 +448,8 @@ export class AuthController {
         await req.user.save();
       }
 
-      // Clear refresh token cookie
+      // Clear both access and refresh token cookies
+      res.clearCookie('accessToken');
       res.clearCookie('refreshToken');
 
       return res.status(200).json({
