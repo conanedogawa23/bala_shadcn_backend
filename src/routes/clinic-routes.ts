@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { param } from 'express-validator';
 import { ClinicController } from '../controllers/ClinicController';
+import { optionalAuthenticate } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -15,11 +16,13 @@ const slugValidation = [
 ];
 
 // Routes
-router.get('/frontend-compatible', ClinicController.getClinicsFrontendCompatible);
-router.get('/available', ClinicController.getAvailableClinics);
-router.get('/mapping', ClinicController.getClinicMapping);
-router.get('/slug-to-name', ClinicController.getClinicMapping); // Alias for mapping endpoint
-router.get('/validate/:slug', slugValidation, ClinicController.validateClinicSlug);
-router.get('/slug-to-name/:slug', slugValidation, ClinicController.slugToClinicName);
+// All clinic discovery/validation endpoints are public with optional authentication
+// This allows frontend to fetch clinics without requiring login
+router.get('/frontend-compatible', optionalAuthenticate, ClinicController.getClinicsFrontendCompatible);
+router.get('/available', optionalAuthenticate, ClinicController.getAvailableClinics);
+router.get('/mapping', optionalAuthenticate, ClinicController.getClinicMapping);
+router.get('/slug-to-name', optionalAuthenticate, ClinicController.getClinicMapping); // Alias for mapping endpoint
+router.get('/validate/:slug', optionalAuthenticate, slugValidation, ClinicController.validateClinicSlug);
+router.get('/slug-to-name/:slug', optionalAuthenticate, slugValidation, ClinicController.slugToClinicName);
 
 export default router;
