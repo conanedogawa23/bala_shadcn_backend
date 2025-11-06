@@ -210,7 +210,11 @@ async function migrateInvoiceTemplates() {
     console.log('✓ Connected to MongoDB (visio database)');
 
     // Fetch existing templates from the native collection
-    const existingTemplates = await mongoose.connection.db
+    const db = mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection not established');
+    }
+    const existingTemplates = await db
       .collection('invoice_templates')
       .find({})
       .toArray();

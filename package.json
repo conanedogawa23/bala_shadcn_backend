@@ -23,6 +23,7 @@
   "dependencies": {
     "@types/pdfkit": "^0.17.3",
     "bcryptjs": "^2.4.3",
+    "module-alias": "^2.2.3",
     "colors": "^1.4.0",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
@@ -63,5 +64,8 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "_moduleAliases": {
+    "@": "dist"
   }
 }
