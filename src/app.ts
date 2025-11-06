@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 
 import { connectDatabase } from '@/config/database';
@@ -34,14 +35,18 @@ app.use(helmet({
   }
 }));
 
-// CORS configuration - Allow all origins with credentials
+// CORS configuration - Allow specific origins with credentials
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow all origins (including undefined for same-origin requests)
-    callback(null, true);
+    // Allow all origins by reflecting the requesting origin
+    // This is required when credentials: true is set (can't use wildcard *)
+    callback(null, origin || '*');
   },
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'Content-Type']
 }));
 
 // Rate limiting - more lenient in development
@@ -68,6 +73,9 @@ if (process.env.NODE_ENV === 'production' || process.env.ENABLE_RATE_LIMITING ==
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Cookie parsing middleware
+app.use(cookieParser());
 
 // Data sanitization
 app.use(mongoSanitize());
