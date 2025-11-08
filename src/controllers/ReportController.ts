@@ -212,7 +212,10 @@ export class ReportController {
       const orders = await Order.find({
         clinicName: clinic,
         createdAt: { $gte: start, $lte: end }
-      }).populate('items.productKey');
+      })
+        .limit(5000) // Reasonable limit for reports
+        .lean() // Use lean() for read-only performance
+        .populate('items.productKey');
 
       // Calculate summary metrics
       const totalRevenue = orders.reduce((sum: number, order: any) => sum + order.totalAmount, 0);
@@ -291,6 +294,81 @@ export class ReportController {
         error: {
           message: 'Failed to generate account summary report',
           code: 'ACCOUNT_SUMMARY_ERROR'
+        }
+      });
+    }
+  }
+
+  /**
+   * Get client statistics using aggregation (no full client data transfer)
+   */
+  static async getClientStatistics(req: AuthRequest, res: Response): Promise<Response> {
+    try {
+      const { clinicName } = req.params;
+      
+      if (!clinicName) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Clinic name is required', code: 'MISSING_CLINIC_NAME' }
+        });
+      }
+
+      // Type assertion for clinicName (validated above)
+      const clinic = clinicName as string;
+
+      // Aggregation pipeline for efficient stats calculation
+      const stats = await ClientModel.aggregate([
+        {
+          $match: { 
+            defaultClinic: clinic,
+            isActive: true 
+          }
+        },
+        {
+          $facet: {
+            total: [{ $count: 'count' }],
+            thisMonth: [
+              {
+                $match: {
+                  dateCreated: {
+                    $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+                  }
+                }
+              },
+              { $count: 'count' }
+            ],
+            activeClients: [
+              {
+                $match: {
+                  dateModified: {
+                    $gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) // 6 months
+                  }
+                }
+              },
+              { $count: 'count' }
+            ]
+          }
+        }
+      ]);
+
+      const result = {
+        totalClients: stats[0]?.total[0]?.count || 0,
+        newClientsThisMonth: stats[0]?.thisMonth[0]?.count || 0,
+        activeClients: stats[0]?.activeClients[0]?.count || 0
+      };
+
+      return res.status(200).json({
+        success: true,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('Client statistics error:', error);
+      return res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to get client statistics',
+          code: 'CLIENT_STATS_ERROR'
         }
       });
     }
@@ -421,7 +499,9 @@ export class ReportController {
       const appointments = await AppointmentModel.find({
         clinicName: clinic,
         startDate: { $gte: start, $lte: end }
-      });
+      })
+        .limit(10000)
+        .lean();
 
       // Group by resource (practitioner)
       const resourceStats = new Map();
@@ -521,7 +601,11 @@ export class ReportController {
       const clinic = clinicName as string;
 
       // Get all orders for the clinic
-      const orders = await Order.find({ clinicName: clinic }).populate('clientId', 'profile.firstName profile.lastName');
+      const orders = await Order.find({ clinicName: clinic })
+        .sort({ createdAt: -1 })
+        .limit(1000)
+        .lean()
+        .populate('clientId', 'profile.firstName profile.lastName');
 
       // Calculate status breakdown
       const statusStats = new Map();
