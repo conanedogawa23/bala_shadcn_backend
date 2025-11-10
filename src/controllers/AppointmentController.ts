@@ -219,7 +219,7 @@ export class AppointmentController {
   });
 
   /**
-   * Cancel appointment
+   * Cancel appointment by MongoDB ObjectId
    */
   static cancelAppointment = asyncHandler(async (req: Request, res: Response) => {
     // Validate request
@@ -242,7 +242,50 @@ export class AppointmentController {
   });
 
   /**
-   * Complete appointment
+   * Cancel appointment by business appointmentId
+   */
+  static cancelAppointmentByBusinessId = asyncHandler(async (req: Request, res: Response) => {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const response = AppointmentView.formatValidationError(errors.array());
+      return res.status(400).json(response);
+    }
+
+    const { appointmentId } = req.params;
+    
+    if (!appointmentId) {
+      const response = AppointmentView.formatValidationError([{
+        field: 'appointmentId',
+        message: 'Appointment ID is required',
+        value: appointmentId
+      }]);
+      return res.status(400).json(response);
+    }
+    
+    const businessId = parseInt(appointmentId, 10);
+
+    if (isNaN(businessId)) {
+      const response = AppointmentView.formatValidationError([{
+        field: 'appointmentId',
+        message: 'Invalid business appointment ID format',
+        value: appointmentId
+      }]);
+      return res.status(400).json(response);
+    }
+
+    const { reason } = req.body;
+
+    // Call service layer
+    await AppointmentService.cancelAppointmentByBusinessId(businessId, reason);
+
+    // Format response
+    const response = AppointmentView.formatSuccess('Appointment cancelled successfully');
+    return res.status(200).json(response);
+  });
+
+  /**
+   * Complete appointment by MongoDB ObjectId
    */
   static completeAppointment = asyncHandler(async (req: Request, res: Response) => {
     // Validate request
@@ -258,6 +301,49 @@ export class AppointmentController {
 
     // Call service layer
     const appointment = await AppointmentService.completeAppointment(validId, notes);
+
+    // Format response
+    const response = AppointmentView.formatAppointment(appointment);
+    return res.status(200).json(response);
+  });
+
+  /**
+   * Complete appointment by business appointmentId
+   */
+  static completeAppointmentByBusinessId = asyncHandler(async (req: Request, res: Response) => {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const response = AppointmentView.formatValidationError(errors.array());
+      return res.status(400).json(response);
+    }
+
+    const { appointmentId } = req.params;
+    
+    if (!appointmentId) {
+      const response = AppointmentView.formatValidationError([{
+        field: 'appointmentId',
+        message: 'Appointment ID is required',
+        value: appointmentId
+      }]);
+      return res.status(400).json(response);
+    }
+    
+    const businessId = parseInt(appointmentId, 10);
+
+    if (isNaN(businessId)) {
+      const response = AppointmentView.formatValidationError([{
+        field: 'appointmentId',
+        message: 'Invalid business appointment ID format',
+        value: appointmentId
+      }]);
+      return res.status(400).json(response);
+    }
+
+    const { notes } = req.body;
+
+    // Call service layer
+    const appointment = await AppointmentService.completeAppointmentByBusinessId(businessId, notes);
 
     // Format response
     const response = AppointmentView.formatAppointment(appointment);

@@ -338,6 +338,36 @@ router.put(
 );
 
 /**
+ * @route   DELETE /api/v1/appointments/business/:appointmentId/cancel
+ * @desc    Cancel appointment by business appointmentId
+ * @access  Public
+ */
+router.delete(
+  '/business/:appointmentId/cancel',
+  [
+    param('appointmentId')
+      .isInt({ min: 1 })
+      .withMessage('Invalid business appointment ID format')
+  ].concat(cancelAppointmentValidation),
+  AppointmentController.cancelAppointmentByBusinessId
+);
+
+/**
+ * @route   PUT /api/v1/appointments/business/:appointmentId/complete
+ * @desc    Complete appointment by business appointmentId
+ * @access  Public
+ */
+router.put(
+  '/business/:appointmentId/complete',
+  [
+    param('appointmentId')
+      .isInt({ min: 1 })
+      .withMessage('Invalid business appointment ID format')
+  ].concat(completeAppointmentValidation),
+  AppointmentController.completeAppointmentByBusinessId
+);
+
+/**
  * @route   GET /api/v1/appointments/:id
  * @desc    Get appointment by MongoDB ObjectId
  * @access  Public

@@ -388,7 +388,7 @@ export class AppointmentService {
   }
 
   /**
-   * Cancel appointment (soft delete)
+   * Cancel appointment by MongoDB ObjectId (soft delete)
    */
   static async cancelAppointment(appointmentId: string, reason?: string): Promise<void> {
     try {
@@ -418,7 +418,37 @@ export class AppointmentService {
   }
 
   /**
-   * Complete appointment and mark ready for billing
+   * Cancel appointment by business appointmentId (soft delete)
+   */
+  static async cancelAppointmentByBusinessId(appointmentId: number, reason?: string): Promise<void> {
+    try {
+      const appointment = await this.getAppointmentByBusinessId(appointmentId);
+      
+      await AppointmentModel.findByIdAndUpdate(
+        appointment._id,
+        { 
+          isActive: false,
+          status: 2, // Cancelled status
+          description: reason ? `Cancelled: ${reason}` : 'Cancelled',
+          dateModified: new Date()
+        }
+      );
+
+      // Update resource statistics
+      await AppointmentService.updateResourceStats(appointment.resourceId);
+
+      logger.info(`Appointment cancelled by business ID: ${appointmentId}${reason ? ` - ${reason}` : ''}`);
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      logger.error('Error in cancelAppointmentByBusinessId:', error);
+      throw new DatabaseError('Failed to cancel appointment by business ID', error as Error);
+    }
+  }
+
+  /**
+   * Complete appointment by MongoDB ObjectId and mark ready for billing
    */
   static async completeAppointment(appointmentId: string, notes?: string): Promise<IAppointment> {
     try {
@@ -455,6 +485,47 @@ export class AppointmentService {
       }
       logger.error('Error in completeAppointment:', error);
       throw new DatabaseError('Failed to complete appointment', error as Error);
+    }
+  }
+
+  /**
+   * Complete appointment by business appointmentId and mark ready for billing
+   */
+  static async completeAppointmentByBusinessId(appointmentId: number, notes?: string): Promise<IAppointment> {
+    try {
+      const appointment = await this.getAppointmentByBusinessId(appointmentId);
+      
+      if (appointment.status === 1) {
+        throw new ValidationError('Appointment is already completed');
+      }
+
+      const updatedAppointment = await AppointmentModel.findByIdAndUpdate(
+        appointment._id,
+        { 
+          status: 1, // Completed
+          readyToBill: true,
+          billDate: new Date(),
+          description: notes ? `${appointment.description || ''}\nNotes: ${notes}` : appointment.description,
+          dateModified: new Date()
+        },
+        { new: true }
+      );
+
+      if (!updatedAppointment) {
+        throw new NotFoundError('Appointment', appointmentId.toString());
+      }
+
+      // Update resource statistics
+      await AppointmentService.updateResourceStats(appointment.resourceId);
+
+      logger.info(`Appointment completed by business ID: ${appointmentId}`);
+      return updatedAppointment;
+    } catch (error) {
+      if (error instanceof ValidationError || error instanceof NotFoundError) {
+        throw error;
+      }
+      logger.error('Error in completeAppointmentByBusinessId:', error);
+      throw new DatabaseError('Failed to complete appointment by business ID', error as Error);
     }
   }
 
