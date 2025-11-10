@@ -3,7 +3,7 @@ import { toObjectIdString } from '../utils/types';
 
 export interface EventResponse {
   id: string;
-  eventId: number;
+  eventId?: number;
   parentEventId?: number;
   userId?: number;
   categoryId?: number;
@@ -190,7 +190,7 @@ export class EventView {
     location?: string;
     color?: string;
     extendedProps: {
-      eventId: number;
+      eventId?: number;
       isApproved: boolean;
       isPublic: boolean;
       client?: {
