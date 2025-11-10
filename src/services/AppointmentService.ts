@@ -155,8 +155,13 @@ export class AppointmentService {
    */
   static async getAppointmentByBusinessId(appointmentId: number): Promise<IAppointment> {
     try {
-      // Simplified query without populate for debugging
-      const appointment = await AppointmentModel.findOne({ appointmentId });
+      // Query by either id or appointmentId field
+      const appointment = await AppointmentModel.findOne({ 
+        $or: [
+          { id: appointmentId },
+          { appointmentId: appointmentId }
+        ]
+      });
       
       if (!appointment) {
         throw new NotFoundError('Appointment', appointmentId.toString());
@@ -180,6 +185,56 @@ export class AppointmentService {
       }
       logger.error('Error in getAppointmentByBusinessId:', error);
       throw new DatabaseError('Failed to retrieve appointment by business ID', error as Error);
+    }
+  }
+
+  /**
+   * Update appointment by business appointmentId
+   */
+  static async updateAppointmentByBusinessId(appointmentId: number, updateData: any): Promise<IAppointment> {
+    try {
+      // Find appointment by business ID
+      const existingAppointment = await this.getAppointmentByBusinessId(appointmentId);
+
+      // If time or resource is being changed, check for conflicts
+      if (updateData.startDate || updateData.endDate || updateData.resourceId) {
+        const startDate = updateData.startDate ? new Date(updateData.startDate) : existingAppointment.startDate;
+        const endDate = updateData.endDate ? new Date(updateData.endDate) : existingAppointment.endDate;
+        const resourceId = updateData.resourceId || existingAppointment.resourceId;
+
+        const conflicts = await AppointmentModel.checkTimeSlotConflict(
+          resourceId,
+          startDate,
+          endDate,
+          existingAppointment._id.toString()
+        );
+
+        if (conflicts.length > 0) {
+          throw new ConflictError('Time slot conflict: Resource is already booked during this time');
+        }
+      }
+
+      const updatedAppointment = await AppointmentModel.findByIdAndUpdate(
+        existingAppointment._id,
+        {
+          ...updateData,
+          dateModified: new Date()
+        },
+        { new: true, runValidators: true }
+      );
+
+      if (!updatedAppointment) {
+        throw new NotFoundError('Appointment', appointmentId.toString());
+      }
+
+      logger.info(`Appointment updated by business ID: ${appointmentId}`);
+      return updatedAppointment;
+    } catch (error) {
+      if (error instanceof ValidationError || error instanceof NotFoundError || error instanceof ConflictError) {
+        throw error;
+      }
+      logger.error('Error in updateAppointmentByBusinessId:', error);
+      throw new DatabaseError('Failed to update appointment by business ID', error as Error);
     }
   }
 
