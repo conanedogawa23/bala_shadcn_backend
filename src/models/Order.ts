@@ -31,7 +31,7 @@ export interface IOrderLineItem {
 // Order Interface
 export interface IOrder extends Document {
   _id: Types.ObjectId;
-  orderNumber: string;
+  orderNumber?: string; // Auto-generated
   appointmentId?: number;
   clientId: number;
   clientName: string;
@@ -96,8 +96,9 @@ const OrderLineItemSchema = new Schema<IOrderLineItem>({
 const OrderSchema = new Schema<IOrder>({
   orderNumber: {
     type: String,
-    required: true,
-    unique: true
+    required: false, // Auto-generated in pre-save middleware
+    unique: true,
+    sparse: true // Allow null during creation before pre-save runs
     // Note: unique: true automatically creates index
   },
   appointmentId: {
@@ -351,7 +352,7 @@ OrderSchema.methods = {
   // Get formatted order summary
   getOrderSummary: function() {
     return {
-      orderNumber: this.orderNumber,
+      orderNumber: this.orderNumber || 'N/A',
       clientName: this.clientName,
       serviceDate: this.serviceDate,
       totalAmount: this.totalAmount,
