@@ -32,7 +32,7 @@ export interface IOrderLineItem {
 export interface IOrder extends Document {
   _id: Types.ObjectId;
   orderNumber: string;
-  appointmentId: number;
+  appointmentId?: number;
   clientId: number;
   clientName: string;
   clinicName: string;
@@ -102,8 +102,9 @@ const OrderSchema = new Schema<IOrder>({
   },
   appointmentId: {
     type: Number,
-    required: true,
-    unique: true
+    required: false,
+    unique: true,
+    sparse: true // Allow multiple null values for orders without appointments
   },
   clientId: {
     type: Schema.Types.Mixed, // Accept both String and Number for legacy data compatibility (matches Client model)
@@ -375,13 +376,13 @@ OrderSchema.virtual('totalDuration').get(function() {
 
 // Virtual for days since service
 OrderSchema.virtual('daysSinceService').get(function() {
-  if (!this.serviceDate) return null;
+  if (!this.serviceDate) {return null;}
   
   const serviceDate = this.serviceDate instanceof Date 
     ? this.serviceDate 
     : new Date(this.serviceDate);
     
-  if (isNaN(serviceDate.getTime())) return null;
+  if (isNaN(serviceDate.getTime())) {return null;}
   
   const now = new Date();
   const diffTime = now.getTime() - serviceDate.getTime();
@@ -389,7 +390,7 @@ OrderSchema.virtual('daysSinceService').get(function() {
 });
 
 // Pre-save middleware to ensure data consistency
-OrderSchema.pre('save', function(next) {
+OrderSchema.pre('save', async function(next) {
   const order = this as IOrder;
   
   // Auto-calculate total if items changed
@@ -399,7 +400,14 @@ OrderSchema.pre('save', function(next) {
   
   // Generate order number if not set
   if (!order.orderNumber) {
-    order.orderNumber = `ORD-${order.appointmentId}`;
+    if (order.appointmentId) {
+      order.orderNumber = `ORD-${order.appointmentId}`;
+    } else {
+      // Generate unique order number for standalone orders without appointment
+      const timestamp = Date.now();
+      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+      order.orderNumber = `ORD-${timestamp}-${random}`;
+    }
   }
   
   next();
