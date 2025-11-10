@@ -83,12 +83,12 @@ const OrderLineItemSchema = new Schema<IOrderLineItem>({
   unitPrice: {
     type: Number,
     required: true,
-    min: 0
+    min: [0, 'Unit price cannot be negative']
   },
   subtotal: {
     type: Number,
     required: true,
-    min: 0
+    min: [0, 'Subtotal cannot be negative']
   }
 }, { _id: false });
 
@@ -147,7 +147,7 @@ const OrderSchema = new Schema<IOrder>({
   totalAmount: {
     type: Number,
     required: true,
-    min: 0
+    min: [0, 'Order amount cannot be negative']
   },
   billDate: Date,
   readyToBill: {

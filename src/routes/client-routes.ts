@@ -35,6 +35,11 @@ const clientValidation = [
     .isLength({ max: 100 })
     .withMessage('Province cannot exceed 100 characters'),
   
+  body('contact.address.street')
+    .optional()
+    .isLength({ max: 200 })
+    .withMessage('Street address cannot exceed 200 characters'),
+  
   body('contact.address.postalCode')
     .optional()
     .matches(/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/)
@@ -43,7 +48,29 @@ const clientValidation = [
   body('contact.email')
     .optional()
     .isEmail()
-    .withMessage('Invalid email format'),
+    .withMessage('Invalid email format')
+    .isLength({ max: 100 })
+    .withMessage('Email cannot exceed 100 characters'),
+  
+  body('contact.phones.cell.full')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('Cell phone cannot exceed 20 characters'),
+  
+  body('contact.phones.home.full')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('Home phone cannot exceed 20 characters'),
+  
+  body('contact.phones.work.full')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('Work phone cannot exceed 20 characters'),
+  
+  body('notes')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Notes cannot exceed 1000 characters'),
   
   body('defaultClinic')
     .notEmpty()
@@ -83,6 +110,11 @@ const updateClientValidation = [
     .isLength({ max: 100 })
     .withMessage('Province cannot exceed 100 characters'),
   
+  body('contact.address.street')
+    .optional()
+    .isLength({ max: 200 })
+    .withMessage('Street address cannot exceed 200 characters'),
+  
   body('contact.address.postalCode')
     .optional()
     .matches(/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/)
@@ -91,7 +123,29 @@ const updateClientValidation = [
   body('contact.email')
     .optional()
     .isEmail()
-    .withMessage('Invalid email format'),
+    .withMessage('Invalid email format')
+    .isLength({ max: 100 })
+    .withMessage('Email cannot exceed 100 characters'),
+  
+  body('contact.phones.cell.full')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('Cell phone cannot exceed 20 characters'),
+  
+  body('contact.phones.home.full')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('Home phone cannot exceed 20 characters'),
+  
+  body('contact.phones.work.full')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('Work phone cannot exceed 20 characters'),
+  
+  body('notes')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Notes cannot exceed 1000 characters'),
   
   body('defaultClinic')
     .optional()

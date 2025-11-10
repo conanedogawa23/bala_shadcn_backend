@@ -119,9 +119,9 @@ export interface IPayment extends Document {
 
 // Payment Amounts Schema
 const PaymentAmountsSchema = new Schema<IPaymentAmounts>({
-  totalPaymentAmount: { type: Number, default: 0, min: 0 },
-  totalPaid: { type: Number, default: 0, min: 0 },
-  totalOwed: { type: Number, default: 0, min: 0 },
+  totalPaymentAmount: { type: Number, default: 0, min: [0.01, 'Payment amount must be positive'] },
+  totalPaid: { type: Number, default: 0, min: [0, 'Total paid cannot be negative'] },
+  totalOwed: { type: Number, default: 0, min: [0, 'Total owed cannot be negative'] },
   
   // Canadian Healthcare Payment Types
   popAmount: { type: Number, default: 0, min: 0 },
@@ -283,6 +283,22 @@ PaymentSchema.pre<IPayment>('save', async function(next) {
     } catch (error) {
       // Fallback to timestamp-based ID if counter fails
       this.paymentNumber = `PAY-${Date.now().toString().slice(-8)}`;
+    }
+  }
+  
+  // Validate no negative amounts
+  if (this.amounts) {
+    const amountFields = [
+      'popAmount', 'popfpAmount', 'dpaAmount', 'dpafpAmount',
+      'cob1Amount', 'cob2Amount', 'cob3Amount',
+      'insurance1stAmount', 'insurance2ndAmount', 'insurance3rdAmount',
+      'refundAmount', 'salesRefundAmount', 'writeoffAmount', 'noInsurFpAmount', 'badDebtAmount'
+    ];
+    
+    for (const field of amountFields) {
+      if (this.amounts[field as keyof IPaymentAmounts] < 0) {
+        throw new Error(`${field} cannot be negative`);
+      }
     }
   }
   

@@ -336,9 +336,37 @@ export class OrderController {
         return;
       }
 
+      // Validate items array
+      if (!Array.isArray(orderData.items) || orderData.items.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'Items array is required and must contain at least one item'
+        });
+        return;
+      }
+
+      // Validate clientId is a positive number
+      const clientId = Number(orderData.clientId);
+      if (isNaN(clientId) || clientId <= 0) {
+        res.status(400).json({
+          success: false,
+          message: 'clientId must be a positive number'
+        });
+        return;
+      }
+
       // Validate and enrich items with product data
       const enrichedItems = [];
       for (const item of orderData.items) {
+        // Validate item has required fields
+        if (!item.productKey) {
+          res.status(400).json({
+            success: false,
+            message: 'Each item must have a productKey'
+          });
+          return;
+        }
+
         const product = await Product.findOne({ productKey: item.productKey });
         if (!product) {
           res.status(400).json({
@@ -348,22 +376,52 @@ export class OrderController {
           return;
         }
 
+        const quantity = item.quantity || 1;
+        const unitPrice = item.unitPrice || product.price;
+        
+        // Validate quantity and price are positive
+        if (quantity <= 0) {
+          res.status(400).json({
+            success: false,
+            message: `Quantity for product ${item.productKey} must be positive`
+          });
+          return;
+        }
+        
+        if (unitPrice < 0) {
+          res.status(400).json({
+            success: false,
+            message: `Unit price for product ${item.productKey} cannot be negative`
+          });
+          return;
+        }
+
         enrichedItems.push({
           productKey: item.productKey,
           productName: product.name,
-          quantity: item.quantity || 1,
+          quantity: quantity,
           duration: item.duration || product.duration,
-          unitPrice: item.unitPrice || product.price,
-          subtotal: (item.quantity || 1) * (item.unitPrice || product.price)
+          unitPrice: unitPrice,
+          subtotal: quantity * unitPrice
         });
       }
 
       // Calculate total amount
       const totalAmount = enrichedItems.reduce((total, item) => total + item.subtotal, 0);
 
-      // Create order
+      // Validate total amount is not negative
+      if (totalAmount < 0) {
+        res.status(400).json({
+          success: false,
+          message: 'Total order amount cannot be negative'
+        });
+        return;
+      }
+
+      // Create order with validated data
       const order = new Order({
         ...orderData,
+        clientId: clientId, // Use validated numeric clientId
         items: enrichedItems,
         totalAmount,
         orderDate: new Date(),
@@ -381,6 +439,17 @@ export class OrderController {
       res.status(201).json(response);
     } catch (error) {
       console.error('Error creating order:', error);
+      
+      // Handle validation errors specifically
+      if (error instanceof Error && error.name === 'ValidationError') {
+        res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          error: error.message
+        });
+        return;
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Failed to create order',
@@ -405,18 +474,54 @@ export class OrderController {
         return;
       }
 
+      // Log the update attempt for debugging
+      console.log('Updating order:', id, 'with data:', JSON.stringify(updateData));
+
       // Remove fields that shouldn't be updated directly
       delete updateData.orderNumber;
       delete updateData.appointmentId;
-      delete updateData.totalAmount;
       delete updateData.createdAt;
 
       const isOrderNumber = id.startsWith('ORD-');
       const query = isOrderNumber ? { orderNumber: id } : { _id: id };
 
-      // If items are being updated, recalculate total
+      // If items are being updated, validate and recalculate total
       if (updateData.items) {
+        // Validate items
+        for (const item of updateData.items) {
+          if (item.quantity <= 0) {
+            res.status(400).json({
+              success: false,
+              message: 'Item quantity must be positive'
+            });
+            return;
+          }
+          if (item.unitPrice < 0) {
+            res.status(400).json({
+              success: false,
+              message: 'Item unit price cannot be negative'
+            });
+            return;
+          }
+          if (item.subtotal < 0) {
+            res.status(400).json({
+              success: false,
+              message: 'Item subtotal cannot be negative'
+            });
+            return;
+          }
+        }
+        
         updateData.totalAmount = updateData.items.reduce((total: number, item: any) => total + item.subtotal, 0);
+      }
+
+      // Validate totalAmount if provided
+      if (updateData.totalAmount !== undefined && updateData.totalAmount < 0) {
+        res.status(400).json({
+          success: false,
+          message: 'Order total amount cannot be negative'
+        });
+        return;
       }
 
       const order = await Order.findOneAndUpdate(
@@ -433,6 +538,9 @@ export class OrderController {
         return;
       }
 
+      // Log successful update
+      console.log('Order updated successfully:', order._id, 'New status:', order.status, 'Payment status:', order.paymentStatus);
+
       const response: OrderResponse = {
         success: true,
         data: order,
@@ -442,6 +550,17 @@ export class OrderController {
       res.status(200).json(response);
     } catch (error) {
       console.error('Error updating order:', error);
+      
+      // Handle validation errors
+      if (error instanceof Error && error.name === 'ValidationError') {
+        res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          error: error.message
+        });
+        return;
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Failed to update order',

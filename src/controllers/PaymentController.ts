@@ -435,6 +435,8 @@ export class PaymentController {
         referringNo
       } = req.body;
 
+      console.log('Creating payment with data:', JSON.stringify({ clientId, clinicName, paymentMethod, paymentType, amounts }));
+
       // Validation
       if (!clientId || !clinicName || !paymentMethod || !paymentType || !amounts) {
         res.status(400).json({
@@ -445,12 +447,39 @@ export class PaymentController {
       }
 
       // Validate amounts structure
-      if (typeof amounts !== 'object' || !amounts.totalPaymentAmount) {
+      if (typeof amounts !== 'object' || amounts.totalPaymentAmount === undefined) {
         res.status(400).json({
           success: false,
           message: 'Invalid amounts object. Must contain totalPaymentAmount'
         });
         return;
+      }
+
+      // Validate totalPaymentAmount is positive
+      if (amounts.totalPaymentAmount <= 0) {
+        res.status(400).json({
+          success: false,
+          message: 'Payment amount must be greater than zero'
+        });
+        return;
+      }
+
+      // Validate all amount fields are not negative
+      const amountFields = [
+        'popAmount', 'popfpAmount', 'dpaAmount', 'dpafpAmount',
+        'cob1Amount', 'cob2Amount', 'cob3Amount',
+        'insurance1stAmount', 'insurance2ndAmount', 'insurance3rdAmount',
+        'refundAmount', 'salesRefundAmount', 'writeoffAmount', 'noInsurFpAmount', 'badDebtAmount'
+      ];
+      
+      for (const field of amountFields) {
+        if (amounts[field] !== undefined && amounts[field] < 0) {
+          res.status(400).json({
+            success: false,
+            message: `${field} cannot be negative`
+          });
+          return;
+        }
       }
 
       // Validate clientId is a valid number
@@ -463,6 +492,28 @@ export class PaymentController {
         return;
       }
 
+      // Ensure amounts have default values
+      const sanitizedAmounts = {
+        totalPaymentAmount: amounts.totalPaymentAmount,
+        totalPaid: amounts.totalPaid || 0,
+        totalOwed: amounts.totalOwed || amounts.totalPaymentAmount,
+        popAmount: amounts.popAmount || 0,
+        popfpAmount: amounts.popfpAmount || 0,
+        dpaAmount: amounts.dpaAmount || 0,
+        dpafpAmount: amounts.dpafpAmount || 0,
+        cob1Amount: amounts.cob1Amount || 0,
+        cob2Amount: amounts.cob2Amount || 0,
+        cob3Amount: amounts.cob3Amount || 0,
+        insurance1stAmount: amounts.insurance1stAmount || 0,
+        insurance2ndAmount: amounts.insurance2ndAmount || 0,
+        insurance3rdAmount: amounts.insurance3rdAmount || 0,
+        refundAmount: amounts.refundAmount || 0,
+        salesRefundAmount: amounts.salesRefundAmount || 0,
+        writeoffAmount: amounts.writeoffAmount || 0,
+        noInsurFpAmount: amounts.noInsurFpAmount || 0,
+        badDebtAmount: amounts.badDebtAmount || 0
+      };
+
       // Create payment
       const payment = new PaymentModel({
         orderNumber,
@@ -471,7 +522,7 @@ export class PaymentController {
         clinicName,
         paymentMethod,
         paymentType,
-        amounts,
+        amounts: sanitizedAmounts,
         orderId: orderId ? new Types.ObjectId(orderId) : undefined,
         notes,
         referringNo,
@@ -481,6 +532,8 @@ export class PaymentController {
       });
 
       const savedPayment = await payment.save();
+
+      console.log('Payment created successfully:', savedPayment._id, savedPayment.paymentNumber);
 
       res.status(201).json({
         success: true,
@@ -535,12 +588,44 @@ export class PaymentController {
         return;
       }
 
+      console.log('Updating payment:', id, 'with data:', JSON.stringify(updateData));
+
+      // Validate amounts if provided
+      if (updateData.amounts) {
+        // Validate totalPaymentAmount is positive
+        if (updateData.amounts.totalPaymentAmount !== undefined && updateData.amounts.totalPaymentAmount <= 0) {
+          res.status(400).json({
+            success: false,
+            message: 'Payment amount must be greater than zero'
+          });
+          return;
+        }
+
+        // Validate all amount fields are not negative
+        const amountFields = [
+          'totalPaid', 'totalOwed', 'popAmount', 'popfpAmount', 'dpaAmount', 'dpafpAmount',
+          'cob1Amount', 'cob2Amount', 'cob3Amount',
+          'insurance1stAmount', 'insurance2ndAmount', 'insurance3rdAmount',
+          'refundAmount', 'salesRefundAmount', 'writeoffAmount', 'noInsurFpAmount', 'badDebtAmount'
+        ];
+        
+        for (const field of amountFields) {
+          if (updateData.amounts[field] !== undefined && updateData.amounts[field] < 0) {
+            res.status(400).json({
+              success: false,
+              message: `${field} cannot be negative`
+            });
+            return;
+          }
+        }
+      }
+
       // Add audit information
       updateData.updatedBy = req.user?._id;
 
       const payment = await PaymentModel.findByIdAndUpdate(
         id,
-        updateData,
+        { $set: updateData },
         { new: true, runValidators: true }
       ).populate('orderId', 'orderNumber status');
 
@@ -552,6 +637,8 @@ export class PaymentController {
         return;
       }
 
+      console.log('Payment updated successfully:', payment._id, 'Status:', payment.status);
+
       res.json({
         success: true,
         message: 'Payment updated successfully',
@@ -559,6 +646,17 @@ export class PaymentController {
       });
     } catch (error) {
       console.error('Error updating payment:', error);
+      
+      // Handle validation errors
+      if (error instanceof Error && error.name === 'ValidationError') {
+        res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          error: error.message
+        });
+        return;
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Failed to update payment',

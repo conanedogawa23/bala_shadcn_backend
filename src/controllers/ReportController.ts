@@ -5,6 +5,7 @@ import Order from '../models/Order';
 import Product from '../models/Product';
 import { ClientModel } from '../models/Client';
 import { AppointmentModel } from '../models/Appointment';
+import { PaymentModel } from '../models/Payment';
 
 // Temporary Payment interface (until Payment model is created)
 interface Payment {
@@ -395,28 +396,30 @@ export class ReportController {
       const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const end = endDate ? new Date(endDate as string) : new Date();
 
-      // TODO: Replace with actual Payment model when available
-      // For now, using mock payment data
-      const payments: Payment[] = [];
+      // Fetch actual Payment data from database
+      const payments = await PaymentModel.find({
+        clinicName: clinic,
+        paymentDate: { $gte: start, $lte: end }
+      }).lean();
 
-      // Calculate summary metrics
+      // Calculate summary metrics using actual Payment model fields
       const totalPayments = payments.length;
-      const totalAmount = payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const totalAmount = payments.reduce((sum: number, payment: any) => sum + (payment.amounts?.totalPaymentAmount || 0), 0);
       const averagePayment = totalPayments > 0 ? totalAmount / totalPayments : 0;
-      const completedPayments = payments.filter(p => p.status === 'completed').length;
-      const pendingPayments = payments.filter(p => p.status === 'pending').length;
-      const refundedPayments = payments.filter(p => p.status === 'refunded').length;
+      const completedPayments = payments.filter((p: any) => p.status === 'completed').length;
+      const pendingPayments = payments.filter((p: any) => p.status === 'pending').length;
+      const refundedPayments = payments.filter((p: any) => p.status === 'refunded').length;
 
       // Calculate payment methods breakdown
       const methodStats = new Map();
-      payments.forEach(payment => {
+      payments.forEach((payment: any) => {
         const method = payment.paymentMethod || 'Unknown';
         if (!methodStats.has(method)) {
           methodStats.set(method, { method, count: 0, amount: 0 });
         }
         const stats = methodStats.get(method);
         stats.count += 1;
-        stats.amount += payment.amount;
+        stats.amount += (payment.amounts?.totalPaymentAmount || 0);
       });
 
       const paymentMethods = Array.from(methodStats.values()).map(method => ({
@@ -426,13 +429,13 @@ export class ReportController {
 
       // Calculate daily payments
       const paymentsByDate = new Map();
-      payments.forEach(payment => {
-        const date = payment.createdAt.toISOString().split('T')[0];
+      payments.forEach((payment: any) => {
+        const date = new Date(payment.paymentDate || payment.createdAt).toISOString().split('T')[0];
         if (!paymentsByDate.has(date)) {
           paymentsByDate.set(date, { date, amount: 0, count: 0 });
         }
         const dayData = paymentsByDate.get(date);
-        dayData.amount += payment.amount;
+        dayData.amount += (payment.amounts?.totalPaymentAmount || 0);
         dayData.count += 1;
       });
 
@@ -697,18 +700,15 @@ export class ReportController {
       const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const end = endDate ? new Date(endDate as string) : new Date();
 
-      // TODO: Replace with actual Payment model when implemented
-      // const payments = await Payment.find({
-      //   clinicName: clinic,
-      //   createdAt: { $gte: start, $lte: end },
-      //   $or: [
-      //     { 'insurance.copay1': { $gt: 0 } },
-      //     { 'insurance.copay2': { $gt: 0 } }
-      //   ]
-      // });
-      
-      // Mock data for now
-      const payments: Payment[] = [];
+      // Fetch actual Payment data from database
+      const payments = await PaymentModel.find({
+        clinicName: clinic,
+        paymentDate: { $gte: start, $lte: end },
+        $or: [
+          { 'amounts.cob1Amount': { $gt: 0 } },
+          { 'amounts.cob2Amount': { $gt: 0 } }
+        ]
+      }).lean();
 
       // Calculate co-pay summary
       let totalCoPayments = 0;
@@ -720,22 +720,22 @@ export class ReportController {
       coPayStats.set('Insurance 1', { insuranceType: 'Insurance 1', count: 0, amount: 0 });
       coPayStats.set('Insurance 2', { insuranceType: 'Insurance 2', count: 0, amount: 0 });
 
-      payments.forEach(payment => {
-        if (payment.insurance?.copay1 && payment.insurance.copay1 > 0) {
+      payments.forEach((payment: any) => {
+        if (payment.amounts?.cob1Amount && payment.amounts.cob1Amount > 0) {
           totalCoPayments += 1;
-          totalCoPayAmount += payment.insurance.copay1;
+          totalCoPayAmount += payment.amounts.cob1Amount;
           insurance1CoPayments += 1;
           const stats = coPayStats.get('Insurance 1');
           stats.count += 1;
-          stats.amount += payment.insurance.copay1;
+          stats.amount += payment.amounts.cob1Amount;
         }
-        if (payment.insurance?.copay2 && payment.insurance.copay2 > 0) {
+        if (payment.amounts?.cob2Amount && payment.amounts.cob2Amount > 0) {
           totalCoPayments += 1;
-          totalCoPayAmount += payment.insurance.copay2;
+          totalCoPayAmount += payment.amounts.cob2Amount;
           insurance2CoPayments += 1;
           const stats = coPayStats.get('Insurance 2');
           stats.count += 1;
-          stats.amount += payment.insurance.copay2;
+          stats.amount += payment.amounts.cob2Amount;
         }
       });
 
@@ -748,18 +748,18 @@ export class ReportController {
 
       // Calculate monthly trends
       const monthlyStats = new Map();
-      payments.forEach(payment => {
-        const month = payment.createdAt.toISOString().substring(0, 7); // YYYY-MM
+      payments.forEach((payment: any) => {
+        const month = new Date(payment.paymentDate || payment.createdAt).toISOString().substring(0, 7); // YYYY-MM
         if (!monthlyStats.has(month)) {
           monthlyStats.set(month, { month, amount: 0, count: 0 });
         }
         const stats = monthlyStats.get(month);
-        if (payment.insurance?.copay1) {
-          stats.amount += payment.insurance.copay1;
+        if (payment.amounts?.cob1Amount) {
+          stats.amount += payment.amounts.cob1Amount;
           stats.count += 1;
         }
-        if (payment.insurance?.copay2) {
-          stats.amount += payment.insurance.copay2;
+        if (payment.amounts?.cob2Amount) {
+          stats.amount += payment.amounts.cob2Amount;
           stats.count += 1;
         }
       });
