@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IContactHistory extends Document {
-  id: number;
+  id?: number; // Auto-generated if not provided
   clientId?: number; // Changed from string to number for consistency with other models
   clinicName?: string;
   contactType: 'call' | 'email' | 'sms' | 'visit' | 'note' | 'appointment' | 'other';
@@ -49,8 +49,9 @@ export interface IContactHistory extends Document {
 const ContactHistorySchema = new Schema<IContactHistory>({
   id: {
     type: Number,
-    required: true,
+    required: false,
     unique: true,
+    sparse: true, // Allow multiple null values for new contact history
     index: true
   },
   clientId: {
@@ -277,7 +278,18 @@ ContactHistorySchema.statics.getRecentActivity = function(
 };
 
 // Pre-save middleware for data validation and processing
-ContactHistorySchema.pre('save', function(next) {
+ContactHistorySchema.pre('save', async function(next) {
+  // Auto-generate id if not provided (for new contact history)
+  if (!this.id) {
+    const ContactHistoryModelRef = this.constructor as Model<IContactHistory>;
+    const highestIdDoc = await ContactHistoryModelRef.findOne()
+      .sort({ id: -1 })
+      .select('id')
+      .lean();
+    
+    this.id = (highestIdDoc?.id || 0) + 1;
+  }
+  
   if (this.isModified() && !this.isNew) {
     this.modifiedAt = new Date();
   }

@@ -398,33 +398,7 @@ AppointmentSchema.pre('save', async function(next) {
   next();
 });
 
-// Note: checkTimeSlotConflict is already defined above (line 335) with correct number type
-
-AppointmentSchema.statics.findReadyToBill = function(clinicName: string) {
-  return this.find({ 
-    clinicName: new RegExp(clinicName, 'i'),
-    readyToBill: true,
-    billDate: { $exists: false }
-  }).sort({ endDate: -1 });
-};
-
-AppointmentSchema.statics.findByResource = function(resourceId: string, date?: Date) {
-  const query: any = { resourceId };
-  
-  if (date) {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    query.startDate = { $gte: startOfDay, $lte: endOfDay };
-  }
-  
-  return this.find(query).sort({ startDate: 1 });
-};
-
-AppointmentSchema.statics.findByClient = function(clientId: string) {
-  return this.find({ clientId }).sort({ startDate: -1 });
-};
+// Note: Static methods findReadyToBill, findByResource, and findByClient are already defined above
+// Removed duplicate definitions to avoid conflicts
 
 export const AppointmentModel = model<IAppointment, IAppointmentModel>('Appointment', AppointmentSchema);

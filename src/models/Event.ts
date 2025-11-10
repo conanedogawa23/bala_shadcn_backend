@@ -1,7 +1,7 @@
 import { Schema, model, Document, Model } from 'mongoose';
 
 export interface IEvent extends Document {
-  eventId: number; // event_id from MSSQL
+  eventId?: number; // event_id from MSSQL (auto-generated if not provided)
   parentEventId?: number; // event_parent_id - for hierarchical events
   userId?: number; // user_id - event creator/owner
   categoryId?: number; // category_id - event category
@@ -56,8 +56,9 @@ export interface IEvent extends Document {
 const EventSchema = new Schema<IEvent>({
   eventId: {
     type: Number,
-    required: true,
+    required: false,
     unique: true,
+    sparse: true, // Allow multiple null values for new events
     index: true
   },
   parentEventId: {
@@ -339,7 +340,18 @@ EventSchema.statics.findPendingApproval = function() {
 };
 
 // Pre-save middleware
-EventSchema.pre('save', function(next) {
+EventSchema.pre('save', async function(next) {
+  // Auto-generate eventId if not provided (for new events)
+  if (!this.eventId) {
+    const EventModelRef = this.constructor as Model<IEvent>;
+    const highestIdDoc = await EventModelRef.findOne()
+      .sort({ eventId: -1 })
+      .select('eventId')
+      .lean();
+    
+    this.eventId = (highestIdDoc?.eventId || 0) + 1;
+  }
+  
   this.dateModified = new Date();
   
   // Ensure event date is properly set

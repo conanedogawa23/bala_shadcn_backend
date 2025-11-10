@@ -1,7 +1,7 @@
 import { Schema, model, Document, Model } from 'mongoose';
 
 export interface IResource extends Document {
-  resourceId: number; // ResourceID from MSSQL
+  resourceId?: number; // ResourceID from MSSQL (auto-generated if not provided)
   resourceName: string; // ResourceName from MSSQL
   type: 'practitioner' | 'service' | 'equipment' | 'room';
   color?: string; // For calendar display
@@ -70,8 +70,9 @@ export interface IResource extends Document {
 const ResourceSchema = new Schema<IResource>({
   resourceId: {
     type: Number,
-    required: true,
-    unique: true
+    required: false,
+    unique: true,
+    sparse: true // Allow multiple null values for new resources
   },
   resourceName: {
     type: String,
@@ -384,8 +385,19 @@ ResourceSchema.statics.findBookableResources = function(clinicName?: string) {
 };
 
 // Pre-save middleware
-ResourceSchema.pre('save', function(next) {
+ResourceSchema.pre('save', async function(next) {
   this.dateModified = new Date();
+  
+  // Auto-generate resourceId if not provided (for new resources)
+  if (!this.resourceId) {
+    const ResourceModelRef = this.constructor as Model<IResource>;
+    const highestIdDoc = await ResourceModelRef.findOne()
+      .sort({ resourceId: -1 })
+      .select('resourceId')
+      .lean();
+    
+    this.resourceId = (highestIdDoc?.resourceId || 0) + 1;
+  }
   
   // Auto-populate defaultClinic if not set
   if (!this.defaultClinic && this.clinics.length > 0) {

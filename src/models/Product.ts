@@ -54,7 +54,7 @@ export interface IProduct extends Document {
   resourceType: FHIRProductType;
 
   // Legacy Support
-  productKey: number;
+  productKey?: number; // Auto-generated if not provided
 
   // Business Fields
   name: string;
@@ -149,8 +149,9 @@ const ProductSchema = new Schema<IProduct>(
     // Legacy Support (for backward compatibility)
     productKey: {
       type: Number,
-      required: true,
-      unique: true
+      required: false,
+      unique: true,
+      sparse: true // Allow multiple null values for new products
     },
 
     // Business Fields
@@ -344,6 +345,17 @@ ProductSchema.virtual('popularityScore').get(function (this: IProduct) {
 
 // Pre-save middleware for business rules
 ProductSchema.pre<IProduct>('save', async function (next) {
+  // Auto-generate productKey if not provided (for new products)
+  if (!this.productKey) {
+    const ProductModelRef = this.constructor as Model<IProduct>;
+    const highestIdDoc = await ProductModelRef.findOne()
+      .sort({ productKey: -1 })
+      .select('productKey')
+      .lean();
+    
+    this.productKey = (highestIdDoc?.productKey || 0) + 1;
+  }
+  
   // Auto-set discontinued status based on business rules
   if (
     DISCONTINUED_PRODUCT_CODES.includes(this.productKey.toString()) ||
