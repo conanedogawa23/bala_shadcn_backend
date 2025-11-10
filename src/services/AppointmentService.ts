@@ -206,7 +206,7 @@ export class AppointmentService {
           resourceId,
           startDate,
           endDate,
-          existingAppointment._id.toString()
+          String(existingAppointment._id)
         );
 
         if (conflicts.length > 0) {
