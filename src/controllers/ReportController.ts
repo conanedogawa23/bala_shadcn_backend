@@ -642,7 +642,7 @@ export class ReportController {
         .slice(0, 20)
         .map(order => ({
           orderId: order._id.toString(),
-          orderNumber: order.orderNumber,
+          orderNumber: order.orderNumber || '',
           clientName: (order.clientId && typeof order.clientId === 'object' && (order.clientId as any).profile) ? 
             `${(order.clientId as any).profile.firstName} ${(order.clientId as any).profile.lastName}` : 
             'Unknown Client',
