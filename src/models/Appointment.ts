@@ -1,7 +1,8 @@
 import { Schema, model, Document, Model } from 'mongoose';
 
 export interface IAppointment extends Document {
-  id: number; // ID from MSSQL (primary key)
+  id?: number; // Auto-generated ID (optional for new appointments)
+  appointmentId?: number; // Business appointment ID from MSSQL (optional)
   type: number; // Type from MSSQL
   startDate: Date; // StartDate from MSSQL
   endDate: Date; // EndDate from MSSQL
@@ -16,6 +17,7 @@ export interface IAppointment extends Document {
 
   // Client and billing information
   clientId: number; // ClientID from MSSQL (integer, not string)
+  clientKey?: number; // ClientKey from MSSQL (alternative client identifier)
   productKey?: number; // ProductKey from MSSQL (service/product being provided)
 
   // Billing and invoice tracking
@@ -57,8 +59,15 @@ interface IAppointmentModel extends Model<IAppointment> {
 const AppointmentSchema = new Schema<IAppointment>({
   id: {
     type: Number,
-    required: true,
-    unique: true
+    required: false,
+    unique: true,
+    sparse: true // Allow multiple null values for new appointments
+  },
+  appointmentId: {
+    type: Number,
+    required: false,
+    unique: true,
+    sparse: true // Allow multiple null values
   },
   type: {
     type: Number,
@@ -124,6 +133,10 @@ const AppointmentSchema = new Schema<IAppointment>({
     required: true
     // Note: Index covered by compound index { clientId: 1, startDate: 1 }
   },
+  clientKey: {
+    type: Number,
+    required: false
+  },
   productKey: {
     type: Number,
     index: true
@@ -143,7 +156,7 @@ const AppointmentSchema = new Schema<IAppointment>({
     type: String,
     required: true,
     trim: true,
-    maxlength: 100, // Matches MSSQL varchar(100)
+    maxlength: 100 // Matches MSSQL varchar(100)
     // Note: Index covered by compound index { clinicName: 1, startDate: 1 }
   },
   invoiceDate: {
@@ -340,8 +353,35 @@ AppointmentSchema.statics.checkTimeSlotConflict = function(
 };
 
 // Pre-save middleware
-AppointmentSchema.pre('save', function(next) {
+AppointmentSchema.pre('save', async function(next) {
   this.dateModified = new Date();
+  
+  // Auto-generate id if not provided (for new appointments)
+  if (!this.id && !this.appointmentId) {
+    // Get the highest existing id from the collection
+    const AppointmentModelRef = this.constructor as Model<IAppointment>;
+    const highestIdDoc = await AppointmentModelRef.findOne()
+      .sort({ id: -1 })
+      .select('id')
+      .lean();
+    
+    const highestAppointmentIdDoc = await AppointmentModelRef.findOne()
+      .sort({ appointmentId: -1 })
+      .select('appointmentId')
+      .lean();
+    
+    const maxId = Math.max(
+      highestIdDoc?.id || 0,
+      highestAppointmentIdDoc?.appointmentId || 0
+    );
+    
+    this.id = maxId + 1;
+    this.appointmentId = this.id;
+  } else if (this.id && !this.appointmentId) {
+    this.appointmentId = this.id;
+  } else if (this.appointmentId && !this.id) {
+    this.id = this.appointmentId;
+  }
   
   // Calculate duration if not provided
   if (!this.duration || this.duration === 0) {
