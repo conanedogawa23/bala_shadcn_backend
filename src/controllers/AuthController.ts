@@ -285,26 +285,8 @@ export class AuthController {
       
       await user.save();
 
-      // Set HTTP-only cookies for both access and refresh tokens
-      const accessTokenCookieOptions = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax' as const,
-        maxAge: 15 * 60 * 1000, // 15 minutes
-        path: '/'
-      };
-
-      const refreshTokenCookieOptions = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax' as const,
-        maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000, // 7 days or 1 day
-        path: '/'
-      };
-
-      res.cookie('accessToken', accessToken, accessTokenCookieOptions);
-      res.cookie('refreshToken', refreshToken, refreshTokenCookieOptions);
-
+      // Return tokens in response body only (no cookies)
+      // Frontend will store these in localStorage
       return res.status(200).json({
         success: true,
         message: 'Login successful',
@@ -393,17 +375,7 @@ export class AuthController {
       user.lastActivity = new Date();
       await user.save();
 
-      // Set HTTP-only cookie for new access token
-      const accessTokenCookieOptions = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax' as const,
-        maxAge: 15 * 60 * 1000, // 15 minutes
-        path: '/'
-      };
-
-      res.cookie('accessToken', newAccessToken, accessTokenCookieOptions);
-
+      // Return new access token in response body only (no cookies)
       return res.status(200).json({
         success: true,
         message: 'Token refreshed successfully',
@@ -433,11 +405,13 @@ export class AuthController {
    */
   static async logout(req: AuthRequest, res: Response): Promise<Response> {
     try {
-      const refreshToken = req.body.refreshToken || req.cookies?.refreshToken;
+      console.log('[LOGOUT] ========== BACKEND LOGOUT START ==========');
+      
+      const refreshToken = req.body.refreshToken; // Token now comes from request body, not cookies
       const deviceId = req.deviceId;
 
       if (req.user && refreshToken) {
-        // Remove refresh token
+        // Revoke refresh token from database
         req.user.revokeRefreshToken(refreshToken);
         
         // Remove session if deviceId provided
@@ -446,11 +420,19 @@ export class AuthController {
         }
         
         await req.user.save();
+        console.log('[LOGOUT] User session revoked from database');
       }
 
-      // Clear both access and refresh token cookies
-      res.clearCookie('accessToken');
-      res.clearCookie('refreshToken');
+      // Clear any remaining session cookies (but NOT auth tokens, they're in localStorage now)
+      const sessionCookieNames = ['session', 'connect.sid'];
+      
+      for (const cookieName of sessionCookieNames) {
+        res.clearCookie(cookieName, { path: '/' });
+        res.clearCookie(cookieName, { path: '/', httpOnly: true });
+        res.clearCookie(cookieName, { path: '/', secure: process.env.NODE_ENV === 'production' });
+      }
+
+      console.log('[LOGOUT] ========== BACKEND LOGOUT COMPLETE ==========');
 
       return res.status(200).json({
         success: true,
@@ -479,8 +461,35 @@ export class AuthController {
         await req.user.save();
       }
 
-      // Clear refresh token cookie
-      res.clearCookie('refreshToken');
+      // Clear cookies with ALL possible option combinations to ensure complete cleanup
+      const cookieNames = ['accessToken', 'refreshToken', 'session', 'connect.sid', 'token', 'authToken'];
+      
+      const optionVariations = [
+        { httpOnly: true, secure: true, sameSite: 'lax' as const, path: '/' },
+        { httpOnly: true, secure: false, sameSite: 'lax' as const, path: '/' },
+        { httpOnly: false, secure: false, sameSite: 'lax' as const, path: '/' },
+        { httpOnly: false, secure: true, sameSite: 'lax' as const, path: '/' },
+        { path: '/' },
+        { httpOnly: true, secure: true, sameSite: 'none' as const, path: '/' },
+      ];
+
+      for (const cookieName of cookieNames) {
+        for (const options of optionVariations) {
+          try {
+            res.clearCookie(cookieName, options);
+          } catch (e) {
+            // Ignore errors
+          }
+        }
+        res.clearCookie(cookieName);
+      }
+
+      // Set expired cookies as fallback
+      const expiredDate = new Date(0);
+      for (const cookieName of cookieNames) {
+        res.cookie(cookieName, '', { expires: expiredDate, path: '/' });
+        res.cookie(cookieName, '', { expires: expiredDate, path: '/', httpOnly: true });
+      }
 
       return res.status(200).json({
         success: true,

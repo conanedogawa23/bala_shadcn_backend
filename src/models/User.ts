@@ -150,6 +150,12 @@ const UserPermissionsSchema = new Schema<IUserPermissions>(
     canManageAppointments: { type: Boolean, default: false },
     canManageOrders: { type: Boolean, default: false },
     canManagePayments: { type: Boolean, default: false },
+    // Granular Payment Permissions
+    canViewPayments: { type: Boolean, default: false },
+    canCreatePayments: { type: Boolean, default: false },
+    canEditPayments: { type: Boolean, default: false },
+    canDeletePayments: { type: Boolean, default: false },
+    canProcessRefunds: { type: Boolean, default: false },
     canAccessAllClinics: { type: Boolean, default: false },
     allowedClinics: [{ type: String, trim: true }]
   },
@@ -253,7 +259,10 @@ UserSchema.virtual('isLocked').get(function (this: IUser) {
 
 // Virtual for full name
 UserSchema.virtual('fullName').get(function (this: IUser) {
-  return `${this.profile.firstName} ${this.profile.lastName}`.trim();
+  if (!this.profile) {
+    return '';
+  }
+  return `${this.profile.firstName || ''} ${this.profile.lastName || ''}`.trim();
 });
 
 // Pre-save middleware
@@ -432,7 +441,10 @@ UserSchema.methods.canAccessClinic = function (clinicName: string): boolean {
 };
 
 UserSchema.methods.getFullName = function (): string {
-  return `${this.profile.firstName} ${this.profile.lastName}`.trim();
+  if (!this.profile) {
+    return '';
+  }
+  return `${this.profile.firstName || ''} ${this.profile.lastName || ''}`.trim();
 };
 
 UserSchema.methods.toSafeObject = function (): Partial<IUser> {

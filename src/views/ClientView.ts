@@ -1,4 +1,5 @@
 import { IClient, IInsurance } from '@/models/Client';
+import { ClientEnrichmentData } from '@/services/ClientService';
 
 export class ClientView {
   /**
@@ -66,6 +67,7 @@ export class ClientView {
 
   /**
    * Format client for frontend compatibility (matches mock data structure)
+   * Includes all fields needed for the edit form
    */
   static formatClientForFrontend(client: IClient) {
     const dateOfBirth = client.personalInfo.dateOfBirth;
@@ -79,24 +81,18 @@ export class ClientView {
       year: ''
     };
 
-    // Extract phone number safely from nested structure
-    let phone = '';
-    if (client.contact?.phones?.cell?.full) {
-      phone = client.contact.phones.cell.full;
-    } else if (client.contact?.phones?.home?.full) {
-      phone = client.contact.phones.home.full;
-    } else if (client.contact?.phones?.work?.full) {
-      phone = client.contact.phones.work.full;
-    } else if (typeof client.contact?.phones?.cell === 'string') {
-      // Handle legacy string format
-      phone = client.contact.phones.cell;
-    } else if (typeof client.contact?.phones?.home === 'string') {
-      // Handle legacy string format
-      phone = client.contact.phones.home;
-    }
+    // Extract phone numbers safely from nested structure
+    const cellPhone = client.contact?.phones?.cell?.full || 
+                     (typeof client.contact?.phones?.cell === 'string' ? client.contact.phones.cell : '');
+    const homePhone = client.contact?.phones?.home?.full || 
+                     (typeof client.contact?.phones?.home === 'string' ? client.contact.phones.home : '');
+    const workPhone = client.contact?.phones?.work?.full || 
+                     (typeof client.contact?.phones?.work === 'string' ? client.contact.phones.work : '');
+    
+    // Primary phone for display (backwards compatible)
+    const phone = cellPhone || homePhone || workPhone || '';
 
-    // Build address string from components
-    let address = '';
+    // Build address string from components for display
     const addressParts = [];
     
     if (client.contact?.address?.street) {
@@ -115,7 +111,13 @@ export class ClientView {
       addressParts.push(client.contact.address.postalCode.full);
     }
     
-    address = addressParts.join(', ');
+    const address = addressParts.join(', ');
+
+    // Get postal code in format needed for form
+    const postalCode = client.contact?.address?.postalCode?.full || 
+                       (client.contact?.address?.postalCode?.first3 && client.contact?.address?.postalCode?.last3 
+                         ? `${client.contact.address.postalCode.first3} ${client.contact.address.postalCode.last3}` 
+                         : '');
 
     // Determine clinic name from multiple possible fields
     let clinic = '';
@@ -136,15 +138,40 @@ export class ClientView {
       lastName: client.personalInfo.lastName,
       birthday,
       gender: client.personalInfo.gender,
+      
+      // Address - both formatted and individual fields for edit form
+      address, // Full formatted address for display
+      street: client.contact?.address?.street || '',
+      apartment: client.contact?.address?.apartment || '',
       city: client.contact?.address?.city || '',
       province: client.contact?.address?.province || '',
-      address, // Full formatted address for display
-      phone,
+      postalCode, // Formatted postal code for form
+      
+      // Phone numbers - both primary and individual for edit form
+      phone, // Primary phone for display (backwards compatible)
+      cellPhone,
+      homePhone,
+      workPhone,
+      
+      // Other contact info
       email: client.contact?.email || '',
+      companyName: client.contact?.company || '',
+      companyOther: client.contact?.companyOther || '',
+      
+      // Medical info
+      referringMD: client.medical?.referringMD || '',
+      familyMD: client.medical?.familyMD || '',
+      csrName: client.medical?.csrName || '',
+      
+      // Clinic info
       clinic,
       status: client.isActive ? 'active' : 'inactive',
       dateOfBirth: dateOfBirth ? dateOfBirth.toISOString() : '',
-      insurance: client.insurance || [], // Include full insurance array
+      
+      // Insurance array with full details
+      insurance: client.insurance || [],
+      
+      // Timestamps
       createdAt: client.dateCreated ? client.dateCreated.toISOString() : '',
       updatedAt: client.dateModified ? client.dateModified.toISOString() : ''
     };
@@ -152,13 +179,28 @@ export class ClientView {
 
   /**
    * Format client summary (minimal data for lists)
+   * Optionally includes enrichment data (next appointment, total orders)
    */
-  static formatClientSummary(client: IClient) {
+  static formatClientSummary(client: IClient, enrichment?: ClientEnrichmentData) {
     // Extract phone number safely
     const phone = client.contact?.phones?.cell?.full || 
                  client.contact?.phones?.home?.full || 
                  client.contact?.phones?.work?.full || 
                  '';
+
+    // Format next appointment if available
+    let nextAppointment = null;
+    if (enrichment?.nextAppointment) {
+      nextAppointment = {
+        date: enrichment.nextAppointment.date.toISOString(),
+        subject: enrichment.nextAppointment.subject,
+        formattedDate: new Date(enrichment.nextAppointment.date).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        })
+      };
+    }
 
     return {
       id: client.clientId,
@@ -169,21 +211,40 @@ export class ClientView {
       email: client.contact?.email || '',
       phone,
       age: client.getAge(),
+      dateOfBirth: client.personalInfo.dateOfBirth ? client.personalInfo.dateOfBirth.toISOString() : '',
       gender: client.personalInfo.gender,
       hasInsurance: client.hasInsurance(),
       defaultClinic: client.defaultClinic,
       isActive: client.isActive,
-      createdAt: client.dateCreated
+      status: client.isActive ? 'active' : 'inactive',
+      createdAt: client.dateCreated,
+      updatedAt: client.dateModified,
+      // Enrichment data
+      nextAppointment,
+      totalOrders: enrichment?.totalOrders ?? 0
     };
   }
 
   /**
    * Format client list with pagination
+   * Includes optional enrichment data map for appointments and orders
    */
-  static formatClientList(clients: IClient[], page: number, limit: number, total: number) {
+  static formatClientList(
+    clients: IClient[], 
+    page: number, 
+    limit: number, 
+    total: number,
+    enrichmentMap?: Map<number, ClientEnrichmentData>
+  ) {
     return {
       success: true,
-      data: clients.map(this.formatClientSummary),
+      data: clients.map(client => {
+        const clientIdNum = typeof client.clientId === 'number' 
+          ? client.clientId 
+          : Number(client.clientId);
+        const enrichment = enrichmentMap?.get(clientIdNum);
+        return this.formatClientSummary(client, enrichment);
+      }),
       pagination: {
         page,
         limit,

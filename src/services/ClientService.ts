@@ -1,8 +1,20 @@
 import { ClientModel, IClient } from '@/models/Client';
+import { AppointmentModel } from '@/models/Appointment';
+import Order from '@/models/Order';
 import { NotFoundError, ValidationError, DatabaseError } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import { ClinicService } from './ClinicService';
 import mongoose from 'mongoose';
+
+// Enrichment data type for client listings
+export interface ClientEnrichmentData {
+  nextAppointment?: {
+    date: Date;
+    subject: string;
+    status: number;
+  } | null;
+  totalOrders: number;
+}
 
 // Add proper type definitions for client data
 interface InsuranceData {
@@ -367,6 +379,178 @@ export class ClientService {
   }
 
   /**
+   * Get enrichment data (next appointment, total orders) for a list of clients
+   * Used to enhance client list views with additional context
+   * 
+   * NOTE: MongoDB data has type inconsistencies (Schema.Types.Mixed):
+   * - Appointments.clientId can be String or Number
+   * - Orders.clientId is typically Number  
+   * - We query with both types to handle all data
+   */
+  static async getClientEnrichmentData(clientIds: number[]): Promise<Map<number, ClientEnrichmentData>> {
+    const enrichmentMap = new Map<number, ClientEnrichmentData>();
+    
+    if (clientIds.length === 0) {
+      return enrichmentMap;
+    }
+
+    try {
+      const now = new Date();
+      
+      // Prepare both string and number versions of clientIds for flexible matching
+      // This handles MongoDB's Mixed type which stores data as either String or Number
+      const clientIdStrings = clientIds.map(id => String(id));
+      const clientIdNumbers = clientIds; // Already numbers
+
+      // First, try to get future appointments (next upcoming appointment)
+      // Use $or to match clientId as either string OR number (Mixed type compatibility)
+      const futureAppointmentsAggregation = await AppointmentModel.aggregate([
+        {
+          $match: {
+            $or: [
+              { clientId: { $in: clientIdStrings } }, // Match as strings
+              { clientId: { $in: clientIdNumbers } }  // Match as numbers
+            ],
+            startDate: { $gte: now },
+            status: { $in: [0, 1] }, // Scheduled (0) or Confirmed (1) status
+            isActive: true
+          }
+        },
+        {
+          $sort: { startDate: 1 }
+        },
+        {
+          $group: {
+            _id: '$clientId',
+            nextAppointment: {
+              $first: {
+                date: '$startDate',
+                subject: '$subject',
+                status: '$status'
+              }
+            }
+          }
+        }
+      ]);
+
+      // For clients without future appointments, get their most recent past appointment
+      // This provides better UX by showing appointment history
+      const clientsWithFutureAppointments = new Set(
+        futureAppointmentsAggregation.map(item => String(item._id))
+      );
+      
+      const clientsNeedingPastAppointments = clientIdStrings.filter(
+        id => !clientsWithFutureAppointments.has(id)
+      );
+
+      let pastAppointmentsAggregation: any[] = [];
+      if (clientsNeedingPastAppointments.length > 0) {
+        pastAppointmentsAggregation = await AppointmentModel.aggregate([
+          {
+            $match: {
+              $or: [
+                { clientId: { $in: clientsNeedingPastAppointments } },
+                { clientId: { $in: clientsNeedingPastAppointments.map(id => Number(id)) } }
+              ],
+              startDate: { $lt: now },
+              isActive: true
+            }
+          },
+          {
+            $sort: { startDate: -1 } // Most recent first
+          },
+          {
+            $group: {
+              _id: '$clientId',
+              nextAppointment: {
+                $first: {
+                  date: '$startDate',
+                  subject: '$subject',
+                  status: '$status'
+                }
+              }
+            }
+          }
+        ]);
+      }
+
+      // Combine both future and past appointment results
+      const nextAppointmentsAggregation = [
+        ...futureAppointmentsAggregation,
+        ...pastAppointmentsAggregation
+      ];
+
+      // Create a map for quick lookup of next appointments
+      // Handle both string and number _id from aggregation results
+      const appointmentMap = new Map<number, { date: Date; subject: string; status: number }>();
+      for (const item of nextAppointmentsAggregation) {
+        // Convert _id to number regardless of whether it was stored as string or number
+        const numericId = typeof item._id === 'number' ? item._id : Number(item._id);
+        if (!isNaN(numericId)) {
+          appointmentMap.set(numericId, item.nextAppointment);
+        }
+      }
+
+      // Batch query for total order counts per client
+      // Orders typically use numeric clientId, but also check for string values
+      const orderCountsAggregation = await Order.aggregate([
+        {
+          $match: {
+            $or: [
+              { clientId: { $in: clientIdNumbers } }, // Match as numbers
+              { clientId: { $in: clientIdStrings } }  // Match as strings (for any legacy data)
+            ]
+          }
+        },
+        {
+          $group: {
+            _id: '$clientId',
+            totalOrders: { $sum: 1 }
+          }
+        }
+      ]);
+
+      // Create a map for quick lookup of order counts
+      // Handle both string and number _id from aggregation results
+      const orderCountMap = new Map<number, number>();
+      for (const item of orderCountsAggregation) {
+        const numericId = typeof item._id === 'number' ? item._id : Number(item._id);
+        if (!isNaN(numericId)) {
+          // Accumulate if the same clientId appears with different types
+          const existing = orderCountMap.get(numericId) || 0;
+          orderCountMap.set(numericId, existing + item.totalOrders);
+        }
+      }
+
+      // Build enrichment data for each client
+      for (const clientId of clientIds) {
+        enrichmentMap.set(clientId, {
+          nextAppointment: appointmentMap.get(clientId) || null,
+          totalOrders: orderCountMap.get(clientId) || 0
+        });
+      }
+
+      logger.debug('Client enrichment data loaded', {
+        requestedClientIds: clientIds.length,
+        appointmentsFound: appointmentMap.size,
+        ordersFound: orderCountMap.size
+      });
+
+      return enrichmentMap;
+    } catch (error) {
+      logger.error('Error in getClientEnrichmentData:', error);
+      // Return empty enrichment on error - don't fail the whole request
+      for (const clientId of clientIds) {
+        enrichmentMap.set(clientId, {
+          nextAppointment: null,
+          totalOrders: 0
+        });
+      }
+      return enrichmentMap;
+    }
+  }
+
+  /**
    * Get client by ID
    */
   static async getClientById(clientId: string): Promise<IClient> {
@@ -561,6 +745,7 @@ export class ClientService {
 
   /**
    * Update client
+   * Uses MongoDB $set with dot notation to properly merge nested objects
    */
   static async updateClient(clientId: string, updateData: UpdateClientData): Promise<IClient> {
     try {
@@ -572,76 +757,194 @@ export class ClientService {
       // Check if client exists
       const existingClient = await this.getClientById(clientId);
 
-      // Parse date of birth from multiple sources if provided
+      // Build $set object with dot notation for proper nested updates
+      const setOperations: Record<string, any> = {};
+      
+      // Process personalInfo fields
       if (updateData.personalInfo) {
+        const pi = updateData.personalInfo;
+        
+        // Parse date of birth from multiple sources if provided
         let dateOfBirth: Date | undefined;
         
         // Priority 1: personalInfo.dateOfBirth
-        if (updateData.personalInfo?.dateOfBirth) {
+        if (pi.dateOfBirth) {
           try {
-            dateOfBirth = new Date(updateData.personalInfo.dateOfBirth);
+            dateOfBirth = new Date(pi.dateOfBirth);
             if (isNaN(dateOfBirth.getTime())) {
               dateOfBirth = undefined;
             }
           } catch (e) {
-            logger.warn('Invalid dateOfBirth format in update:', updateData.personalInfo.dateOfBirth);
+            logger.warn('Invalid dateOfBirth format in update:', pi.dateOfBirth);
           }
         }
         
         // Priority 2: personalInfo.birthday object
-        if (!dateOfBirth && updateData.personalInfo?.birthday?.day && updateData.personalInfo?.birthday?.month && updateData.personalInfo?.birthday?.year) {
-          const { day, month, year } = updateData.personalInfo.birthday;
+        if (!dateOfBirth && pi.birthday?.day && pi.birthday?.month && pi.birthday?.year) {
+          const { day, month, year } = pi.birthday;
           try {
             dateOfBirth = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
             if (isNaN(dateOfBirth.getTime())) {
               dateOfBirth = undefined;
             }
           } catch (e) {
-            logger.warn('Invalid birthday format in update:', updateData.personalInfo.birthday);
+            logger.warn('Invalid birthday format in update:', pi.birthday);
           }
         }
-
-        // Set dateOfBirth if we have a valid date
-        if (dateOfBirth) {
-          if (!updateData.personalInfo.birthday) {
-            updateData.personalInfo.birthday = {
-              day: dateOfBirth.getDate().toString().padStart(2, '0'),
-              month: (dateOfBirth.getMonth() + 1).toString().padStart(2, '0'),
-              year: dateOfBirth.getFullYear().toString()
-            };
-          }
-          updateData.personalInfo.dateOfBirth = dateOfBirth;
-        }
-
-        // Update full name if first or last name changed
-        if (updateData.personalInfo?.firstName || updateData.personalInfo?.lastName) {
-          const firstName = updateData.personalInfo?.firstName || existingClient.personalInfo.firstName;
-          const lastName = updateData.personalInfo?.lastName || existingClient.personalInfo.lastName;
-          
-          updateData.personalInfo.fullName = `${lastName}, ${firstName}`;
-        }
-      }
-
-      // Ensure postal code is in correct format if provided
-      if (updateData.contact?.address?.postalCode && typeof updateData.contact.address.postalCode === 'string') {
-        const pc = updateData.contact.address.postalCode.replace(/\s+/g, '');
-        if (pc.length >= 6) {
-          updateData.contact.address.postalCode = {
-            first3: pc.substring(0, 3).toUpperCase(),
-            last3: pc.substring(3, 6).toUpperCase(),
-            full: `${pc.substring(0, 3).toUpperCase()} ${pc.substring(3, 6).toUpperCase()}`
-          };
-        }
-      }
-
-      // If default clinic changed, verify new clinic exists and update client counts
-      if (updateData.defaultClinic && updateData.defaultClinic !== existingClient.defaultClinic) {
-        await ClinicService.getClinicByName(updateData.defaultClinic);
         
-        // Update clinic counts
-        await this.updateClinicClientCount(existingClient.defaultClinic);
-        await this.updateClinicClientCount(updateData.defaultClinic);
+        // Set individual personalInfo fields using dot notation
+        if (pi.firstName !== undefined) {
+          setOperations['personalInfo.firstName'] = pi.firstName;
+        }
+        if (pi.lastName !== undefined) {
+          setOperations['personalInfo.lastName'] = pi.lastName;
+        }
+        if (pi.gender !== undefined) {
+          setOperations['personalInfo.gender'] = pi.gender;
+        }
+        
+        // Handle dateOfBirth and birthday
+        if (dateOfBirth) {
+          setOperations['personalInfo.dateOfBirth'] = dateOfBirth;
+          setOperations['personalInfo.birthday.day'] = dateOfBirth.getDate().toString().padStart(2, '0');
+          setOperations['personalInfo.birthday.month'] = (dateOfBirth.getMonth() + 1).toString().padStart(2, '0');
+          setOperations['personalInfo.birthday.year'] = dateOfBirth.getFullYear().toString();
+        } else if (pi.birthday) {
+          if (pi.birthday.day !== undefined) setOperations['personalInfo.birthday.day'] = pi.birthday.day;
+          if (pi.birthday.month !== undefined) setOperations['personalInfo.birthday.month'] = pi.birthday.month;
+          if (pi.birthday.year !== undefined) setOperations['personalInfo.birthday.year'] = pi.birthday.year;
+        }
+        
+        // Update full name if first or last name changed
+        const firstName = pi.firstName || existingClient.personalInfo.firstName;
+        const lastName = pi.lastName || existingClient.personalInfo.lastName;
+        if (pi.firstName !== undefined || pi.lastName !== undefined) {
+          setOperations['personalInfo.fullName'] = `${lastName}, ${firstName}`;
+          setOperations['personalInfo.fullNameForAutocomplete'] = `${lastName}, ${firstName}`;
+        }
       }
+
+      // Process contact fields
+      if (updateData.contact) {
+        const contact = updateData.contact;
+        
+        // Address fields
+        if (contact.address) {
+          if (contact.address.street !== undefined) {
+            setOperations['contact.address.street'] = contact.address.street;
+          }
+          if (contact.address.apartment !== undefined) {
+            setOperations['contact.address.apartment'] = contact.address.apartment;
+          }
+          if (contact.address.city !== undefined) {
+            setOperations['contact.address.city'] = contact.address.city;
+          }
+          if (contact.address.province !== undefined) {
+            setOperations['contact.address.province'] = contact.address.province;
+          }
+          
+          // Handle postal code
+          if (contact.address.postalCode !== undefined) {
+            if (typeof contact.address.postalCode === 'string') {
+              const pc = contact.address.postalCode.replace(/\s+/g, '');
+              if (pc.length >= 6) {
+                setOperations['contact.address.postalCode.first3'] = pc.substring(0, 3).toUpperCase();
+                setOperations['contact.address.postalCode.last3'] = pc.substring(3, 6).toUpperCase();
+                setOperations['contact.address.postalCode.full'] = `${pc.substring(0, 3).toUpperCase()} ${pc.substring(3, 6).toUpperCase()}`;
+              }
+            } else if (contact.address.postalCode.first3 && contact.address.postalCode.last3) {
+              setOperations['contact.address.postalCode.first3'] = contact.address.postalCode.first3.toUpperCase();
+              setOperations['contact.address.postalCode.last3'] = contact.address.postalCode.last3.toUpperCase();
+              setOperations['contact.address.postalCode.full'] = `${contact.address.postalCode.first3.toUpperCase()} ${contact.address.postalCode.last3.toUpperCase()}`;
+            }
+          }
+        }
+        
+        // Phone fields
+        if (contact.phones) {
+          // Helper to process phone number
+          const processPhone = (phone: any, prefix: string) => {
+            if (phone === undefined) return;
+            
+            if (typeof phone === 'string') {
+              // Parse phone string to structured format
+              const cleaned = phone.replace(/\D/g, '');
+              if (cleaned.length === 10) {
+                setOperations[`${prefix}.countryCode`] = '1';
+                setOperations[`${prefix}.areaCode`] = cleaned.substring(0, 3);
+                setOperations[`${prefix}.number`] = `${cleaned.substring(3, 6)}-${cleaned.substring(6)}`;
+                setOperations[`${prefix}.full`] = `(${cleaned.substring(0, 3)}) ${cleaned.substring(3, 6)}-${cleaned.substring(6)}`;
+              } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+                setOperations[`${prefix}.countryCode`] = '1';
+                setOperations[`${prefix}.areaCode`] = cleaned.substring(1, 4);
+                setOperations[`${prefix}.number`] = `${cleaned.substring(4, 7)}-${cleaned.substring(7)}`;
+                setOperations[`${prefix}.full`] = `(${cleaned.substring(1, 4)}) ${cleaned.substring(4, 7)}-${cleaned.substring(7)}`;
+              } else if (phone.trim()) {
+                // If can't parse but has value, store as full
+                setOperations[`${prefix}.full`] = phone;
+              }
+            } else if (phone && typeof phone === 'object') {
+              if (phone.countryCode !== undefined) setOperations[`${prefix}.countryCode`] = phone.countryCode;
+              if (phone.areaCode !== undefined) setOperations[`${prefix}.areaCode`] = phone.areaCode;
+              if (phone.number !== undefined) setOperations[`${prefix}.number`] = phone.number;
+              if (phone.full !== undefined) setOperations[`${prefix}.full`] = phone.full;
+              if (phone.extension !== undefined) setOperations[`${prefix}.extension`] = phone.extension;
+            }
+          };
+          
+          processPhone(contact.phones.cell, 'contact.phones.cell');
+          processPhone(contact.phones.home, 'contact.phones.home');
+          processPhone(contact.phones.work, 'contact.phones.work');
+        }
+        
+        // Email and company
+        if (contact.email !== undefined) {
+          setOperations['contact.email'] = contact.email;
+        }
+        if (contact.company !== undefined) {
+          setOperations['contact.company'] = contact.company;
+        }
+        if (contact.companyOther !== undefined) {
+          setOperations['contact.companyOther'] = contact.companyOther;
+        }
+      }
+
+      // Process medical fields
+      if (updateData.medical) {
+        const medical = updateData.medical;
+        if (medical.familyMD !== undefined) {
+          setOperations['medical.familyMD'] = medical.familyMD;
+        }
+        if (medical.referringMD !== undefined) {
+          setOperations['medical.referringMD'] = medical.referringMD;
+        }
+        if (medical.csrName !== undefined) {
+          setOperations['medical.csrName'] = medical.csrName;
+        }
+      }
+
+      // Insurance array - replace entirely (this is correct behavior)
+      if (updateData.insurance !== undefined) {
+        setOperations['insurance'] = updateData.insurance;
+      }
+
+      // Top-level fields
+      if (updateData.defaultClinic !== undefined) {
+        // Verify new clinic exists and update client counts
+        if (updateData.defaultClinic !== existingClient.defaultClinic) {
+          await ClinicService.getClinicByName(updateData.defaultClinic);
+          await this.updateClinicClientCount(existingClient.defaultClinic);
+          await this.updateClinicClientCount(updateData.defaultClinic);
+        }
+        setOperations['defaultClinic'] = updateData.defaultClinic;
+      }
+      
+      if (updateData.isActive !== undefined) {
+        setOperations['isActive'] = updateData.isActive;
+      }
+
+      // Always update dateModified
+      setOperations['dateModified'] = new Date();
 
       const numericClientId = Number(clientId);
       const updatedClient = await ClientModel.findOneAndUpdate(
@@ -652,15 +955,16 @@ export class ClientService {
             { clientKey: numericClientId }
           ]
         },
-        {
-          ...updateData,
-          dateModified: new Date()
-        },
+        { $set: setOperations },
         { new: true, runValidators: true }
       );
 
-      logger.info(`Client updated successfully: ${updatedClient!.getFullName()} (ID: ${clientId})`);
-      return updatedClient!;
+      if (!updatedClient) {
+        throw new NotFoundError(`Client not found: ${clientId}`);
+      }
+
+      logger.info(`Client updated successfully: ${updatedClient.getFullName()} (ID: ${clientId})`);
+      return updatedClient;
     } catch (error) {
       if (error instanceof ValidationError || error instanceof NotFoundError) {
         logger.error('Validation/NotFound error in updateClient:', { 

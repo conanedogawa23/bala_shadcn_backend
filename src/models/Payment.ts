@@ -268,22 +268,22 @@ PaymentSchema.index({ paymentMethod: 1, paymentType: 1 });
 PaymentSchema.index({ orderNumber: 1 });
 PaymentSchema.index({ 'amounts.totalOwed': 1 }); // For outstanding payments
 
+// Helper function to generate unique payment ID
+function generatePaymentId(): string {
+  // Generate a unique ID using timestamp + random characters
+  // Format: PAY-{timestamp_base36}-{random_chars}
+  // Example: PAY-M2K5X9F-A7B3
+  const timestamp = Date.now().toString(36).toUpperCase(); // Base36 timestamp
+  const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase(); // 4 random chars
+  return `PAY-${timestamp}-${randomPart}`;
+}
+
 // Pre-save middleware
 PaymentSchema.pre<IPayment>('save', async function(next) {
   // Generate payment number if new
   if (this.isNew && !this.paymentNumber) {
-    try {
-      const counter = await mongoose.connection.collection('counters').findOneAndUpdate(
-        { _id: 'paymentNumber' } as any,
-        { $inc: { sequence: 1 } },
-        { upsert: true, returnDocument: 'after' }
-      );
-      const sequence = counter?.value?.sequence || counter?.sequence || 1;
-      this.paymentNumber = `PAY-${String(sequence).padStart(8, '0')}`;
-    } catch (error) {
-      // Fallback to timestamp-based ID if counter fails
-      this.paymentNumber = `PAY-${Date.now().toString().slice(-8)}`;
-    }
+    // Generate unique payment ID using timestamp + random (no counter needed)
+    this.paymentNumber = generatePaymentId();
   }
   
   // Validate no negative amounts

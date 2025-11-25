@@ -8,6 +8,7 @@ import { validateRequiredString } from '../utils/mongooseHelpers';
 export class ClientController {
   /**
    * Get clients by clinic with pagination and search
+   * Includes enrichment data (next appointment, total orders) for each client
    */
   static getClientsByClinic = asyncHandler(async (req: Request, res: Response) => {
     // Validate request
@@ -22,7 +23,7 @@ export class ClientController {
     const validClinicName = validateRequiredString(clinicName, 'Clinic Name');
     const { page, limit, search, status } = req.query;
 
-    // Call service layer
+    // Call service layer to get clients
     const result = await ClientService.getClientsByClinic({
       clinicName: validClinicName,
       page: page ? Number(page) : undefined,
@@ -31,12 +32,20 @@ export class ClientController {
       status: status as string
     });
 
-    // Format response using view layer
+    // Get enrichment data (next appointments, total orders) for all clients in the result
+    const clientIds = result.clients.map(client => 
+      typeof client.clientId === 'number' ? client.clientId : Number(client.clientId)
+    ).filter(id => !isNaN(id));
+    
+    const enrichmentMap = await ClientService.getClientEnrichmentData(clientIds);
+
+    // Format response using view layer with enrichment data
     const response = ClientView.formatClientList(
       result.clients,
       result.page,
       result.limit,
-      result.total
+      result.total,
+      enrichmentMap
     );
 
     return res.status(200).json(response);
@@ -210,6 +219,7 @@ export class ClientController {
 
   /**
    * Get clients by clinic in frontend-compatible format
+   * Includes enrichment data (next appointment, total orders) for each client
    */
   static getClientsByClinicCompatible = asyncHandler(async (req: Request, res: Response) => {
     // Validate request
@@ -233,8 +243,40 @@ export class ClientController {
       status: status as string
     });
 
-    // Format response using frontend-compatible view
-    const clientsData = result.clients.map(client => ClientView.formatClientForFrontend(client));
+    // Get enrichment data (next appointments, total orders) for all clients
+    const clientIds = result.clients.map(client => {
+      // Handle both string and number clientId formats
+      const id = client.clientId;
+      return typeof id === 'number' ? id : Number(id);
+    }).filter(id => !isNaN(id));
+    
+    const enrichmentMap = await ClientService.getClientEnrichmentData(clientIds);
+
+    // Format response using frontend-compatible view with enrichment data
+    const clientsData = result.clients.map(client => {
+      const clientIdNum = typeof client.clientId === 'number' 
+        ? client.clientId 
+        : Number(client.clientId);
+      const enrichment = enrichmentMap.get(clientIdNum);
+      
+      // Get base formatted data
+      const formattedClient = ClientView.formatClientForFrontend(client);
+      
+      // Add enrichment data
+      return {
+        ...formattedClient,
+        nextAppointment: enrichment?.nextAppointment ? {
+          date: enrichment.nextAppointment.date.toISOString(),
+          subject: enrichment.nextAppointment.subject,
+          formattedDate: new Date(enrichment.nextAppointment.date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          })
+        } : null,
+        totalOrders: enrichment?.totalOrders ?? 0
+      };
+    });
 
     return res.status(200).json({
       success: true,

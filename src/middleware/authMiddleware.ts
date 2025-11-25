@@ -38,17 +38,17 @@ export const authenticate = async (
   next: NextFunction
 ): Promise<void | Response<AuthErrorResponse>> => {
   try {
-    // Extract token from Authorization header or cookies
+    // Extract token from Authorization header (tokens now stored in localStorage, not cookies)
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') 
       ? authHeader.substring(7) 
-      : req.cookies?.accessToken;
+      : null;
 
     if (!token) {
       return res.status(401).json({
         success: false,
         error: {
-          message: 'Access token is required',
+          message: 'Access token is required - please include Bearer token in Authorization header',
           code: 'MISSING_ACCESS_TOKEN',
           statusCode: 401
         }
@@ -150,7 +150,7 @@ export const optionalAuthenticate = async (
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') 
       ? authHeader.substring(7) 
-      : req.cookies?.accessToken;
+      : null;
 
     if (token) {
       try {

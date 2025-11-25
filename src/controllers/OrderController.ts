@@ -255,7 +255,9 @@ export class OrderController {
         actualClinicName = rawClinicName || '';
       }
 
-      const filter: any = { clinicName: actualClinicName };
+      // Use case-insensitive regex for clinic name matching
+      const clinicRegex = new RegExp(`^${actualClinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      const filter: any = { clinicName: clinicRegex };
 
       if (status) {
         filter.status = status;
@@ -812,98 +814,60 @@ export class OrderController {
         actualClinicName = rawClinicName as string;
       }
 
-      // Use broad default date range to capture all historical data
-      const start = startDate ? new Date(startDate as string) : new Date('2018-01-01'); // Start from earliest possible data
-      const end = endDate ? new Date(endDate as string) : new Date('2025-12-31'); // Go to end of 2025
+      // Use case-insensitive regex for clinic name matching
+      const clinicRegex = new RegExp(`^${actualClinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
-      console.log('Revenue Analytics Debug:', {
-        rawClinicName,
-        actualClinicName,
-        startDate: start.toISOString(),
-        endDate: end.toISOString()
-      });
+      // Calculate date range - default to last 12 months if not specified
+      const end = endDate ? new Date(endDate as string) : new Date();
+      const start = startDate ? new Date(startDate as string) : new Date(end.getTime() - 365 * 24 * 60 * 60 * 1000);
 
-      // First, test without any date filter to get baseline data
-      const testCountNoDateFilter = await Order.countDocuments({
-        clinicName: actualClinicName,
+      // Get total orders count for this clinic
+      const totalOrdersCount = await Order.countDocuments({
+        clinicName: clinicRegex,
         status: { $ne: 'cancelled' }
       });
 
-      console.log('Test count without date filter:', testCountNoDateFilter);
-
-      // Test basic aggregation without date filter first
-      const testAnalytics = await Order.aggregate([
-        {
-          $match: {
-            clinicName: actualClinicName,
-            status: { $ne: 'cancelled' }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            totalRevenue: { $sum: '$totalAmount' },
-            orderCount: { $sum: 1 }
-          }
-        }
-      ]);
-
-      console.log('Test analytics without date filter:', testAnalytics);
-
-      // Use simplified date matching - remove time components for better matching
-      const startOfDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-      const endOfDay = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);
-
-      console.log('Simplified date range:', {
-        startOfDay: startOfDay.toISOString(),
-        endOfDay: endOfDay.toISOString()
-      });
-
-      // Check if there are any orders in the date range with simplified dates
-      const matchingOrdersCount = await Order.countDocuments({
-        clinicName: actualClinicName,
-        serviceDate: { $gte: startOfDay, $lte: endOfDay },
-        status: { $ne: 'cancelled' }
-      });
-
-      console.log('Matching orders count with simplified dates:', matchingOrdersCount);
-
+      // Monthly revenue analytics with proper date handling
       const analytics = await Order.aggregate([
         {
           $match: {
-            clinicName: actualClinicName,
-            // Exclude problematic monthly aggregate data for now
-            monthlyAggregate: { $ne: true },
+            clinicName: clinicRegex,
             status: { $ne: 'cancelled' }
           }
         },
         {
           $addFields: {
-            serviceDateConverted: {
-              $dateFromString: {
-                dateString: '$serviceDate',
-                onError: null
+            // Handle both Date objects and ISO strings for orderDate/serviceDate
+            effectiveDate: {
+              $cond: {
+                if: { $eq: [{ $type: '$orderDate' }, 'date'] },
+                then: '$orderDate',
+                else: {
+                  $cond: {
+                    if: { $eq: [{ $type: '$serviceDate' }, 'date'] },
+                    then: '$serviceDate',
+                    else: {
+                      $dateFromString: {
+                        dateString: { $ifNull: ['$orderDate', '$serviceDate'] },
+                        onError: '$createdAt'
+                      }
+                    }
+                  }
+                }
               }
             }
           }
         },
         {
           $match: {
-            serviceDateConverted: { $ne: null }
+            effectiveDate: { $gte: start, $lte: end }
           }
         },
         {
           $group: {
             _id: {
-              year: { $year: '$serviceDateConverted' },
-              month: { $month: '$serviceDateConverted' },
-              monthName: {
-                $arrayElemAt: [
-                  ['', 'January', 'February', 'March', 'April', 'May', 'June',
-                   'July', 'August', 'September', 'October', 'November', 'December'],
-                  { $month: '$serviceDateConverted' }
-                ]
-              }
+              year: { $year: '$effectiveDate' },
+              month: { $month: '$effectiveDate' }
             },
             totalRevenue: { $sum: '$totalAmount' },
             orderCount: { $sum: 1 },
@@ -911,49 +875,21 @@ export class OrderController {
             completedOrders: {
               $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
             },
-            scheduledOrders: {
-              $sum: { $cond: [{ $eq: ['$status', 'scheduled'] }, 1, 0] }
-            },
             paidOrders: {
               $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, 1, 0] }
-            },
-            pendingOrders: {
-              $sum: { $cond: [{ $eq: ['$paymentStatus', 'pending'] }, 1, 0] }
-            },
-            // Add min/max order values for insights
-            maxOrderValue: { $max: '$totalAmount' },
-            minOrderValue: { $min: '$totalAmount' }
+            }
           }
         },
         { 
           $sort: { '_id.year': 1, '_id.month': 1 } 
-        },
-        {
-          $addFields: {
-            period: {
-              $concat: [
-                { $toString: '$_id.year' },
-                '-',
-                { $cond: [
-                  { $lt: ['$_id.month', 10] },
-                  { $concat: ['0', { $toString: '$_id.month' }] },
-                  { $toString: '$_id.month' }
-                ]}
-              ]
-            }
-          }
         }
       ]);
 
-      console.log('Analytics result:', analytics);
-
-      // Also provide summary statistics
+      // Calculate summary statistics
       const summaryStats = await Order.aggregate([
         {
           $match: {
-            clinicName: actualClinicName,
-            // Use same filter as main analytics: exclude monthly aggregates and cancelled orders
-            monthlyAggregate: { $ne: true },
+            clinicName: clinicRegex,
             status: { $ne: 'cancelled' }
           }
         },
@@ -975,7 +911,7 @@ export class OrderController {
         },
         {
           $project: {
-            uniqueClients: 0 // Remove the array, keep only the count
+            uniqueClients: 0
           }
         }
       ]);
@@ -996,9 +932,7 @@ export class OrderController {
             start: start.toISOString(),
             end: end.toISOString()
           },
-          matchingOrdersCount,
-          testCountNoDateFilter,
-          testAnalytics
+          totalOrdersCount
         }
       };
 
@@ -1018,34 +952,56 @@ export class OrderController {
    */
   static async getProductPerformance(req: Request, res: Response): Promise<void> {
     try {
-      const { startDate, endDate } = req.query;
+      const { startDate, endDate, clinicName: rawClinicName } = req.query;
 
-      // Use more reasonable default date range - past 2 years to capture actual data
-      const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 730 * 24 * 60 * 60 * 1000); // 2 years ago
+      // Use more reasonable default date range - past 12 months
       const end = endDate ? new Date(endDate as string) : new Date();
+      const start = startDate ? new Date(startDate as string) : new Date(end.getTime() - 365 * 24 * 60 * 60 * 1000);
 
-      // Convert dates to ISO strings for MongoDB compatibility
-      const startISO = start.toISOString();
-      const endISO = end.toISOString();
-
-      console.log('Product Performance Debug:', {
-        startDate: startISO,
-        endDate: endISO
-      });
-
-      // Check matching orders count for debugging
-      const matchingOrdersCount = await Order.countDocuments({
-        serviceDate: { $gte: start, $lte: end },
+      // Build match filter
+      const matchFilter: any = {
         status: { $ne: OrderStatus.CANCELLED }
-      });
+      };
 
-      console.log('Product Performance - Matching orders count:', matchingOrdersCount);
+      // Add clinic filter if provided
+      if (rawClinicName) {
+        let actualClinicName: string = rawClinicName as string;
+        try {
+          actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
+        } catch (conversionError) {
+          actualClinicName = rawClinicName as string;
+        }
+        // Use case-insensitive regex for clinic name matching
+        matchFilter.clinicName = new RegExp(`^${actualClinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      }
+
+      // Check matching orders count
+      const matchingOrdersCount = await Order.countDocuments(matchFilter);
 
       const performance = await Order.aggregate([
         {
+          $match: matchFilter
+        },
+        {
+          $addFields: {
+            effectiveDate: {
+              $cond: {
+                if: { $eq: [{ $type: '$orderDate' }, 'date'] },
+                then: '$orderDate',
+                else: {
+                  $cond: {
+                    if: { $eq: [{ $type: '$serviceDate' }, 'date'] },
+                    then: '$serviceDate',
+                    else: '$createdAt'
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
           $match: {
-            serviceDate: { $gte: start, $lte: end },
-            status: { $ne: OrderStatus.CANCELLED }
+            effectiveDate: { $gte: start, $lte: end }
           }
         },
         { $unwind: '$items' },
@@ -1072,19 +1028,17 @@ export class OrderController {
         },
         {
           $project: {
-            uniqueClients: 0 // Remove the array, keep only the count
+            uniqueClients: 0
           }
         },
-        { $sort: { totalRevenue: -1 } }
+        { $sort: { totalRevenue: -1 } },
+        { $limit: 50 }
       ]);
 
       // Get overall product performance summary
       const productSummary = await Order.aggregate([
         {
-          $match: {
-            serviceDate: { $gte: start, $lte: end },
-            status: { $ne: OrderStatus.CANCELLED }
-          }
+          $match: matchFilter
         },
         { $unwind: '$items' },
         {
@@ -1103,15 +1057,10 @@ export class OrderController {
         },
         {
           $project: {
-            totalProducts: 0 // Remove the array, keep only the count
+            totalProducts: 0
           }
         }
       ]);
-
-      console.log('Product Performance result:', { 
-        performanceItemsCount: performance.length,
-        samplePerformance: performance.slice(0, 2)
-      });
 
       const response: OrderResponse = {
         success: true,

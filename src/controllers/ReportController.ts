@@ -77,6 +77,24 @@ interface PaymentSummaryData {
   }>;
 }
 
+interface UserSessionData {
+  userId: string;
+  username: string;
+  fullName: string;
+  role: string;
+  lastLogin: string | null;
+  lastActivity: string | null;
+  totalSessions: number;
+  activeSessions: number;
+  sessions: Array<{
+    deviceId: string;
+    ipAddress: string;
+    userAgent: string;
+    lastActivity: string;
+    isActive: boolean;
+  }>;
+}
+
 interface TimesheetData {
   clinicName: string;
   dateRange: {
@@ -94,10 +112,13 @@ interface TimesheetData {
     revenue: number;
     utilization: number;
   }>;
+  userActivity: Array<UserSessionData>;
   summary: {
     totalHours: number;
     totalRevenue: number;
     averageUtilization: number;
+    totalActiveUsers: number;
+    totalLoginSessions: number;
   };
 }
 
@@ -316,18 +337,29 @@ export class ReportController {
 
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
+      
+      // Use case-insensitive regex for clinic name matching
+      // This handles variations like "BodyBlissPhysio", "bodyblissphysio", etc.
+      const clinicRegex = new RegExp(`^${clinic.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
       // Aggregation pipeline for efficient stats calculation
       const stats = await ClientModel.aggregate([
         {
           $match: { 
-            defaultClinic: clinic,
-            isActive: true 
+            defaultClinic: clinicRegex
           }
         },
         {
           $facet: {
             total: [{ $count: 'count' }],
+            active: [
+              {
+                $match: {
+                  isActive: true
+                }
+              },
+              { $count: 'count' }
+            ],
             thisMonth: [
               {
                 $match: {
@@ -338,7 +370,7 @@ export class ReportController {
               },
               { $count: 'count' }
             ],
-            activeClients: [
+            activeRecently: [
               {
                 $match: {
                   dateModified: {
@@ -355,7 +387,7 @@ export class ReportController {
       const result = {
         totalClients: stats[0]?.total[0]?.count || 0,
         newClientsThisMonth: stats[0]?.thisMonth[0]?.count || 0,
-        activeClients: stats[0]?.activeClients[0]?.count || 0
+        activeClients: stats[0]?.active[0]?.count || stats[0]?.activeRecently[0]?.count || stats[0]?.total[0]?.count || 0
       };
 
       return res.status(200).json({
@@ -479,6 +511,7 @@ export class ReportController {
 
   /**
    * Generate Timesheet Report
+   * Includes practitioner hours and user login/logout activity tracking
    */
   static async getTimesheetReport(req: AuthRequest, res: Response): Promise<Response> {
     try {
@@ -508,9 +541,10 @@ export class ReportController {
 
       // Group by resource (practitioner)
       const resourceStats = new Map();
-      appointments.forEach((appointment: any) => {
-        const resourceId = appointment.resourceId;
-        const resourceName = appointment.resourceName || `Resource ${resourceId}`;
+      for (const appointment of appointments) {
+        const appt = appointment as any;
+        const resourceId = appt.resourceId;
+        const resourceName = appt.resourceName || `Resource ${resourceId}`;
         
         if (!resourceStats.has(resourceId)) {
           resourceStats.set(resourceId, {
@@ -527,18 +561,18 @@ export class ReportController {
 
         const stats = resourceStats.get(resourceId);
         stats.totalAppointments += 1;
-        stats.totalDuration += appointment.duration || 60; // Default 60 minutes
+        stats.totalDuration += appt.duration || 60; // Default 60 minutes
         
-        if (appointment.status === 1) { // Completed
+        if (appt.status === 1) { // Completed
           stats.completedAppointments += 1;
-        } else if (appointment.status === 2) { // Cancelled
+        } else if (appt.status === 2) { // Cancelled
           stats.cancelledAppointments += 1;
         }
 
         // Calculate revenue from related orders
         // This would need to be enhanced with actual order/appointment linking
         stats.revenue += 100; // Placeholder revenue calculation
-      });
+      }
 
       // Convert to array and calculate derived metrics
       const practitioners = Array.from(resourceStats.values()).map(stats => ({
@@ -548,12 +582,65 @@ export class ReportController {
         utilization: Math.min(100, (stats.totalHours / (8 * 5)) * 100) // Assuming 8 hours/day, 5 days/week
       }));
 
+      // Fetch user login/logout activity for users with access to this clinic
+      const users = await User.find({
+        $or: [
+          { 'permissions.canAccessAllClinics': true },
+          { 'permissions.allowedClinics': { $regex: new RegExp(clinic, 'i') } }
+        ],
+        status: 'active'
+      })
+        .select('username profile role lastLogin lastActivity sessions permissions')
+        .lean();
+
+      // Process user activity data - filter sessions within date range
+      const userActivity: UserSessionData[] = users.map((user: any) => {
+        // Filter sessions within the date range
+        const sessionsInRange = (user.sessions || []).filter((session: any) => {
+          if (!session.lastActivity) {
+            return false;
+          }
+          const sessionDate = new Date(session.lastActivity);
+          return sessionDate >= start && sessionDate <= end;
+        });
+
+        // Calculate active sessions
+        const activeSessions = sessionsInRange.filter((s: any) => s.isActive).length;
+
+        return {
+          userId: user._id.toString(),
+          username: user.username,
+          fullName: `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim() || user.username,
+          role: user.role,
+          lastLogin: user.lastLogin ? new Date(user.lastLogin).toISOString() : null,
+          lastActivity: user.lastActivity ? new Date(user.lastActivity).toISOString() : null,
+          totalSessions: sessionsInRange.length,
+          activeSessions,
+          sessions: sessionsInRange.map((session: any) => ({
+            deviceId: session.deviceId || 'unknown',
+            ipAddress: session.ipAddress || 'unknown',
+            userAgent: session.userAgent || 'unknown',
+            lastActivity: session.lastActivity ? new Date(session.lastActivity).toISOString() : new Date().toISOString(),
+            isActive: session.isActive || false
+          }))
+        };
+      });
+
+      // Sort by last activity (most recent first)
+      userActivity.sort((a, b) => {
+        const dateA = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
+        const dateB = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
+        return dateB - dateA;
+      });
+
       // Calculate summary
       const totalHours = practitioners.reduce((sum, p) => sum + p.totalHours, 0);
       const totalRevenue = practitioners.reduce((sum, p) => sum + p.revenue, 0);
       const averageUtilization = practitioners.length > 0 
         ? practitioners.reduce((sum, p) => sum + p.utilization, 0) / practitioners.length 
         : 0;
+      const totalActiveUsers = userActivity.filter(u => u.activeSessions > 0).length;
+      const totalLoginSessions = userActivity.reduce((sum, u) => sum + u.totalSessions, 0);
 
       const reportData: TimesheetData = {
         clinicName: clinic,
@@ -562,10 +649,13 @@ export class ReportController {
           endDate: end.toISOString().split('T')[0] as string
         },
         practitioners: practitioners.sort((a, b) => b.totalHours - a.totalHours),
+        userActivity,
         summary: {
           totalHours,
           totalRevenue,
-          averageUtilization
+          averageUtilization,
+          totalActiveUsers,
+          totalLoginSessions
         }
       };
 

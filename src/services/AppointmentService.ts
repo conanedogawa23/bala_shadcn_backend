@@ -659,23 +659,32 @@ export class AppointmentService {
 
       // Map to appointment collection clinic name due to data inconsistency
       const appointmentClinicName = AppointmentService.getAppointmentClinicName(clinicName);
-      const query: any = { clinicName: appointmentClinicName, isActive: true };
+      const query: any = { clinicName: new RegExp(`^${appointmentClinicName}$`, 'i'), isActive: true };
       
       if (startDate && endDate) {
         query.startDate = { $gte: startDate, $lte: endDate };
       }
+
+      // Get current date for upcoming/overdue calculations
+      const now = new Date();
 
       const [
         totalAppointments,
         completedAppointments,
         cancelledAppointments,
         readyToBillCount,
+        upcomingCount,
+        overdueCount,
         averageDuration
       ] = await Promise.all([
         AppointmentModel.countDocuments(query),
         AppointmentModel.countDocuments({ ...query, status: 1 }),
         AppointmentModel.countDocuments({ ...query, status: 2 }),
         AppointmentModel.countDocuments({ ...query, readyToBill: true, invoiceDate: { $exists: false } }),
+        // Upcoming: scheduled appointments (status 0) that are in the future
+        AppointmentModel.countDocuments({ ...query, status: 0, startDate: { $gt: now } }),
+        // Overdue: scheduled appointments (status 0) that are in the past
+        AppointmentModel.countDocuments({ ...query, status: 0, startDate: { $lt: now } }),
         AppointmentModel.aggregate([
           { $match: query },
           { $group: { _id: null, avgDuration: { $avg: '$duration' } } }
@@ -696,6 +705,8 @@ export class AppointmentService {
           completedAppointments,
           cancelledAppointments,
           pendingAppointments: totalAppointments - completedAppointments - cancelledAppointments,
+          upcomingCount,
+          overdueCount,
           readyToBillCount,
           averageDuration: averageDuration[0]?.avgDuration || 0,
           completionRate: totalAppointments > 0 ? (completedAppointments / totalAppointments) * 100 : 0,
