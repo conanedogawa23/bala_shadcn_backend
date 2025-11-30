@@ -18,8 +18,6 @@ export class PaymentService {
     sortBy = 'clientName'
   ): Promise<{ data: any[]; total: number; page: number; limit: number }> {
     try {
-      await ClinicService.getClinicByName(clinicName);
-
       const skip = (page - 1) * limit;
       const sortField: Record<string, 1 | -1> = sortBy === 'amountDue' ? { amountDue: -1 } : { clientName: 1 };
 
@@ -66,8 +64,6 @@ export class PaymentService {
     endDate?: Date
   ): Promise<{ paymentTypeSummary: any[]; dailySummary: any[] }> {
     try {
-      await ClinicService.getClinicByName(clinicName);
-
       const matchCriteria: any = { clinicName };
 
       if (startDate || endDate) {
@@ -163,8 +159,6 @@ export class PaymentService {
    */
   static async getAgingReport(clinicName: string): Promise<{ agingByClient: any[]; summary: any }> {
     try {
-      await ClinicService.getClinicByName(clinicName);
-
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
@@ -485,7 +479,10 @@ export class PaymentService {
   static async getPaymentTypeStats(clinicName?: string, startDate?: Date, endDate?: Date) {
     try {
       const match: any = {};
-      if (clinicName) match.clinicName = clinicName;
+      if (clinicName) {
+        // Use case-insensitive exact match to prevent substring matches
+        match.clinicName = new RegExp(`^${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      }
       if (startDate || endDate) {
         match.paymentDate = {};
         if (startDate) match.paymentDate.$gte = startDate;

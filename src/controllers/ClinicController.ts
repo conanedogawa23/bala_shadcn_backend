@@ -5,32 +5,22 @@ import { ClientModel } from '../models/Client';
 import { AppointmentModel } from '../models/Appointment';
 import Order from '../models/Order';
 import { asyncHandler } from '../utils/asyncHandler';
-import { ClinicView } from '../views/ClinicView';
 
 export class ClinicController {
 
-  // Return clinic name as-is to match MongoDB exactly (no slug transformation)
-  private static generateProperSlug = (clinicName: string, displayName?: string): string => {
-    // Return the exact MongoDB clinic name without any transformation
-    return clinicName;
-  };
-
-  // Utility function to get backend clinic names
+  /**
+   * Get backend clinic name for data queries
+   * Maps clinic.name to the actual names used in client/appointment/order documents
+   */
   private static getBackendClinicName = (clinicName: string, displayName: string): string => {
     // Map to actual clinic names used in client/appointment documents
-    // Based on MongoDB data analysis:
-    // - Clients collection uses: BodyBlissPhysio, BodyBlissOneCare, etc.
-    // - Appointments collection uses: BodyBlissPhysio, Physio Bliss, etc.
     const backendNameMappings: Record<string, string> = {
-      // Primary mapping - clinic.name to actual data collection names
-      'bodyblissphysio': 'BodyBlissPhysio',           // 3,664 clients, 59,058 appointments
-      'BodyBlissOneCare': 'BodyBlissOneCare',         // 14,846 clients, 10,169 appointments
-      'Ortholine Duncan Mills': 'Ortholine Duncan Mills', // 11,369 clients, 14,291 appointments
-      'Physio Bliss': 'Physio Bliss',                 // 711 clients, 51,922 appointments
-      'My Cloud': 'My Cloud',                         // 379 clients, 1,425 appointments
-      'Century Care': 'Century Care',                 // 203 clients
-      
-      // Fallback mappings by displayName
+      'bodyblissphysio': 'BodyBlissPhysio',
+      'BodyBlissOneCare': 'BodyBlissOneCare',
+      'Ortholine Duncan Mills': 'Ortholine Duncan Mills',
+      'Physio Bliss': 'Physio Bliss',
+      'My Cloud': 'My Cloud',
+      'Century Care': 'Century Care',
       'BodyBliss Physiotherapy': 'BodyBlissPhysio'
     };
 
@@ -38,31 +28,23 @@ export class ClinicController {
   };
 
   /**
-   * Get all available clinics with full data
+   * Get all available clinics with full data from MongoDB
    * GET /api/v1/clinics/frontend-compatible
+   * This is the primary endpoint for fetching clinic data
    */
   static getClinicsFrontendCompatible = asyncHandler(async (req: Request, res: Response) => {
     try {
-      // Get retained clinics from MongoDB with full data
+      // Get retained clinics from MongoDB
       const retainedClinics = await ClinicModel.findRetainedClinics();
 
-      // Debug: Log clinic count and logo status
       console.log(`📊 Processing ${retainedClinics.length} retained clinics`);
-      for (const c of retainedClinics) {
-        console.log(`  - ${c.name}: hasLogo=${!!c.logo?.data}, logoType=${c.logo?.contentType}`);
-      }
 
       // Transform to frontend-compatible format with real stats
       const clinicsData = await Promise.all(retainedClinics.map(async (clinic) => {
-        // Use MongoDB fields directly
         const streetAddress = clinic.address?.street || '';
         const cityName = clinic.address?.city || '';
         const provinceName = clinic.address?.province || '';
         const postalCode = clinic.address?.postalCode || '';
-        
-        // Phone/fax not in current model - set empty values
-        const phoneContact = null;
-        const faxContact = null;
 
         // Calculate real stats from database
         let clientCount = 0;
@@ -71,57 +53,50 @@ export class ClinicController {
         let lastActivity: Date | null = null;
 
         try {
-          // Get the correct backend clinic name used in client/appointment collections
           const backendName = ClinicController.getBackendClinicName(clinic.name, clinic.getDisplayName());
           
-          // Count clients using the mapped backend name
+          // Count clients, appointments, orders
           clientCount = await ClientModel.countDocuments({ 
             defaultClinic: backendName, 
             isActive: true 
           });
 
-          // Count appointments using the mapped backend name
           totalAppointments = await AppointmentModel.countDocuments({ 
             clinicName: backendName, 
             isActive: true 
           });
 
-          // Count orders using the mapped backend name
           totalOrders = await Order.countDocuments({ 
             clinicName: backendName
           });
 
-          // Get latest activity from appointments
+          // Get latest activity
           const latestAppointment = await AppointmentModel.findOne({ 
             clinicName: backendName, 
             isActive: true 
           }).sort({ startDate: -1 }).limit(1);
           
-          if (latestAppointment && latestAppointment.startDate) {
+          if (latestAppointment?.startDate) {
             lastActivity = latestAppointment.startDate;
           }
-
         } catch (statsError) {
           console.error(`Error calculating stats for clinic ${clinic.name}:`, statsError);
-          // Continue with zeros if stats calculation fails
         }
         
         return {
           id: clinic.clinicId,
-          name: ClinicController.generateProperSlug(clinic.name, clinic.getDisplayName()),
+          name: clinic.name, // Use MongoDB name directly - this is the canonical name
           displayName: clinic.getDisplayName(),
-          backendName: ClinicController.getBackendClinicName(clinic.name, clinic.getDisplayName()), // For API calls to other services
+          backendName: ClinicController.getBackendClinicName(clinic.name, clinic.getDisplayName()),
           address: streetAddress,
           city: cityName,
           province: provinceName,
           postalCode: postalCode,
-          phone: '',
-          fax: '',
           status: clinic.isActive() ? 'active' : 'inactive',
           lastActivity: lastActivity?.toISOString()?.split('T')[0] || null,
-          totalAppointments: totalAppointments,
-          totalOrders: totalOrders,
-          clientCount: clientCount,
+          totalAppointments,
+          totalOrders,
+          clientCount,
           description: `${clinic.getDisplayName()} - Active retained clinic`,
           logo: clinic.logo || null
         };
@@ -146,141 +121,70 @@ export class ClinicController {
   });
 
   /**
-   * Get all available clinics
+   * Get all available clinics (simple list)
    * GET /api/v1/clinics/available
    */
   static getAvailableClinics = asyncHandler(async (req: Request, res: Response) => {
-    const clinics = ClinicService.getAvailableClinics();
-    const mapping = ClinicService.getClinicMapping();
+    const clinics = await ClinicService.getRetainedClinics();
 
     res.json({
       success: true,
       message: 'Available clinics retrieved successfully',
       data: {
         clinics,
-        mapping,
         total: clinics.length
       }
     });
   });
 
   /**
-   * Validate clinic by slug (MongoDB-based)
-   * GET /api/v1/clinics/validate/:slug
+   * Find clinic by name (case-insensitive)
+   * GET /api/v1/clinics/find/:name
    */
-  static validateClinicSlug = asyncHandler(async (req: Request, res: Response) => {
-    const { slug } = req.params;
+  static findClinicByName = asyncHandler(async (req: Request, res: Response) => {
+    const { name } = req.params;
     
-    if (!slug) {
-      const retainedClinics = await ClinicModel.findRetainedClinics();
-      const availableSlugs = retainedClinics.map(clinic => 
-        ClinicController.generateProperSlug(clinic.name, clinic.getDisplayName())
-      );
-      
+    if (!name) {
+      const clinicNames = await ClinicService.getRetainedClinicNames();
       return res.status(400).json({
         success: false,
-        message: 'Clinic slug is required',
-        data: {
-          availableSlugs
-        }
+        message: 'Clinic name is required',
+        data: { availableClinics: clinicNames }
       });
     }
     
-    // Get retained clinics from MongoDB
-    const retainedClinics = await ClinicModel.findRetainedClinics();
-    
-    // Find clinic by matching generated slug
-    const clinic = retainedClinics.find(c => 
-      ClinicController.generateProperSlug(c.name, c.getDisplayName()) === slug
-    );
+    const clinic = await ClinicService.findClinicByName(name);
     
     if (!clinic) {
-      const availableSlugs = retainedClinics.map(c => 
-        ClinicController.generateProperSlug(c.name, c.getDisplayName())
-      );
-      
+      const clinicNames = await ClinicService.getRetainedClinicNames();
       return res.status(404).json({
         success: false,
-        message: `Clinic with slug '${slug}' not found in retained clinics list`,
-        data: {
-          availableSlugs
-        }
+        message: `Clinic '${name}' not found`,
+        data: { availableClinics: clinicNames }
       });
     }
 
     return res.json({
       success: true,
-      message: 'Clinic validated successfully',
+      message: 'Clinic found',
       data: {
-        clinic: {
-          id: clinic.clinicId,
-          name: ClinicController.generateProperSlug(clinic.name, clinic.getDisplayName()),
-          displayName: clinic.getDisplayName(),
-          backendName: ClinicController.getBackendClinicName(clinic.name, clinic.getDisplayName())
-        },
-        backendName: ClinicController.getBackendClinicName(clinic.name, clinic.getDisplayName())
+        clinic,
+        backendName: ClinicController.getBackendClinicName(clinic.name, clinic.displayName)
       }
     });
   });
 
   /**
-   * Get clinic mapping
-   * GET /api/v1/clinics/mapping
+   * Get clinic names only
+   * GET /api/v1/clinics/names
    */
-  static getClinicMapping = asyncHandler(async (req: Request, res: Response) => {
-    const mapping = ClinicService.getClinicMapping();
+  static getClinicNames = asyncHandler(async (req: Request, res: Response) => {
+    const names = await ClinicService.getRetainedClinicNames();
 
     res.json({
       success: true,
-      message: 'Clinic mapping retrieved successfully',
-      data: {
-        mapping,
-        slugs: Object.keys(mapping),
-        clinicNames: Object.values(mapping)
-      }
+      message: 'Clinic names retrieved successfully',
+      data: { names, total: names.length }
     });
-  });
-
-  /**
-   * Convert slug to clinic name
-   * GET /api/v1/clinics/slug-to-name/:slug
-   */
-  static slugToClinicName = asyncHandler(async (req: Request, res: Response) => {
-    const { slug } = req.params;
-    
-    if (!slug) {
-      return res.status(400).json({
-        success: false,
-        message: 'Clinic slug is required',
-        data: {
-          isValid: false,
-          availableSlugs: ClinicService.getAvailableClinics().map(c => c.slug)
-        }
-      });
-    }
-    
-    try {
-      const clinicName = ClinicService.slugToClinicName(slug);
-      
-      return res.json({
-        success: true,
-        message: 'Slug converted successfully',
-        data: {
-          slug,
-          clinicName,
-          isValid: true
-        }
-      });
-    } catch (error) {
-      return res.status(400).json({
-        success: false,
-        message: (error as Error).message,
-        data: {
-          slug,
-          isValid: false,
-          availableSlugs: ClinicService.getAvailableClinics().map(c => c.slug)
-        }
-      });
-    }
   });
 }

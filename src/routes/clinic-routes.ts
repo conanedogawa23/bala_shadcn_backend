@@ -5,24 +5,19 @@ import { optionalAuthenticate } from '../middleware/authMiddleware';
 
 const router = Router();
 
-// Validation middleware
-const slugValidation = [
-  param('slug')
+// Validation middleware for clinic name
+const nameValidation = [
+  param('name')
     .isLength({ min: 1 })
-    .withMessage('Clinic slug is required')
-    .matches(/^[a-z0-9-]+$/)
-    .withMessage('Clinic slug must contain only lowercase letters, numbers, and hyphens')
+    .withMessage('Clinic name is required')
     .trim()
 ];
 
-// Routes
-// All clinic discovery/validation endpoints are public with optional authentication
-// This allows frontend to fetch clinics without requiring login
+// Routes - All endpoints use MongoDB as source of truth
+// Public with optional authentication - frontend can fetch without login
 router.get('/frontend-compatible', optionalAuthenticate, ClinicController.getClinicsFrontendCompatible);
 router.get('/available', optionalAuthenticate, ClinicController.getAvailableClinics);
-router.get('/mapping', optionalAuthenticate, ClinicController.getClinicMapping);
-router.get('/slug-to-name', optionalAuthenticate, ClinicController.getClinicMapping); // Alias for mapping endpoint
-router.get('/validate/:slug', optionalAuthenticate, slugValidation, ClinicController.validateClinicSlug);
-router.get('/slug-to-name/:slug', optionalAuthenticate, slugValidation, ClinicController.slugToClinicName);
+router.get('/names', optionalAuthenticate, ClinicController.getClinicNames);
+router.get('/find/:name', optionalAuthenticate, nameValidation, ClinicController.findClinicByName);
 
 export default router;

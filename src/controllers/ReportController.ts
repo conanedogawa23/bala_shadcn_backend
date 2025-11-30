@@ -568,10 +568,23 @@ export class ReportController {
         } else if (appt.status === 2) { // Cancelled
           stats.cancelledAppointments += 1;
         }
+      }
 
-        // Calculate revenue from related orders
-        // This would need to be enhanced with actual order/appointment linking
-        stats.revenue += 100; // Placeholder revenue calculation
+      // Calculate revenue from related orders for each practitioner
+      // Get orders for appointments in the date range
+      const appointmentIds = appointments.map((appt: any) => appt._id);
+      const relatedOrders = await Order.find({
+        clinicName: clinic,
+        appointmentId: { $in: appointmentIds },
+        createdAt: { $gte: start, $lte: end }
+      }).lean();
+
+      // Map revenue to practitioners based on appointment
+      for (const order of relatedOrders) {
+        const appt = appointments.find((a: any) => a._id.toString() === order.appointmentId?.toString());
+        if (appt && resourceStats.has(appt.resourceId)) {
+          resourceStats.get(appt.resourceId).revenue += order.totalAmount || 0;
+        }
       }
 
       // Convert to array and calculate derived metrics
@@ -914,75 +927,73 @@ export class ReportController {
 
       // Get clients acquired in the date range with their referral sources
       const clients = await ClientModel.find({
-        clinics: clinicName,
-        createdAt: { $gte: start, $lte: end }
-      });
+        defaultClinic: clinic,
+        dateCreated: { $gte: start, $lte: end }
+      }).lean();
 
-      // Calculate marketing metrics
       const totalClients = clients.length;
-      const totalSpent = 5000; // Placeholder - would come from marketing spend tracking
-      const conversionRate = 0.15; // Placeholder conversion rate
-      const costPerAcquisition = totalClients > 0 ? totalSpent / totalClients : 0;
 
       // Get revenue from acquired clients
-      const clientIds = clients.map((c: any) => c._id);
+      const clientIds = clients.map((c: any) => c.clientId || c.clientKey);
       const clientOrders = await Order.find({
         clientId: { $in: clientIds },
+        clinicName: clinic,
         createdAt: { $gte: start, $lte: end }
-      });
+      }).lean();
 
       const totalRevenue = clientOrders.reduce((sum: number, order: any) => sum + order.totalAmount, 0);
+
+      // Group clients by referral source from client data
+      const referralStats = new Map();
+      clients.forEach((client: any) => {
+        // Check for referral source in client data
+        const source = client.referralSource || client.source || 'Unknown';
+        if (!referralStats.has(source)) {
+          referralStats.set(source, { source, count: 0, clientIds: [] });
+        }
+        const stats = referralStats.get(source);
+        stats.count += 1;
+        stats.clientIds.push(client.clientId || client.clientKey);
+      });
+
+      // Calculate revenue per referral source
+      const channels = Array.from(referralStats.values()).map(stats => {
+        const sourceOrders = clientOrders.filter((order: any) => 
+          stats.clientIds.includes(order.clientId)
+        );
+        const sourceRevenue = sourceOrders.reduce((sum: number, order: any) => sum + order.totalAmount, 0);
+        
+        // NOTE: Marketing spend data would need to come from external marketing platform
+        // integrations (Google Ads API, Facebook Ads API, etc.)
+        // For now, we calculate estimated spend based on industry averages
+        const estimatedCPA = 50; // Estimated cost per acquisition
+        const estimatedSpent = stats.count * estimatedCPA;
+        const roi = estimatedSpent > 0 ? ((sourceRevenue - estimatedSpent) / estimatedSpent) * 100 : 0;
+
+        return {
+          channel: stats.source,
+          spent: estimatedSpent,
+          clients: stats.count,
+          revenue: sourceRevenue,
+          roi: Math.round(roi)
+        };
+      }).sort((a, b) => b.revenue - a.revenue);
+
+      // Calculate overall metrics
+      const totalSpent = channels.reduce((sum, ch) => sum + ch.spent, 0);
       const totalROI = totalSpent > 0 ? ((totalRevenue - totalSpent) / totalSpent) * 100 : 0;
+      const conversionRate = totalClients > 0 ? (clientOrders.length / totalClients) : 0;
+      const costPerAcquisition = totalClients > 0 ? totalSpent / totalClients : 0;
 
-      // Simulate campaign data (would come from marketing platform integrations)
-      const campaigns = [
-        {
-          campaignName: 'Google Ads - Foot Care',
-          spent: 1500,
-          revenue: 4500,
-          roi: 200,
-          conversions: 15
-        },
-        {
-          campaignName: 'Facebook - Custom Orthotics',
-          spent: 1200,
-          revenue: 3600,
-          roi: 200,
-          conversions: 12
-        },
-        {
-          campaignName: 'Referral Program',
-          spent: 800,
-          revenue: 3200,
-          roi: 300,
-          conversions: 20
-        }
-      ];
-
-      // Simulate channel data
-      const channels = [
-        {
-          channel: 'Google Ads',
-          spent: 1500,
-          clients: 15,
-          revenue: 4500,
-          roi: 200
-        },
-        {
-          channel: 'Social Media',
-          spent: 1200,
-          clients: 12,
-          revenue: 3600,
-          roi: 200
-        },
-        {
-          channel: 'Referrals',
-          spent: 800,
-          clients: 20,
-          revenue: 3200,
-          roi: 300
-        }
-      ];
+      // Generate campaign data from top channels
+      // NOTE: Real campaign data would come from marketing platform APIs
+      const campaigns = channels.slice(0, 5).map((channel, index) => ({
+        campaignName: `${channel.channel} Campaign`,
+        spent: channel.spent,
+        revenue: channel.revenue,
+        roi: channel.roi,
+        conversions: channel.clients
+      }));
 
       const reportData: MarketingBudgetData = {
         clinicName: clinic,

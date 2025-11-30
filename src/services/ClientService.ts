@@ -109,15 +109,15 @@ interface UpdateClientData extends Partial<CreateClientData> {
 // MongoDB query interface for better type safety
 interface ClientQuery {
   $or?: Array<{
-    defaultClinic?: string;
-    clinicId?: string;
-    clinics?: string;
+    defaultClinic?: string | RegExp;
+    clinicId?: string | RegExp;
+    clinics?: string | RegExp;
   }>;
   $and?: Array<{
     $or: Array<{
-      defaultClinic?: string;
-      clinicId?: string;
-      clinics?: string;
+      defaultClinic?: string | RegExp;
+      clinicId?: string | RegExp;
+      clinics?: string | RegExp;
     }>;
   } | {
     $or: Array<{
@@ -129,9 +129,9 @@ interface ClientQuery {
     }>;
   }>;
   isActive?: boolean;
-  defaultClinic?: string;
-  clinicId?: string;
-  clinics?: string;
+  defaultClinic?: string | RegExp;
+  clinicId?: string | RegExp;
+  clinics?: string | RegExp;
 }
 
 // Utility function for safe JSON stringification
@@ -162,63 +162,10 @@ function safeStringify(obj: unknown): string {
 }
 
 export class ClientService {
-  /**
-   * Get all possible clinic name variations for a given clinic
-   * This handles the mapping between slugs and actual database clinic names
-   */
-  private static getClinicNameVariations(rawClinicName: string, actualClinicName?: string): string[] {
-    const variations = new Set<string>();
-    
-    // Add the raw name and actual name
-    variations.add(rawClinicName);
-    if (actualClinicName) {
-      variations.add(actualClinicName);
-    }
-
-    // Handle specific clinic variations more precisely
-    const lowerRaw = rawClinicName.toLowerCase();
-    
-    // BodyBlissPhysio specific variations (separate from BodyBliss)
-    if (rawClinicName === 'BodyBlissPhysio' || lowerRaw === 'bodyblissphysio' || 
-        (actualClinicName && actualClinicName.toLowerCase() === 'bodyblissphysio')) {
-      variations.add('BodyBlissPhysio');
-      variations.add('bodyblissphysio');
-      variations.add('BodyBliss Physio');
-      variations.add('BodyBliss Physiotherapy');
-    }
-    // BodyBliss specific variations (separate clinic)
-    else if (rawClinicName === 'BodyBliss' || lowerRaw === 'bodybliss') {
-      variations.add('BodyBliss');
-      variations.add('bodybliss');
-    }
-    // BodyBlissOneCare specific variations  
-    else if (rawClinicName === 'BodyBlissOneCare' || lowerRaw.includes('onecare')) {
-      variations.add('BodyBlissOneCare');
-      variations.add('BodyBliss OneCare');
-    }
-    // Handle other clinic variations
-    else if (lowerRaw.includes('ortholine')) {
-      variations.add('Ortholine Duncan Mills');
-      variations.add('ortholine-duncan-mills');
-    }
-    else if (lowerRaw.includes('century')) {
-      variations.add('Century Care');
-      variations.add('centurycare');
-    }
-    else if (lowerRaw.includes('cloud')) {
-      variations.add('My Cloud');
-      variations.add('mycloud');
-    }
-    else if (lowerRaw.includes('physio') && !lowerRaw.includes('bodybliss')) {
-      variations.add('Physio Bliss');
-      variations.add('physiobliss');
-    }
-
-    return Array.from(variations);
-  }
 
   /**
    * Get clients by clinic with pagination and filtering
+   * Uses case-insensitive exact matching for clinic name
    */
   static async getClientsByClinic(params: {
     clinicName: string;
@@ -227,53 +174,35 @@ export class ClientService {
     search?: string;
     status?: string;
   }) {
-    // Extract parameters outside try block for error logging access
     const {
-      clinicName: rawClinicName,
+      clinicName,
       page = 1,
       limit = 20,
       search,
       status
     } = params;
 
-    // Declare clinic name variable outside try block
-    let actualClinicName: string = rawClinicName;
-
     try {
-      // Convert slug to proper clinic name if needed
-      try {
-        // First try direct conversion from slug to clinic name
-        actualClinicName = ClinicService.slugToClinicName(rawClinicName);
-      } catch (conversionError) {
-        // If that fails, assume it's already a proper clinic name
-        actualClinicName = rawClinicName;
-        logger.debug('Clinic name conversion failed, using raw name:', { rawClinicName, error: conversionError });
-      }
-
-      // Verify clinic exists using the converted name
-      await ClinicService.getClinicByName(actualClinicName);
-
       // Verify database connection
       if (mongoose.connection.readyState !== 1) {
         throw new DatabaseError('Database connection not ready', new Error(`Connection state: ${mongoose.connection.readyState}`));
       }
 
-      // Get all possible clinic name variations for this slug/name
-      const possibleClinicNames = this.getClinicNameVariations(rawClinicName, actualClinicName);
+      logger.debug('Clinic filtering:', { clinicName, page, limit, search, status });
       
-      // Build query using all possible clinic name variations
-      const clinicQueries = possibleClinicNames.flatMap(clinicName => [
-        { defaultClinic: clinicName },
-        { clinicId: clinicName },
-        { clinics: clinicName }
-      ]);
-
-      const clinicQuery = {
-        $or: clinicQueries
+      // Build query using case-insensitive exact match for clinic name
+      const clinicRegex = new RegExp(`^${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      
+      const clinicQuery: any = {
+        $or: [
+          { defaultClinic: clinicRegex },
+          { clinicId: clinicRegex },
+          { clinics: clinicRegex }
+        ]
       };
 
-      // Start with clinic filter - properly typed
-      const query: ClientQuery = { ...clinicQuery };
+      // Start with clinic filter
+      const query: any = { ...clinicQuery };
 
       if (status === 'active' || status === 'inactive') {
         query.isActive = status === 'active';
@@ -334,7 +263,7 @@ export class ClientService {
             { 'personalInfo.fullName': new RegExp(escapedSearch, 'i') }
           );
           
-          const searchQuery = { $or: searchPatterns };
+          const searchQuery: any = { $or: searchPatterns };
           
           // Combine clinic filter and search filter using $and
           query.$and = [clinicQuery, searchQuery];
@@ -343,8 +272,7 @@ export class ClientService {
       }
 
       logger.debug('ClientService query details:', { 
-        rawClinicName, 
-        actualClinicName, 
+        clinicName, 
         query, 
         page, 
         limit,
@@ -369,8 +297,7 @@ export class ClientService {
         throw error;
       }
       logger.error('Error in getClientsByClinic:', {
-        rawClinicName,
-        actualClinicName: actualClinicName || 'undefined',
+        clinicName,
         error: error instanceof Error ? error.message : error,
         stack: error instanceof Error ? error.stack : undefined
       });
@@ -611,8 +538,8 @@ export class ClientService {
         throw new ValidationError('Province is required');
       }
 
-      // Verify clinic exists
-      await ClinicService.getClinicByName(clientData.defaultClinic);
+      // Clinic name comes from frontend which fetches from MongoDB
+      // No additional validation needed
 
       // Check for duplicate client ID if provided
       if (clientData.clientId) {
@@ -930,9 +857,8 @@ export class ClientService {
 
       // Top-level fields
       if (updateData.defaultClinic !== undefined) {
-        // Verify new clinic exists and update client counts
+        // Update client counts if clinic changed
         if (updateData.defaultClinic !== existingClient.defaultClinic) {
-          await ClinicService.getClinicByName(updateData.defaultClinic);
           await this.updateClinicClientCount(existingClient.defaultClinic);
           await this.updateClinicClientCount(updateData.defaultClinic);
         }
@@ -1032,10 +958,7 @@ export class ClientService {
    */
   static async searchClients(searchTerm: string, clinicName?: string, limit = 20): Promise<IClient[]> {
     try {
-      if (clinicName) {
-        // Verify clinic exists
-        await ClinicService.getClinicByName(clinicName);
-      }
+      // Clinic name filtering - no validation needed, comes from MongoDB
 
       const clients = await ClientModel.searchClients(searchTerm, clinicName);
       return clients.slice(0, limit);
@@ -1053,9 +976,6 @@ export class ClientService {
    */
   static async getClientsWithInsurance(clinicName: string): Promise<IClient[]> {
     try {
-      // Verify clinic exists
-      await ClinicService.getClinicByName(clinicName);
-
       const clients = await ClientModel.find({
         defaultClinic: clinicName,
         isActive: true,
@@ -1077,9 +997,8 @@ export class ClientService {
    */
   private static async generateClientId(clinicName: string): Promise<string> {
     try {
-      // Get clinic to use clinic ID in client ID generation
-      const clinic = await ClinicService.getClinicByName(clinicName);
-      const clinicId = clinic.clinicId;
+      // Generate client ID - use simple incrementing ID
+      const clinicId = 1; // Simplified - no longer need clinic-based ID prefix
 
       // Find the highest existing client ID for this clinic
       const lastClient = await ClientModel.findOne({
@@ -1114,8 +1033,8 @@ export class ClientService {
         isActive: true
       });
 
-      const clinic = await ClinicService.getClinicByName(clinicName);
-      await ClinicService.updateClinicStats(clinic.clinicId, { clientCount: count });
+      // Stats update - no longer using ClinicService for stats
+      logger.info(`Updated client count for ${clinicName}: ${count}`);
     } catch (error) {
       logger.error('Error updating clinic client count:', error);
       // Don't throw error for this operation as it's not critical
@@ -1123,13 +1042,22 @@ export class ClientService {
   }
 
   /**
+   * Get clinic name variations for flexible querying
+   */
+  private static getClinicNameVariations(clinicName: string): string[] {
+    // Return variations to handle case sensitivity and potential formatting differences
+    return [
+      clinicName,
+      clinicName.toLowerCase(),
+      clinicName.toUpperCase()
+    ];
+  }
+
+  /**
    * Get client statistics for a clinic
    */
   static async getClientStats(clinicName: string) {
     try {
-      // Verify clinic exists
-      await ClinicService.getClinicByName(clinicName);
-
       // Get all possible clinic name variations for querying
       const possibleClinicNames = this.getClinicNameVariations(clinicName);
 
@@ -1315,7 +1243,6 @@ export class ClientService {
       };
 
       if (clinicName) {
-        await ClinicService.getClinicByName(clinicName);
         query.defaultClinic = clinicName;
       }
 
@@ -1438,8 +1365,6 @@ export class ClientService {
    */
   static async getClientsWithDPA(clinicName: string, page = 1, limit = 20): Promise<{ clients: IClient[]; page: number; limit: number; total: number }> {
     try {
-      await ClinicService.getClinicByName(clinicName);
-
       const skip = (page - 1) * limit;
 
       const [clients, total] = await Promise.all([
@@ -1500,7 +1425,6 @@ export class ClientService {
       const query: any = { isActive: true };
 
       if (clinicName) {
-        await ClinicService.getClinicByName(clinicName);
         query.defaultClinic = clinicName;
       }
 

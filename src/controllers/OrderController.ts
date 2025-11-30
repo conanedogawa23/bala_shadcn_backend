@@ -65,15 +65,8 @@ export class OrderController {
       }
 
       if (clinicName) {
-        // Convert slug to proper clinic name if needed
-        let actualClinicName: string = clinicName;
-        try {
-          actualClinicName = ClinicService.slugToClinicName(clinicName);
-        } catch (conversionError) {
-          // If conversion fails, assume it's already a proper clinic name
-          actualClinicName = clinicName;
-        }
-        filter.clinicName = actualClinicName;
+        // Use case-insensitive exact match for clinic name
+        filter.clinicName = new RegExp(`^${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
       }
 
       if (clientId) {
@@ -246,14 +239,8 @@ export class OrderController {
       const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
       const skip = (pageNum - 1) * limitNum;
 
-      // Convert slug to proper clinic name if needed
-      let actualClinicName: string = rawClinicName || '';
-      try {
-        actualClinicName = ClinicService.slugToClinicName(rawClinicName || '');
-      } catch (conversionError) {
-        // If conversion fails, assume it's already a proper clinic name
-        actualClinicName = rawClinicName || '';
-      }
+      // Use clinic name directly
+      const actualClinicName: string = rawClinicName || '';
 
       // Use case-insensitive regex for clinic name matching
       const clinicRegex = new RegExp(`^${actualClinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
@@ -805,16 +792,8 @@ export class OrderController {
         return;
       }
 
-      // Convert slug to proper clinic name if needed
-      let actualClinicName: string = rawClinicName as string;
-      try {
-        actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
-      } catch (conversionError) {
-        // If conversion fails, assume it's already a proper clinic name
-        actualClinicName = rawClinicName as string;
-      }
-
-      // Use case-insensitive regex for clinic name matching
+      // Use clinic name directly with case-insensitive regex matching
+      const actualClinicName: string = rawClinicName as string;
       const clinicRegex = new RegExp(`^${actualClinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
       // Calculate date range - default to last 12 months if not specified
@@ -963,16 +942,9 @@ export class OrderController {
         status: { $ne: OrderStatus.CANCELLED }
       };
 
-      // Add clinic filter if provided
+      // Add clinic filter if provided - use case-insensitive exact match
       if (rawClinicName) {
-        let actualClinicName: string = rawClinicName as string;
-        try {
-          actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
-        } catch (conversionError) {
-          actualClinicName = rawClinicName as string;
-        }
-        // Use case-insensitive regex for clinic name matching
-        matchFilter.clinicName = new RegExp(`^${actualClinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+        matchFilter.clinicName = new RegExp(`^${(rawClinicName as string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
       }
 
       // Check matching orders count
@@ -1158,12 +1130,8 @@ export class OrderController {
         return;
       }
 
-      let actualClinicName: string = rawClinicName as string;
-      try {
-        actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
-      } catch (conversionError) {
-        actualClinicName = rawClinicName as string;
-      }
+      // Use clinic name directly
+      const actualClinicName: string = rawClinicName as string;
 
       const result = await OrderService.getOrderStatusReport(
         actualClinicName,
@@ -1277,15 +1245,7 @@ export class OrderController {
       const { clinicName: rawClinicName, page = '1', limit = '20' } = req.query;
 
       // Clinic name is optional - if not provided, get all pending refunds
-      let actualClinicName: string | undefined = undefined;
-      
-      if (rawClinicName) {
-        try {
-          actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
-        } catch (conversionError) {
-          actualClinicName = rawClinicName as string;
-        }
-      }
+      const actualClinicName: string | undefined = rawClinicName as string | undefined;
 
       const result = await OrderService.getOrdersPendingRefund(
         actualClinicName,
@@ -1362,15 +1322,7 @@ export class OrderController {
       const { clinicName: rawClinicName, format = 'json', startDate, endDate, limit = '1000' } = req.query;
 
       // Clinic name is optional for export
-      let actualClinicName: string | undefined = undefined;
-      
-      if (rawClinicName) {
-        try {
-          actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
-        } catch (conversionError) {
-          actualClinicName = rawClinicName as string;
-        }
-      }
+      const actualClinicName: string | undefined = rawClinicName as string | undefined;
 
       const data = await OrderService.exportOrdersReport(
         actualClinicName,

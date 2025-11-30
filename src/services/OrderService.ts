@@ -13,9 +13,10 @@ export class OrderService {
     endDate?: Date
   ): Promise<{ statusDistribution: any[]; paymentDistribution: any[] }> {
     try {
-      await ClinicService.getClinicByName(clinicName);
-
-      const matchCriteria: any = { clinicName };
+      // Use case-insensitive exact match to prevent substring matches
+      const matchCriteria: any = { 
+        clinicName: new RegExp(`^${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+      };
 
       if (startDate || endDate) {
         matchCriteria.serviceDate = {};
@@ -163,10 +164,6 @@ export class OrderService {
     limit = 20
   ): Promise<{ orders: IOrder[]; page: number; limit: number; total: number }> {
     try {
-      if (clinicName) {
-        await ClinicService.getClinicByName(clinicName);
-      }
-
       const skip = (page - 1) * limit;
       
       const filter: any = {
@@ -174,7 +171,8 @@ export class OrderService {
       };
       
       if (clinicName) {
-        filter.clinicName = clinicName;
+        // Use case-insensitive exact match to prevent substring matches
+        filter.clinicName = new RegExp(`^${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
       }
 
       const [orders, total] = await Promise.all([
@@ -206,8 +204,8 @@ export class OrderService {
       const matchCriteria: any = { 'items.productKey': productKey };
 
       if (clinicName) {
-        await ClinicService.getClinicByName(clinicName);
-        matchCriteria.clinicName = clinicName;
+        // Use case-insensitive exact match to prevent substring matches
+        matchCriteria.clinicName = new RegExp(`^${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
       }
 
       if (startDate || endDate) {
@@ -255,14 +253,11 @@ export class OrderService {
     limit = 1000
   ): Promise<any> {
     try {
-      if (clinicName) {
-        await ClinicService.getClinicByName(clinicName);
-      }
-
       const matchCriteria: any = {};
       
       if (clinicName) {
-        matchCriteria.clinicName = clinicName;
+        // Use case-insensitive exact match to prevent substring matches
+        matchCriteria.clinicName = new RegExp(`^${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
       }
 
       if (startDate || endDate) {
@@ -329,8 +324,6 @@ export class OrderService {
     endDate?: Date
   ): Promise<{ analytics: any[]; summary: any }> {
     try {
-      await ClinicService.getClinicByName(clinicName);
-
       const start = startDate || new Date('2018-01-01');
       const end = endDate || new Date('2025-12-31');
 

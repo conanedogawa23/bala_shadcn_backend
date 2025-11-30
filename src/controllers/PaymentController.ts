@@ -98,15 +98,8 @@ export class PaymentController {
       if (paymentMethod) filter.paymentMethod = paymentMethod;
       if (paymentType) filter.paymentType = paymentType;
       if (clinicName) {
-        // Convert slug to proper clinic name if needed
-        let actualClinicName: string = clinicName as string;
-        try {
-          actualClinicName = ClinicService.slugToClinicName(clinicName as string);
-        } catch (conversionError) {
-          // If conversion fails, assume it's already a proper clinic name
-          actualClinicName = clinicName as string;
-        }
-        filter.clinicName = actualClinicName;
+        // Use case-insensitive exact match for clinic name
+        filter.clinicName = new RegExp(`^${(clinicName as string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
       }
       if (clientId) filter.clientId = Number(clientId);
       if (orderNumber) filter.orderNumber = orderNumber as string;
@@ -330,14 +323,8 @@ export class PaymentController {
         return;
       }
 
-      // Convert slug to proper clinic name if needed
-      let actualClinicName: string = rawClinicName;
-      try {
-        actualClinicName = ClinicService.slugToClinicName(rawClinicName);
-      } catch (conversionError) {
-        // If conversion fails, assume it's already a proper clinic name
-        actualClinicName = rawClinicName;
-      }
+      // Use clinic name directly
+      const actualClinicName: string = rawClinicName;
 
       const filter: any = { clinicName: actualClinicName };
       if (status) filter.status = status;
@@ -980,12 +967,8 @@ export class PaymentController {
         return;
       }
 
-      let actualClinicName: string = rawClinicName as string;
-      try {
-        actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
-      } catch (conversionError) {
-        actualClinicName = rawClinicName as string;
-      }
+      // Use clinic name directly
+      const actualClinicName: string = rawClinicName as string;
 
       const result = await PaymentService.getAccountSummary(
         actualClinicName,
@@ -1032,12 +1015,8 @@ export class PaymentController {
         return;
       }
 
-      let actualClinicName: string = rawClinicName as string;
-      try {
-        actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
-      } catch (conversionError) {
-        actualClinicName = rawClinicName as string;
-      }
+      // Use clinic name directly
+      const actualClinicName: string = rawClinicName as string;
 
       const result = await PaymentService.getPaymentSummary(
         actualClinicName,
@@ -1129,12 +1108,8 @@ export class PaymentController {
         return;
       }
 
-      let actualClinicName: string = rawClinicName as string;
-      try {
-        actualClinicName = ClinicService.slugToClinicName(rawClinicName as string);
-      } catch (conversionError) {
-        actualClinicName = rawClinicName as string;
-      }
+      // Use clinic name directly
+      const actualClinicName: string = rawClinicName as string;
 
       const result = await PaymentService.getAgingReport(actualClinicName);
 
