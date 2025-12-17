@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import User, { IUser, UserRole, UserStatus } from '../models/User';
 import { AuthRequest } from './AuthController';
 import { Types } from 'mongoose';
+import { logger } from '../utils/logger';
 
 // Query interfaces
 interface UserQuery {
@@ -194,7 +195,7 @@ export class UserController {
       });
 
     } catch (error) {
-      console.error('Get users error:', error);
+      logger.error('Get users error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -239,7 +240,7 @@ export class UserController {
       });
 
     } catch (error) {
-      console.error('Get user error:', error);
+      logger.error('Get user error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -334,7 +335,7 @@ export class UserController {
       });
 
     } catch (error) {
-      console.error('Create user error:', error);
+      logger.error('Create user error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -413,7 +414,7 @@ export class UserController {
       });
 
     } catch (error) {
-      console.error('Update user error:', error);
+      logger.error('Update user error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -466,7 +467,7 @@ export class UserController {
       });
 
     } catch (error) {
-      console.error('Delete user error:', error);
+      logger.error('Delete user error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -522,7 +523,7 @@ export class UserController {
       });
 
     } catch (error) {
-      console.error('Update user status error:', error);
+      logger.error('Update user status error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -559,7 +560,7 @@ export class UserController {
       });
 
     } catch (error) {
-      console.error('Unlock user error:', error);
+      logger.error('Unlock user error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -660,7 +661,7 @@ export class UserController {
       });
 
     } catch (error) {
-      console.error('Get user stats error:', error);
+      logger.error('Get user stats error:', error);
       return res.status(500).json({
         success: false,
         error: {

@@ -482,17 +482,36 @@ export class ClientService {
    */
   static async getClientById(clientId: string): Promise<IClient> {
     try {
-      // Try multiple approaches to handle both string and number types in MongoDB
-      // Some data may have clientId as string, others as number (due to migration)
+      // clientId is stored as string in MongoDB
       const numericClientId = Number(clientId);
       
-      const client = await ClientModel.findOne({
-        $or: [
-          { clientId: numericClientId },     // Try as number (schema type)
-          { clientId: clientId },             // Try as string (legacy data)
-          { clientKey: numericClientId }      // Try clientKey fallback
-        ]
+      logger.debug('getClientById called', {
+        requestedClientId: clientId,
+        queryType: 'findOne by clientId (string) with clientKey fallback'
       });
+      
+      // PRIORITY 1: Find by clientId (string in MongoDB)
+      let client = await ClientModel.findOne({ clientId: clientId });
+      
+      // PRIORITY 2: Only if not found, try clientKey as fallback (for backward compatibility)
+      if (!client && !isNaN(numericClientId)) {
+        logger.debug('Client not found by clientId, trying clientKey fallback', { clientId });
+        client = await ClientModel.findOne({ clientKey: numericClientId });
+      }
+      
+      if (client) {
+        logger.debug('Client found', {
+          requestedId: clientId,
+          foundClientId: client.clientId,
+          foundClientKey: client.clientKey,
+          matchedBy: client.clientId === clientId ? 'clientId' : 'clientKey',
+          clientName: `${client.personalInfo.firstName} ${client.personalInfo.lastName}`
+        });
+      } else {
+        logger.warn('Client not found', {
+          requestedClientId: clientId
+        });
+      }
       
       if (!client) {
         throw new NotFoundError('Client', clientId);
@@ -543,14 +562,7 @@ export class ClientService {
 
       // Check for duplicate client ID if provided
       if (clientData.clientId) {
-        const numericClientId = Number(clientData.clientId);
-        const existingClient = await ClientModel.findOne({
-          $or: [
-            { clientId: numericClientId },
-            { clientId: clientData.clientId },
-            { clientKey: numericClientId }
-          ]
-        });
+        const existingClient = await ClientModel.findOne({ clientId: clientData.clientId });
         if (existingClient) {
           throw new ValidationError('Client with this ID already exists');
         }
@@ -872,15 +884,9 @@ export class ClientService {
       // Always update dateModified
       setOperations['dateModified'] = new Date();
 
-      const numericClientId = Number(clientId);
+      // Use _id from the found client to avoid ambiguity
       const updatedClient = await ClientModel.findOneAndUpdate(
-        { 
-          $or: [
-            { clientId: numericClientId },
-            { clientId: clientId },
-            { clientKey: numericClientId }
-          ]
-        },
+        { _id: existingClient._id },
         { $set: setOperations },
         { new: true, runValidators: true }
       );
@@ -924,16 +930,10 @@ export class ClientService {
   static async deleteClient(clientId: string): Promise<void> {
     try {
       const client = await this.getClientById(clientId);
-      const numericClientId = Number(clientId);
       
+      // Use _id from the found client to avoid ambiguity
       await ClientModel.findOneAndUpdate(
-        { 
-          $or: [
-            { clientId: numericClientId },
-            { clientId: clientId },
-            { clientKey: numericClientId }
-          ]
-        },
+        { _id: client._id },
         { 
           isActive: false,
           dateModified: new Date()
@@ -1328,16 +1328,11 @@ export class ClientService {
         }
       }
 
-      const numericClientId = Number(clientId);
+      // Get the client first to ensure it exists
+      const existingClient = await this.getClientById(clientId);
       
       const client = await ClientModel.findOneAndUpdate(
-        { 
-          $or: [
-            { clientId: numericClientId },
-            { clientId: clientId },
-            { clientKey: numericClientId }
-          ]
-        },
+        { _id: existingClient._id },
         { 
           insurance,
           dateModified: new Date()

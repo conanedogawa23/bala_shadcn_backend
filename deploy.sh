@@ -66,10 +66,10 @@ ssh -i "$PEM_FILE" $EC2_USER@$EC2_HOST \
     "cd $DEPLOY_PATH && npm install --omit=dev && npm install tsconfig-paths" > /dev/null 2>&1
 echo -e "${GREEN}✓ Dependencies installed${NC}\n"
 
-# Step 7: Restart PM2 process
+# Step 7: Restart/Start PM2 process with bootstrap entry
 echo -e "${YELLOW}[7/8] Restarting PM2 process...${NC}"
-ssh -i "$PEM_FILE" $EC2_USER@$EC2_HOST "pm2 restart $PM2_PROCESS" | grep -E "(visio-backend|status|online)"
-echo -e "${GREEN}✓ PM2 restarted${NC}\n"
+ssh -i "$PEM_FILE" $EC2_USER@$EC2_HOST "pm2 describe $PM2_PROCESS >/dev/null 2>&1 || pm2 start $DEPLOY_PATH/dist/bootstrap.js --name $PM2_PROCESS && pm2 restart $PM2_PROCESS && pm2 save" | grep -E "(visio-backend|status|online)"
+echo -e "${GREEN}✓ PM2 process running${NC}\n"
 
 # Step 8: Verify deployment
 echo -e "${YELLOW}[8/8] Verifying deployment...${NC}"

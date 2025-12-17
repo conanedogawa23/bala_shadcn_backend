@@ -2,11 +2,11 @@
   "name": "visio-health-backend",
   "version": "1.0.1",
   "description": "Backend API for Visio Health clinic management system with MSSQL to MongoDB migration",
-  "main": "dist/app.js",
+  "main": "dist/bootstrap.js",
   "scripts": {
     "dev": "nodemon",
     "build": "tsc",
-    "start": "node dist/app.js",
+    "start": "node dist/bootstrap.js",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix"
   },

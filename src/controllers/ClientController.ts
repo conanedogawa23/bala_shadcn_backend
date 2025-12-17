@@ -4,6 +4,7 @@ import { ClientService } from '../services/ClientService';
 import { ClientView } from '../views/ClientView';
 import { asyncHandler } from '../utils/asyncHandler';
 import { validateRequiredString } from '../utils/mongooseHelpers';
+import { logger } from '../utils/logger';
 
 export class ClientController {
   /**
@@ -298,6 +299,12 @@ export class ClientController {
   static getClientByIdCompatible = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
 
+    logger.debug('getClientByIdCompatible called', {
+      url: req.originalUrl,
+      params: req.params,
+      extractedId: id
+    });
+
     if (!id) {
       const response = ClientView.formatError('Client ID is required', 'MISSING_PARAMETER');
       return res.status(400).json(response);
@@ -305,6 +312,11 @@ export class ClientController {
 
     // Call service layer
     const client = await ClientService.getClientById(id);
+
+    logger.debug('Client retrieved successfully', {
+      clientId: client.clientId,
+      clientName: `${client.personalInfo.firstName} ${client.personalInfo.lastName}`
+    });
 
     // Format response using frontend-compatible view
     const clientData = ClientView.formatClientForFrontend(client);

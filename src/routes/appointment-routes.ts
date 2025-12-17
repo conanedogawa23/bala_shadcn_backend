@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import { AppointmentController } from '@/controllers/AppointmentController';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -201,16 +202,16 @@ const completeAppointmentValidation = [
 router.get('/test/:clinicName', async (req, res): Promise<void> => {
   try {
     const { clinicName } = req.params;
-    console.log('=== SIMPLE TEST ENDPOINT ===');
-    console.log('clinicName:', clinicName);
+    logger.info('=== SIMPLE TEST ENDPOINT ===');
+    logger.info('clinicName:', clinicName);
     
     const { AppointmentModel } = require('@/models/Appointment');
     const { ClinicModel } = require('@/models/Clinic');
     const mongoose = require('mongoose');
     
     // Debug: Check database connection
-    console.log('Connected to database:', mongoose.connection.name);
-    console.log('Connection state:', mongoose.connection.readyState);
+    logger.info('Connected to database:', mongoose.connection.name);
+    logger.info('Connection state:', mongoose.connection.readyState);
     
     // Debug: List all databases available
     const adminDb = mongoose.connection.db.admin();
@@ -221,7 +222,7 @@ router.get('/test/:clinicName', async (req, res): Promise<void> => {
     
     // Test: Count all clinics first
     const allClinicsCount = await ClinicModel.countDocuments({});
-    console.log('Total clinics in database:', allClinicsCount);
+    logger.info('Total clinics in database:', allClinicsCount);
     
     // Test: Raw MongoDB collection access
     const rawCollection = mongoose.connection.collection('clinics');
@@ -230,15 +231,15 @@ router.get('/test/:clinicName', async (req, res): Promise<void> => {
     
     // Test: Find all clinic names
     const allClinicNames = await ClinicModel.find({}, { name: 1 }).limit(5);
-    console.log('First 5 clinic names:', allClinicNames.map((c: any) => c.name));
+    logger.info('First 5 clinic names:', allClinicNames.map((c: any) => c.name));
     
     // Test 1: Check if clinic exists
     const clinic = await ClinicModel.findOne({ name: clinicName });
-    console.log('Clinic found:', !!clinic, clinic?.name);
+    logger.info('Clinic found:', !!clinic, clinic?.name);
     
     // Test: Try case-insensitive search
     const clinicInsensitive = await ClinicModel.findOne({ name: { $regex: new RegExp(`^${clinicName}$`, 'i') } });
-    console.log('Case-insensitive search:', !!clinicInsensitive, clinicInsensitive?.name);
+    logger.info('Case-insensitive search:', !!clinicInsensitive, clinicInsensitive?.name);
     
     if (!clinic) {
       res.json({ 
@@ -262,21 +263,21 @@ router.get('/test/:clinicName', async (req, res): Promise<void> => {
     
     // Test 2: Get appointment clinic name
     const appointmentClinicName = clinicName === 'bodyblissphysio' ? 'BodyBlissPhysio' : clinicName;
-    console.log('Mapped clinic name:', appointmentClinicName);
+    logger.info('Mapped clinic name:', appointmentClinicName);
     
     // Test 3: Simple count
     const count = await AppointmentModel.countDocuments({ 
       clinicName: appointmentClinicName, 
       isActive: true 
     });
-    console.log('Appointment count:', count);
+    logger.info('Appointment count:', count);
     
     // Test 4: Simple find (no lean, no populate)
     const appointments = await AppointmentModel.find({ 
       clinicName: appointmentClinicName, 
       isActive: true 
     }).limit(2);
-    console.log('Appointments found:', appointments.length);
+    logger.info('Appointments found:', appointments.length);
     
     res.json({
       success: true,
@@ -288,7 +289,7 @@ router.get('/test/:clinicName', async (req, res): Promise<void> => {
     });
     
   } catch (error) {
-    console.error('ERROR in test endpoint:', error);
+    logger.error('ERROR in test endpoint:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : 'No stack available';
     res.status(500).json({ error: errorMessage, stack: errorStack });

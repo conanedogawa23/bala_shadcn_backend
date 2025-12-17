@@ -36,8 +36,8 @@ export interface IInsurance {
 }
 
 export interface IClient extends Document {
-  clientId: number; // sb_clients_id from MSSQL (now NUMBER for consistency)
-  clientKey?: number; // sb_clients_key from MSSQL
+  clientId: string; // sb_clients_id from MSSQL (stored as STRING in MongoDB)
+  clientKey?: number; // sb_clients_key from MSSQL (stored as NUMBER in MongoDB)
   personalInfo: {
     firstName: string; // sb_clients_first_name from MSSQL
     lastName: string; // sb_clients_last_name from MSSQL
@@ -198,9 +198,10 @@ const InsuranceSchema = new Schema<IInsurance>({
 
 const ClientSchema = new Schema<IClient>({
   clientId: {
-    type: Schema.Types.Mixed, // Accept both String and Number for legacy data compatibility
+    type: String, // Stored as String in MongoDB (migrated from MSSQL)
     required: true,
-    unique: true
+    unique: true,
+    trim: true
   },
   clientKey: {
     type: Number

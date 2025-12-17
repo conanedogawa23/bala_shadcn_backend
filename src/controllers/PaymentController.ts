@@ -5,6 +5,7 @@ import { ClientModel } from '../models/Client';
 import { ClinicModel } from '../models/Clinic';
 import { ClinicService } from '../services/ClinicService';
 import { PaymentService } from '../services/PaymentService';
+import { logger } from '../utils/logger';
 
 // Extend Request interface to include user property
 interface AuthenticatedRequest extends Request {
@@ -21,47 +22,47 @@ export class PaymentController {
    * Helper method to find payment by ID (supports both ObjectId and paymentNumber)
    */
     private static async findPaymentById(id: string): Promise<any> {
-    console.log(`Helper findPaymentById called with: ${id}`);
+    logger.info(`Helper findPaymentById called with: ${id}`);
     
     let payment;
     
     // Try to find by MongoDB _id first
-    console.log(`Searching by ObjectId: ${id}`);
+    logger.info(`Searching by ObjectId: ${id}`);
     try {
       payment = await PaymentModel.findById(id)
         .populate('orderId', 'orderNumber status clientId clientName totalAmount')
         .populate('createdBy', 'username email')
         .populate('updatedBy', 'username email');
-      console.log(`ObjectId search result: ${payment ? 'found' : 'not found'}`);
+      logger.info(`ObjectId search result: ${payment ? 'found' : 'not found'}`);
     } catch (objectIdError) {
-      console.log('ObjectId search failed, trying other methods...');
+      logger.info('ObjectId search failed, trying other methods...');
     }
     
     // If not found by ObjectId, try paymentId
     if (!payment) {
-      console.log(`Searching by paymentId: ${id}`);
+      logger.info(`Searching by paymentId: ${id}`);
       try {
         payment = await PaymentModel.findOne({ paymentId: id })
           .populate('orderId', 'orderNumber status clientId clientName totalAmount')
           .populate('createdBy', 'username email')
           .populate('updatedBy', 'username email');
-        console.log(`PaymentId search result: ${payment ? 'found' : 'not found'}`);
+        logger.info(`PaymentId search result: ${payment ? 'found' : 'not found'}`);
       } catch (paymentIdError) {
-        console.log('PaymentId search failed, trying paymentNumber...');
+        logger.info('PaymentId search failed, trying paymentNumber...');
       }
     }
     
     // If still not found, try paymentNumber as final fallback
     if (!payment) {
-      console.log(`Fallback: Searching by paymentNumber: ${id}`);
+      logger.info(`Fallback: Searching by paymentNumber: ${id}`);
       try {
         payment = await PaymentModel.findOne({ paymentNumber: id })
           .populate('orderId', 'orderNumber status clientId clientName totalAmount')
           .populate('createdBy', 'username email')
           .populate('updatedBy', 'username email');
-        console.log(`PaymentNumber fallback result: ${payment ? 'found' : 'not found'}`);
+        logger.info(`PaymentNumber fallback result: ${payment ? 'found' : 'not found'}`);
       } catch (paymentNumberError) {
-        console.error('All search methods failed:', paymentNumberError);
+        logger.error('All search methods failed:', paymentNumberError);
       }
     }
     
@@ -147,7 +148,7 @@ export class PaymentController {
         }
       });
     } catch (error) {
-      console.error('Error fetching payments:', error);
+      logger.error('Error fetching payments:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch payments',
@@ -173,7 +174,7 @@ export class PaymentController {
         return;
       }
 
-      console.log(`PaymentController.getPaymentById called with ID: ${id}`);
+      logger.info(`PaymentController.getPaymentById called with ID: ${id}`);
 
       const payment = await PaymentController.findPaymentById(id);
 
@@ -223,7 +224,7 @@ export class PaymentController {
           };
         }
       } catch (clientError) {
-        console.error('Error fetching client data for invoice:', clientError);
+        logger.error('Error fetching client data for invoice:', clientError);
         // Continue with null clientData - will use fallback
       }
 
@@ -247,9 +248,9 @@ export class PaymentController {
           }
           
           // Log to verify logo exists
-          console.log(`Clinic ${clinic.name} has logo:`, !!clinic.logo);
+          logger.info(`Clinic ${clinic.name} has logo:`, !!clinic.logo);
           if (clinic.logo) {
-            console.log(`Logo details - contentType: ${clinic.logo.contentType}, filename: ${clinic.logo.filename}, data length: ${clinic.logo.data?.length || 0}`);
+            logger.info(`Logo details - contentType: ${clinic.logo.contentType}, filename: ${clinic.logo.filename}, data length: ${clinic.logo.data?.length || 0}`);
           }
           
           clinicData = {
@@ -269,7 +270,7 @@ export class PaymentController {
           };
         }
       } catch (clinicError) {
-        console.error('Error fetching clinic data for invoice:', clinicError);
+        logger.error('Error fetching clinic data for invoice:', clinicError);
         // Continue with null clinicData - will use fallback
       }
 
@@ -277,14 +278,14 @@ export class PaymentController {
       paymentData.clientData = clientData;
       paymentData.clinicData = clinicData;
 
-      console.log(`Successfully found payment: ${paymentData.paymentNumber}`);
+      logger.info(`Successfully found payment: ${paymentData.paymentNumber}`);
 
       res.json({
         success: true,
         data: paymentData
       });
     } catch (error) {
-      console.error('Error fetching payment:', error);
+      logger.error('Error fetching payment:', error);
 
       // Enhanced error handling
       if (error instanceof Error) {
@@ -351,7 +352,7 @@ export class PaymentController {
         }
       });
     } catch (error) {
-      console.error('Error fetching clinic payments:', error);
+      logger.error('Error fetching clinic payments:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch clinic payments',
@@ -384,7 +385,7 @@ export class PaymentController {
         data: payments
       });
     } catch (error) {
-      console.error('Error fetching client payments:', error);
+      logger.error('Error fetching client payments:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch client payments',
@@ -422,7 +423,7 @@ export class PaymentController {
         referringNo
       } = req.body;
 
-      console.log('Creating payment with data:', JSON.stringify({ clientId, clinicName, paymentMethod, paymentType, amounts }));
+      logger.info('Creating payment with data:', JSON.stringify({ clientId, clinicName, paymentMethod, paymentType, amounts }));
 
       // Validation
       if (!clientId || !clinicName || !paymentMethod || !paymentType || !amounts) {
@@ -520,7 +521,7 @@ export class PaymentController {
 
       const savedPayment = await payment.save();
 
-      console.log('Payment created successfully:', savedPayment._id, savedPayment.paymentNumber);
+      logger.info('Payment created successfully:', savedPayment._id, savedPayment.paymentNumber);
 
       res.status(201).json({
         success: true,
@@ -528,7 +529,7 @@ export class PaymentController {
         data: savedPayment
       });
     } catch (error) {
-      console.error('Error creating payment:', error);
+      logger.error('Error creating payment:', error);
 
       // Handle validation errors
       if (error instanceof Error) {
@@ -575,7 +576,7 @@ export class PaymentController {
         return;
       }
 
-      console.log('Updating payment:', id, 'with data:', JSON.stringify(updateData));
+      logger.info('Updating payment:', id, 'with data:', JSON.stringify(updateData));
 
       // Validate amounts if provided
       if (updateData.amounts) {
@@ -624,7 +625,7 @@ export class PaymentController {
         return;
       }
 
-      console.log('Payment updated successfully:', payment._id, 'Status:', payment.status);
+      logger.info('Payment updated successfully:', payment._id, 'Status:', payment.status);
 
       res.json({
         success: true,
@@ -632,7 +633,7 @@ export class PaymentController {
         data: payment
       });
     } catch (error) {
-      console.error('Error updating payment:', error);
+      logger.error('Error updating payment:', error);
       
       // Handle validation errors
       if (error instanceof Error && error.name === 'ValidationError') {
@@ -691,7 +692,7 @@ export class PaymentController {
         message: 'Payment deleted successfully'
       });
     } catch (error) {
-      console.error('Error deleting payment:', error);
+      logger.error('Error deleting payment:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to delete payment',
@@ -745,7 +746,7 @@ export class PaymentController {
         data: payment
       });
     } catch (error) {
-      console.error('Error adding payment amount:', error);
+      logger.error('Error adding payment amount:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to add payment amount',
@@ -799,7 +800,7 @@ export class PaymentController {
         data: refundedPayment
       });
     } catch (error) {
-      console.error('Error processing refund:', error);
+      logger.error('Error processing refund:', error);
       res.status(500).json({
         success: false,
         message: error instanceof Error ? error.message : 'Failed to process refund',
@@ -845,7 +846,7 @@ export class PaymentController {
         }
       });
     } catch (error) {
-      console.error('Error fetching payment stats:', error);
+      logger.error('Error fetching payment stats:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch payment statistics',
@@ -898,7 +899,7 @@ export class PaymentController {
         }
       });
     } catch (error) {
-      console.error('Error fetching outstanding payments:', error);
+      logger.error('Error fetching outstanding payments:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch outstanding payments',
@@ -940,7 +941,7 @@ export class PaymentController {
         }
       });
     } catch (error) {
-      console.error('Error fetching revenue data:', error);
+      logger.error('Error fetching revenue data:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch revenue data',
@@ -988,7 +989,7 @@ export class PaymentController {
         }
       });
     } catch (error) {
-      console.error('Error fetching account summary:', error);
+      logger.error('Error fetching account summary:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch account summary',
@@ -1036,7 +1037,7 @@ export class PaymentController {
         }
       });
     } catch (error) {
-      console.error('Error fetching payment summary:', error);
+      logger.error('Error fetching payment summary:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch payment summary',
@@ -1082,7 +1083,7 @@ export class PaymentController {
         }
       });
     } catch (error) {
-      console.error('Error fetching client payment history:', error);
+      logger.error('Error fetching client payment history:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch client payment history',
@@ -1121,7 +1122,7 @@ export class PaymentController {
         }
       });
     } catch (error) {
-      console.error('Error fetching aging report:', error);
+      logger.error('Error fetching aging report:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch aging report',
@@ -1156,7 +1157,7 @@ export class PaymentController {
         data: payment
       });
     } catch (error) {
-      console.error('Error disputing payment:', error);
+      logger.error('Error disputing payment:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to dispute payment',

@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import PDFDocument from 'pdfkit';
 import { ClinicModel } from '../models/Clinic';
 import { InvoiceTemplateModel } from '../models/InvoiceTemplate';
+import { logger } from '@/utils/logger';
 
 interface InvoiceData {
   invoiceNumber: string;
@@ -615,7 +616,7 @@ export class InvoiceService {
         const fallbackTemplate = await mongoose.connection.collection('invoice_templates').findOne({
           clinicName: clinic.name
         });
-        console.warn(`Using fallback template for clinic: ${clinic.name}`);
+        logger.warn(`Using fallback template for clinic: ${clinic.name}`);
       }
       
       // Generate invoice number
@@ -668,7 +669,7 @@ export class InvoiceService {
         currencySymbol: invoiceTemplate?.currencySymbol || '$'
       };
     } catch (error) {
-      console.error('Error building invoice data:', error);
+      logger.error('Error building invoice data:', error);
       return null;
     }
   }
@@ -739,7 +740,7 @@ export class InvoiceService {
         const logoBuffer = Buffer.from(clinicWithLogo.logo.data, 'base64');
         doc.image(logoBuffer, 50, 50, { width: 150, fit: [150, 80] });
       } catch (error) {
-        console.error('Error embedding logo:', error);
+        logger.error('Error embedding logo:', error);
       }
     }
     

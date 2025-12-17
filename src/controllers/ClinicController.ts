@@ -5,6 +5,7 @@ import { ClientModel } from '../models/Client';
 import { AppointmentModel } from '../models/Appointment';
 import Order from '../models/Order';
 import { asyncHandler } from '../utils/asyncHandler';
+import { logger } from '../utils/logger';
 
 export class ClinicController {
 
@@ -37,7 +38,7 @@ export class ClinicController {
       // Get retained clinics from MongoDB
       const retainedClinics = await ClinicModel.findRetainedClinics();
 
-      console.log(`📊 Processing ${retainedClinics.length} retained clinics`);
+      logger.info(`📊 Processing ${retainedClinics.length} retained clinics`);
 
       // Transform to frontend-compatible format with real stats
       const clinicsData = await Promise.all(retainedClinics.map(async (clinic) => {
@@ -80,7 +81,7 @@ export class ClinicController {
             lastActivity = latestAppointment.startDate;
           }
         } catch (statsError) {
-          console.error(`Error calculating stats for clinic ${clinic.name}:`, statsError);
+          logger.error(`Error calculating stats for clinic ${clinic.name}:`, statsError);
         }
         
         return {

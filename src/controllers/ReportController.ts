@@ -6,6 +6,7 @@ import Product from '../models/Product';
 import { ClientModel } from '../models/Client';
 import { AppointmentModel } from '../models/Appointment';
 import { PaymentModel } from '../models/Payment';
+import { logger } from '../utils/logger';
 
 // Temporary Payment interface (until Payment model is created)
 interface Payment {
@@ -310,7 +311,7 @@ export class ReportController {
       });
 
     } catch (error) {
-      console.error('Account summary report error:', error);
+      logger.error('Account summary report error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -396,7 +397,7 @@ export class ReportController {
       });
 
     } catch (error) {
-      console.error('Client statistics error:', error);
+      logger.error('Client statistics error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -498,7 +499,7 @@ export class ReportController {
       });
 
     } catch (error) {
-      console.error('Payment summary report error:', error);
+      logger.error('Payment summary report error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -678,7 +679,7 @@ export class ReportController {
       });
 
     } catch (error) {
-      console.error('Timesheet report error:', error);
+      logger.error('Timesheet report error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -771,7 +772,7 @@ export class ReportController {
       });
 
     } catch (error) {
-      console.error('Order status report error:', error);
+      logger.error('Order status report error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -893,7 +894,7 @@ export class ReportController {
       });
 
     } catch (error) {
-      console.error('Co-pay summary report error:', error);
+      logger.error('Co-pay summary report error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -1017,7 +1018,7 @@ export class ReportController {
       });
 
     } catch (error) {
-      console.error('Marketing budget report error:', error);
+      logger.error('Marketing budget report error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -1097,7 +1098,7 @@ export class ReportController {
       });
 
     } catch (error) {
-      console.error('Available reports error:', error);
+      logger.error('Available reports error:', error);
       return res.status(500).json({
         success: false,
         error: {

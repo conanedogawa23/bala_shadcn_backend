@@ -3,6 +3,7 @@ import Order, { IOrder, OrderStatus, PaymentStatus } from '../models/Order';
 import Product from '../models/Product';
 import { ClinicService } from '../services/ClinicService';
 import { OrderService } from '../services/OrderService';
+import { logger } from '../utils/logger';
 
 interface OrderQuery {
   page?: string;
@@ -121,7 +122,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      logger.error('Error fetching orders:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch orders',
@@ -166,7 +167,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching order:', error);
+      logger.error('Error fetching order:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch order',
@@ -211,7 +212,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching client orders:', error);
+      logger.error('Error fetching client orders:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch client orders',
@@ -297,7 +298,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching clinic orders:', error);
+      logger.error('Error fetching clinic orders:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch clinic orders',
@@ -427,7 +428,7 @@ export class OrderController {
 
       res.status(201).json(response);
     } catch (error) {
-      console.error('Error creating order:', error);
+      logger.error('Error creating order:', error);
       
       // Handle validation errors specifically
       if (error instanceof Error && error.name === 'ValidationError') {
@@ -464,7 +465,7 @@ export class OrderController {
       }
 
       // Log the update attempt for debugging
-      console.log('Updating order:', id, 'with data:', JSON.stringify(updateData));
+      logger.info('Updating order:', id, 'with data:', JSON.stringify(updateData));
 
       // Remove fields that shouldn't be updated directly
       delete updateData.orderNumber;
@@ -528,7 +529,7 @@ export class OrderController {
       }
 
       // Log successful update
-      console.log('Order updated successfully:', order._id, 'New status:', order.status, 'Payment status:', order.paymentStatus);
+      logger.info('Order updated successfully:', order._id, 'New status:', order.status, 'Payment status:', order.paymentStatus);
 
       const response: OrderResponse = {
         success: true,
@@ -538,7 +539,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error updating order:', error);
+      logger.error('Error updating order:', error);
       
       // Handle validation errors
       if (error instanceof Error && error.name === 'ValidationError') {
@@ -605,7 +606,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error updating order status:', error);
+      logger.error('Error updating order status:', error);
       res.status(400).json({
         success: false,
         message: error instanceof Error ? error.message : 'Failed to update order status'
@@ -651,7 +652,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error marking order for billing:', error);
+      logger.error('Error marking order for billing:', error);
       res.status(400).json({
         success: false,
         message: error instanceof Error ? error.message : 'Failed to mark order for billing'
@@ -706,7 +707,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error processing payment:', error);
+      logger.error('Error processing payment:', error);
       res.status(400).json({
         success: false,
         message: error instanceof Error ? error.message : 'Failed to process payment'
@@ -735,7 +736,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching orders ready for billing:', error);
+      logger.error('Error fetching orders ready for billing:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch orders ready for billing',
@@ -768,7 +769,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching overdue orders:', error);
+      logger.error('Error fetching overdue orders:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch overdue orders',
@@ -917,7 +918,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching revenue analytics:', error);
+      logger.error('Error fetching revenue analytics:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch revenue analytics',
@@ -1054,7 +1055,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching product performance:', error);
+      logger.error('Error fetching product performance:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch product performance',
@@ -1107,7 +1108,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error cancelling order:', error);
+      logger.error('Error cancelling order:', error);
       res.status(400).json({
         success: false,
         message: error instanceof Error ? error.message : 'Failed to cancel order'
@@ -1146,7 +1147,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error generating order status report:', error);
+      logger.error('Error generating order status report:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to generate order status report',
@@ -1194,7 +1195,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching client order details:', error);
+      logger.error('Error fetching client order details:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch client order details',
@@ -1228,7 +1229,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error marking orders for billing:', error);
+      logger.error('Error marking orders for billing:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to mark orders for billing',
@@ -1266,7 +1267,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching orders pending refund:', error);
+      logger.error('Error fetching orders pending refund:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch orders pending refund',
@@ -1305,7 +1306,7 @@ export class OrderController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching product service history:', error);
+      logger.error('Error fetching product service history:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch product service history',
@@ -1346,7 +1347,7 @@ export class OrderController {
         res.status(200).json(response);
       }
     } catch (error) {
-      console.error('Error exporting orders report:', error);
+      logger.error('Error exporting orders report:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to export orders report',

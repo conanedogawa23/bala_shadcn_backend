@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import User, { IUser, UserRole, UserStatus } from '../models/User';
+import { logger } from '../utils/logger';
 
 // Extended Request interface for authenticated requests
 export interface AuthRequest extends Request {
@@ -187,7 +188,7 @@ export class AuthController {
       });
 
     } catch (error) {
-      console.error('Registration error:', error);
+      logger.error('Registration error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -299,7 +300,7 @@ export class AuthController {
       });
 
     } catch (error) {
-      console.error('Login error:', error);
+      logger.error('Login error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -388,7 +389,7 @@ export class AuthController {
       });
 
     } catch (error) {
-      console.error('Token refresh error:', error);
+      logger.error('Token refresh error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -405,7 +406,7 @@ export class AuthController {
    */
   static async logout(req: AuthRequest, res: Response): Promise<Response> {
     try {
-      console.log('[LOGOUT] ========== BACKEND LOGOUT START ==========');
+      logger.info('[LOGOUT] ========== BACKEND LOGOUT START ==========');
       
       const refreshToken = req.body.refreshToken; // Token now comes from request body, not cookies
       const deviceId = req.deviceId;
@@ -420,7 +421,7 @@ export class AuthController {
         }
         
         await req.user.save();
-        console.log('[LOGOUT] User session revoked from database');
+        logger.info('[LOGOUT] User session revoked from database');
       }
 
       // Clear any remaining session cookies (but NOT auth tokens, they're in localStorage now)
@@ -432,7 +433,7 @@ export class AuthController {
         res.clearCookie(cookieName, { path: '/', secure: process.env.NODE_ENV === 'production' });
       }
 
-      console.log('[LOGOUT] ========== BACKEND LOGOUT COMPLETE ==========');
+      logger.info('[LOGOUT] ========== BACKEND LOGOUT COMPLETE ==========');
 
       return res.status(200).json({
         success: true,
@@ -440,7 +441,7 @@ export class AuthController {
       });
 
     } catch (error) {
-      console.error('Logout error:', error);
+      logger.error('Logout error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -497,7 +498,7 @@ export class AuthController {
       });
 
     } catch (error) {
-      console.error('Logout all error:', error);
+      logger.error('Logout all error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -535,7 +536,7 @@ export class AuthController {
       });
 
     } catch (error) {
-      console.error('Get profile error:', error);
+      logger.error('Get profile error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -617,7 +618,7 @@ export class AuthController {
       });
 
     } catch (error) {
-      console.error('Change password error:', error);
+      logger.error('Change password error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -667,7 +668,7 @@ export class AuthController {
       });
 
     } catch (error) {
-      console.error('Forgot password error:', error);
+      logger.error('Forgot password error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -745,7 +746,7 @@ export class AuthController {
       });
 
     } catch (error) {
-      console.error('Reset password error:', error);
+      logger.error('Reset password error:', error);
       return res.status(500).json({
         success: false,
         error: {
@@ -803,7 +804,7 @@ export class AuthController {
       });
 
     } catch (error) {
-      console.error('Email verification error:', error);
+      logger.error('Email verification error:', error);
       return res.status(500).json({
         success: false,
         error: {

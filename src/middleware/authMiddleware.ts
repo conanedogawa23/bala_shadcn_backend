@@ -4,6 +4,7 @@ import User, { IUser, UserRole, IUserPermissions } from '../models/User';
 import { ClinicModel } from '../models/Clinic';
 import { AuthRequest } from '../controllers/AuthController';
 import { Types } from 'mongoose';
+import { logger } from '@/utils/logger';
 
 // JWT Payload interface
 interface JWTPayload {
@@ -125,7 +126,7 @@ export const authenticate = async (
     next();
 
   } catch (error) {
-    console.error('Authentication middleware error:', error);
+    logger.error('Authentication middleware error:', error);
     return res.status(500).json({
       success: false,
       error: {
@@ -359,12 +360,12 @@ export const trackActivity = async (
         try {
           await req.user!.updateLastActivity();
         } catch (error) {
-          console.error('Failed to update user activity:', error);
+          logger.error('Failed to update user activity:', error);
         }
       });
     } catch (error) {
       // Don't fail the request if activity tracking fails
-      console.error('Activity tracking error:', error);
+      logger.error('Activity tracking error:', error);
     }
   }
   
@@ -403,7 +404,7 @@ export const verifyClinicExists = async (
 
     next();
   } catch (error) {
-    console.error('Clinic verification error:', error);
+    logger.error('Clinic verification error:', error);
     return res.status(500).json({
       success: false,
       error: {

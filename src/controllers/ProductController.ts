@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import Product, { IProduct, ProductCategory, ProductStatus } from '../models/Product';
+import { logger } from '../utils/logger';
 
 interface ProductQuery {
   page?: string;
@@ -107,7 +108,7 @@ export class ProductController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      logger.error('Error fetching products:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch products',
@@ -155,7 +156,7 @@ export class ProductController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching product:', error);
+      logger.error('Error fetching product:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch product',
@@ -188,7 +189,7 @@ export class ProductController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching clinic products:', error);
+      logger.error('Error fetching clinic products:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch clinic products',
@@ -224,7 +225,7 @@ export class ProductController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching category products:', error);
+      logger.error('Error fetching category products:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch category products',
@@ -252,7 +253,7 @@ export class ProductController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching popular products:', error);
+      logger.error('Error fetching popular products:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch popular products',
@@ -293,7 +294,7 @@ export class ProductController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error searching products:', error);
+      logger.error('Error searching products:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to search products',
@@ -384,7 +385,7 @@ export class ProductController {
 
       res.status(201).json(response);
     } catch (error) {
-      console.error('Error creating product:', error);
+      logger.error('Error creating product:', error);
       
       // Handle Mongoose validation errors
       if (error instanceof Error) {
@@ -462,7 +463,7 @@ export class ProductController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error updating product:', error);
+      logger.error('Error updating product:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to update product',
@@ -519,7 +520,7 @@ export class ProductController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error deactivating product:', error);
+      logger.error('Error deactivating product:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to deactivate product',
@@ -557,7 +558,7 @@ export class ProductController {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error('Error fetching product analytics:', error);
+      logger.error('Error fetching product analytics:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch product analytics',
