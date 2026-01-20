@@ -582,7 +582,7 @@ export class ReportController {
 
       // Map revenue to practitioners based on appointment
       for (const order of relatedOrders) {
-        const appt = appointments.find((a: any) => a._id.toString() === order.appointmentId?.toString());
+        const appt = appointments.find((a: any) => String(a._id) === order.appointmentId?.toString());
         if (appt && resourceStats.has(appt.resourceId)) {
           resourceStats.get(appt.resourceId).revenue += order.totalAmount || 0;
         }
@@ -622,7 +622,7 @@ export class ReportController {
         const activeSessions = sessionsInRange.filter((s: any) => s.isActive).length;
 
         return {
-          userId: user._id.toString(),
+          userId: String(user._id),
           username: user.username,
           fullName: `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim() || user.username,
           role: user.role,
@@ -745,7 +745,7 @@ export class ReportController {
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .slice(0, 20)
         .map(order => ({
-          orderId: order._id.toString(),
+          orderId: String(order._id),
           orderNumber: order.orderNumber || '',
           clientName: (order.clientId && typeof order.clientId === 'object' && (order.clientId as any).profile) ? 
             `${(order.clientId as any).profile.firstName} ${(order.clientId as any).profile.lastName}` : 

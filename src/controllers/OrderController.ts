@@ -3,6 +3,8 @@ import Order, { IOrder, OrderStatus, PaymentStatus } from '../models/Order';
 import Product from '../models/Product';
 import { ClinicService } from '../services/ClinicService';
 import { OrderService } from '../services/OrderService';
+import NotificationService from '../services/NotificationService';
+import { NotificationType, NotificationCategory, NotificationAction } from '../models/Notification';
 import { logger } from '../utils/logger';
 
 interface OrderQuery {
@@ -420,6 +422,27 @@ export class OrderController {
 
       await order.save();
 
+      // Create notification for order creation
+      try {
+        await NotificationService.createNotification({
+          type: NotificationType.SUCCESS,
+          category: NotificationCategory.ORDER,
+          action: NotificationAction.CREATED,
+          title: 'New Order Created',
+          message: `Order ${order.orderNumber || ''} created for ${order.clientName || 'client'}`,
+          clinicName: order.clinicName,
+          entityId: String(order._id),
+          entityType: 'Order',
+          metadata: {
+            orderNumber: order.orderNumber,
+            clientName: order.clientName,
+            amount: order.totalAmount
+          }
+        });
+      } catch (notifError) {
+        logger.error('Failed to create notification for order:', notifError);
+      }
+
       const response: OrderResponse = {
         success: true,
         data: order,
@@ -531,6 +554,27 @@ export class OrderController {
       // Log successful update
       logger.info('Order updated successfully:', order._id, 'New status:', order.status, 'Payment status:', order.paymentStatus);
 
+      // Create notification for order update
+      try {
+        await NotificationService.createNotification({
+          type: NotificationType.INFO,
+          category: NotificationCategory.ORDER,
+          action: NotificationAction.UPDATED,
+          title: 'Order Updated',
+          message: `Order ${order.orderNumber || ''} has been updated`,
+          clinicName: order.clinicName,
+          entityId: String(order._id),
+          entityType: 'Order',
+          metadata: {
+            orderNumber: order.orderNumber,
+            clientName: order.clientName,
+            amount: order.totalAmount
+          }
+        });
+      } catch (notifError) {
+        logger.error('Failed to create notification for order update:', notifError);
+      }
+
       const response: OrderResponse = {
         success: true,
         data: order,
@@ -597,6 +641,34 @@ export class OrderController {
       }
 
       await order.updateStatus(status);
+
+      // Create notification for status change
+      try {
+        const notifType = status === OrderStatus.COMPLETED ? NotificationType.SUCCESS :
+                         status === OrderStatus.CANCELLED ? NotificationType.WARNING :
+                         NotificationType.INFO;
+        const notifAction = status === OrderStatus.COMPLETED ? NotificationAction.COMPLETED :
+                           status === OrderStatus.CANCELLED ? NotificationAction.CANCELLED :
+                           NotificationAction.STATUS_CHANGED;
+        
+        await NotificationService.createNotification({
+          type: notifType,
+          category: NotificationCategory.ORDER,
+          action: notifAction,
+          title: `Order ${status === OrderStatus.COMPLETED ? 'Completed' : status === OrderStatus.CANCELLED ? 'Cancelled' : 'Status Changed'}`,
+          message: `Order ${order.orderNumber || ''} status changed to ${status}`,
+          clinicName: order.clinicName,
+          entityId: String(order._id),
+          entityType: 'Order',
+          metadata: {
+            orderNumber: order.orderNumber,
+            clientName: order.clientName,
+            newStatus: status
+          }
+        });
+      } catch (notifError) {
+        logger.error('Failed to create notification for order status change:', notifError);
+      }
 
       const response: OrderResponse = {
         success: true,

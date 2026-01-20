@@ -15,6 +15,7 @@ import authRoutes from './auth-routes';
 import userRoutes from './user-routes';
 import reportRoutes from './report-routes';
 import invoiceRoutes from './invoice-routes';
+import notificationRoutes from './notification-routes';
 import { authenticate, optionalAuthenticate, trackActivity } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -57,7 +58,8 @@ router.get('/', (req: Request, res: Response) => {
       products: '/api/v1/products',
       orders: '/api/v1/orders',
       payments: '/api/v1/payments',
-      reports: '/api/v1/reports'
+      reports: '/api/v1/reports',
+      notifications: '/api/v1/notifications'
     }
   });
 });
@@ -357,5 +359,6 @@ router.use('/insurance-addresses', authenticate, trackActivity, insuranceCompany
 router.use('/advanced-billing', authenticate, trackActivity, advancedBillingRoutes);
 router.use('/insurance-reference', authenticate, trackActivity, insuranceReferenceRoutes);
 router.use('/invoices', authenticate, trackActivity, invoiceRoutes);
+router.use('/notifications', authenticate, trackActivity, notificationRoutes); // PROTECTED - Notification management
 
 export default router;

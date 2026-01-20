@@ -4,6 +4,8 @@ import { AppointmentService } from '../services/AppointmentService';
 import { AppointmentView } from '../views/AppointmentView';
 import { asyncHandler } from '../utils/asyncHandler';
 import { validateRequiredString } from '../utils/mongooseHelpers';
+import NotificationService from '../services/NotificationService';
+import { NotificationType, NotificationCategory, NotificationAction } from '../models/Notification';
 
 export class AppointmentController {
   /**
@@ -150,6 +152,27 @@ export class AppointmentController {
     // Call service layer
     const appointment = await AppointmentService.createAppointment(req.body);
 
+    // Create notification for appointment creation
+    try {
+      await NotificationService.createNotification({
+        type: NotificationType.SUCCESS,
+        category: NotificationCategory.APPOINTMENT,
+        action: NotificationAction.CREATED,
+        title: 'New Appointment Scheduled',
+        message: `Appointment scheduled for ${appointment.subject || 'client'}`,
+        clinicName: appointment.clinicName,
+        entityId: String(appointment._id),
+        entityType: 'Appointment',
+        metadata: {
+          appointmentId: appointment.appointmentId || appointment.id,
+          clientName: appointment.subject,
+          startDate: appointment.startDate.toISOString()
+        }
+      });
+    } catch (notifError) {
+      // Don't fail appointment creation if notification fails
+    }
+
     // Format response
     const response = AppointmentView.formatAppointment(appointment);
     return res.status(201).json(response);
@@ -171,6 +194,26 @@ export class AppointmentController {
 
     // Call service layer
     const appointment = await AppointmentService.updateAppointment(validId, req.body);
+
+    // Create notification for appointment update
+    try {
+      await NotificationService.createNotification({
+        type: NotificationType.INFO,
+        category: NotificationCategory.APPOINTMENT,
+        action: NotificationAction.UPDATED,
+        title: 'Appointment Updated',
+        message: `Appointment for ${appointment.subject || 'client'} has been updated`,
+        clinicName: appointment.clinicName,
+        entityId: String(appointment._id),
+        entityType: 'Appointment',
+        metadata: {
+          appointmentId: appointment.appointmentId || appointment.id,
+          clientName: appointment.subject
+        }
+      });
+    } catch (notifError) {
+      // Don't fail update if notification fails
+    }
 
     // Format response
     const response = AppointmentView.formatAppointment(appointment);
@@ -233,8 +276,32 @@ export class AppointmentController {
     const validId = validateRequiredString(id, 'Appointment ID');
     const { reason } = req.body;
 
+    // Get appointment before cancellation for notification
+    const appointment = await AppointmentService.getAppointmentById(validId);
+
     // Call service layer
     await AppointmentService.cancelAppointment(validId, reason);
+
+    // Create notification for appointment cancellation
+    try {
+      await NotificationService.createNotification({
+        type: NotificationType.WARNING,
+        category: NotificationCategory.APPOINTMENT,
+        action: NotificationAction.CANCELLED,
+        title: 'Appointment Cancelled',
+        message: `Appointment for ${appointment.subject || 'client'} has been cancelled${reason ? `: ${reason}` : ''}`,
+        clinicName: appointment.clinicName,
+        entityId: String(appointment._id),
+        entityType: 'Appointment',
+        metadata: {
+          appointmentId: appointment.appointmentId || appointment.id,
+          clientName: appointment.subject,
+          reason: reason || ''
+        }
+      });
+    } catch (notifError) {
+      // Don't fail cancellation if notification fails
+    }
 
     // Format response
     const response = AppointmentView.formatSuccess('Appointment cancelled successfully');
@@ -301,6 +368,26 @@ export class AppointmentController {
 
     // Call service layer
     const appointment = await AppointmentService.completeAppointment(validId, notes);
+
+    // Create notification for appointment completion
+    try {
+      await NotificationService.createNotification({
+        type: NotificationType.SUCCESS,
+        category: NotificationCategory.APPOINTMENT,
+        action: NotificationAction.COMPLETED,
+        title: 'Appointment Completed',
+        message: `Appointment for ${appointment.subject || 'client'} has been completed`,
+        clinicName: appointment.clinicName,
+        entityId: String(appointment._id),
+        entityType: 'Appointment',
+        metadata: {
+          appointmentId: appointment.appointmentId || appointment.id,
+          clientName: appointment.subject
+        }
+      });
+    } catch (notifError) {
+      // Don't fail completion if notification fails
+    }
 
     // Format response
     const response = AppointmentView.formatAppointment(appointment);

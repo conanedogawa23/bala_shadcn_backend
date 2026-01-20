@@ -434,7 +434,7 @@ ProductSchema.methods.getFormattedInfo = function (): any {
 ProductSchema.methods.toFHIRResource = function (): any {
   const fhirResource = {
     resourceType: this.resourceType,
-    id: this._id.toString(),
+    id: String(this._id),
     identifier: this.identifier,
     code: this.code,
     status: this.status === ProductStatus.ACTIVE ? 'active' : 'inactive',

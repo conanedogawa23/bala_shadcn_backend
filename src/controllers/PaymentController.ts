@@ -5,6 +5,8 @@ import { ClientModel } from '../models/Client';
 import { ClinicModel } from '../models/Clinic';
 import { ClinicService } from '../services/ClinicService';
 import { PaymentService } from '../services/PaymentService';
+import NotificationService from '../services/NotificationService';
+import { NotificationType, NotificationCategory, NotificationAction } from '../models/Notification';
 import { logger } from '../utils/logger';
 
 // Extend Request interface to include user property
@@ -523,6 +525,30 @@ export class PaymentController {
 
       logger.info('Payment created successfully:', savedPayment._id, savedPayment.paymentNumber);
 
+      // Create notification for payment creation
+      try {
+        await NotificationService.createNotification({
+          type: NotificationType.SUCCESS,
+          category: NotificationCategory.PAYMENT,
+          action: NotificationAction.CREATED,
+          title: 'Payment Received',
+          message: `Payment ${savedPayment.paymentNumber || ''} of $${savedPayment.amounts.totalPaymentAmount.toFixed(2)} received${clientName ? ` from ${clientName}` : ''}`,
+          clinicName: clinicName,
+          entityId: String(savedPayment._id),
+          entityType: 'Payment',
+          metadata: {
+            paymentNumber: savedPayment.paymentNumber,
+            clientName: clientName || '',
+            amount: savedPayment.amounts.totalPaymentAmount,
+            paymentMethod: savedPayment.paymentMethod
+          },
+          createdBy: String(req.user._id)
+        });
+      } catch (notifError) {
+        logger.error('Failed to create notification for payment:', notifError);
+        // Don't fail the payment creation if notification fails
+      }
+
       res.status(201).json({
         success: true,
         message: 'Payment created successfully',
@@ -627,6 +653,28 @@ export class PaymentController {
 
       logger.info('Payment updated successfully:', payment._id, 'Status:', payment.status);
 
+      // Create notification for payment update
+      try {
+        await NotificationService.createNotification({
+          type: NotificationType.INFO,
+          category: NotificationCategory.PAYMENT,
+          action: NotificationAction.UPDATED,
+          title: 'Payment Updated',
+          message: `Payment ${payment.paymentNumber || ''} has been updated`,
+          clinicName: payment.clinicName,
+          entityId: String(payment._id),
+          entityType: 'Payment',
+          metadata: {
+            paymentNumber: payment.paymentNumber,
+            clientName: payment.clientName || '',
+            amount: payment.amounts.totalPaymentAmount
+          },
+          createdBy: req.user?._id ? String(req.user._id) : undefined
+        });
+      } catch (notifError) {
+        logger.error('Failed to create notification for payment update:', notifError);
+      }
+
       res.json({
         success: true,
         message: 'Payment updated successfully',
@@ -685,6 +733,28 @@ export class PaymentController {
           message: 'Payment not found'
         });
         return;
+      }
+
+      // Create notification for payment deletion
+      try {
+        await NotificationService.createNotification({
+          type: NotificationType.WARNING,
+          category: NotificationCategory.PAYMENT,
+          action: NotificationAction.DELETED,
+          title: 'Payment Deleted',
+          message: `Payment ${payment.paymentNumber || ''} has been deleted`,
+          clinicName: payment.clinicName,
+          entityId: String(payment._id),
+          entityType: 'Payment',
+          metadata: {
+            paymentNumber: payment.paymentNumber,
+            clientName: payment.clientName || '',
+            amount: payment.amounts.totalPaymentAmount
+          },
+          createdBy: req.user?._id ? String(req.user._id) : undefined
+        });
+      } catch (notifError) {
+        logger.error('Failed to create notification for payment deletion:', notifError);
       }
 
       res.json({
