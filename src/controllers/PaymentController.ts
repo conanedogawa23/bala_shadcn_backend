@@ -73,15 +73,16 @@ export class PaymentController {
 
   /**
    * @route   GET /api/v1/payments
-   * @desc    Get all payments with filtering and pagination
+   * @desc    Get all payments with filtering, search, and pagination
    * @access  Private
-   * @params  page, limit, status, paymentMethod, paymentType, clinicName, clientId, orderNumber, orderId, startDate, endDate, outstanding
+   * @params  page, limit, search, status, paymentMethod, paymentType, clinicName, clientId, orderNumber, orderId, startDate, endDate, outstanding
    */
   static async getAllPayments(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const {
         page = 1,
         limit = 20,
+        search,
         status,
         paymentMethod,
         paymentType,
@@ -94,7 +95,19 @@ export class PaymentController {
         outstanding
       } = req.query;
 
+      const pageNum = Math.max(1, Number(page));
+      const limitNum = Math.min(100, Math.max(1, Number(limit)));
       const filter: any = {};
+
+      // Text search across multiple fields
+      if (search) {
+        const searchStr = (search as string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        filter.$or = [
+          { paymentNumber: new RegExp(searchStr, 'i') },
+          { clientName: new RegExp(searchStr, 'i') },
+          { orderNumber: new RegExp(searchStr, 'i') }
+        ];
+      }
 
       // Apply filters
       if (status) filter.status = status;
@@ -105,7 +118,7 @@ export class PaymentController {
         filter.clinicName = new RegExp(`^${(clinicName as string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
       }
       if (clientId) filter.clientId = Number(clientId);
-      if (orderNumber) filter.orderNumber = orderNumber as string;
+      if (orderNumber && !search) filter.orderNumber = orderNumber as string;
       if (orderId) {
         // Handle ObjectId filtering for orderId
         try {
@@ -124,29 +137,30 @@ export class PaymentController {
         if (endDate) filter.paymentDate.$lte = new Date(endDate as string);
       }
 
-      const skip = (Number(page) - 1) * Number(limit);
+      const skip = (pageNum - 1) * limitNum;
+      const totalPages = (total: number) => Math.ceil(total / limitNum);
 
       const [payments, total] = await Promise.all([
         PaymentModel.find(filter)
           .populate('orderId', 'orderNumber status clientId')
           .sort({ paymentDate: -1 })
           .skip(skip)
-          .limit(Number(limit)),
+          .limit(limitNum),
         PaymentModel.countDocuments(filter)
       ]);
 
-      const totalPages = Math.ceil(total / Number(limit));
+      const pages = totalPages(total);
 
       res.json({
         success: true,
         data: payments,
         pagination: {
-          currentPage: Number(page),
-          totalPages,
-          totalItems: total,
-          itemsPerPage: Number(limit),
-          hasNextPage: Number(page) < totalPages,
-          hasPrevPage: Number(page) > 1
+          page: pageNum,
+          limit: limitNum,
+          total,
+          pages,
+          hasNext: pageNum < pages,
+          hasPrev: pageNum > 1
         }
       });
     } catch (error) {
@@ -310,13 +324,14 @@ export class PaymentController {
 
   /**
    * @route   GET /api/v1/payments/clinic/:clinicName
-   * @desc    Get payments by clinic name
+   * @desc    Get payments by clinic name with search, filters, and pagination
    * @access  Private
+   * @params  page, limit, search, status, paymentMethod, startDate, endDate, outstanding
    */
   static async getPaymentsByClinic(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const { clinicName: rawClinicName } = req.params;
-      const { page = 1, limit = 20, status, outstanding } = req.query;
+      const { page = 1, limit = 20, search, status, paymentMethod, startDate, endDate, outstanding } = req.query;
 
       if (!rawClinicName) {
         res.status(400).json({
@@ -326,31 +341,58 @@ export class PaymentController {
         return;
       }
 
+      const pageNum = Math.max(1, Number(page));
+      const limitNum = Math.min(100, Math.max(1, Number(limit)));
+
       // Use clinic name directly
       const actualClinicName: string = rawClinicName;
 
       const filter: any = { clinicName: actualClinicName };
+
+      // Text search across payment number, client name, order number
+      if (search) {
+        const searchStr = (search as string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        filter.$or = [
+          { paymentNumber: new RegExp(searchStr, 'i') },
+          { clientName: new RegExp(searchStr, 'i') },
+          { orderNumber: new RegExp(searchStr, 'i') }
+        ];
+      }
+
       if (status) filter.status = status;
+      if (paymentMethod) filter.paymentMethod = paymentMethod;
       if (outstanding === 'true') filter['amounts.totalOwed'] = { $gt: 0 };
 
-      const skip = (Number(page) - 1) * Number(limit);
+      // Date range filter
+      if (startDate || endDate) {
+        filter.paymentDate = {};
+        if (startDate) filter.paymentDate.$gte = new Date(startDate as string);
+        if (endDate) filter.paymentDate.$lte = new Date(endDate as string);
+      }
+
+      const skip = (pageNum - 1) * limitNum;
 
       const [payments, total] = await Promise.all([
         PaymentModel.find(filter)
           .populate('orderId', 'orderNumber status')
           .sort({ paymentDate: -1 })
           .skip(skip)
-          .limit(Number(limit)),
+          .limit(limitNum),
         PaymentModel.countDocuments(filter)
       ]);
+
+      const pages = Math.ceil(total / limitNum);
 
       res.json({
         success: true,
         data: payments,
         pagination: {
-          currentPage: Number(page),
-          totalPages: Math.ceil(total / Number(limit)),
-          totalItems: total
+          page: pageNum,
+          limit: limitNum,
+          total,
+          pages,
+          hasNext: pageNum < pages,
+          hasPrev: pageNum > 1
         }
       });
     } catch (error) {

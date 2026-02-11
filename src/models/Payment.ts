@@ -269,6 +269,10 @@ PaymentSchema.index({ paymentMethod: 1, paymentType: 1 });
 PaymentSchema.index({ orderNumber: 1 });
 PaymentSchema.index({ 'amounts.totalOwed': 1 }); // For outstanding payments
 
+// Indexes for text search performance
+PaymentSchema.index({ paymentNumber: 1 });
+PaymentSchema.index({ clientName: 1 });
+
 // Helper function to generate unique payment ID
 function generatePaymentId(): string {
   // Generate a unique ID using timestamp + random characters
