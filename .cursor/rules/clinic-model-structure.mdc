@@ -4,38 +4,37 @@ alwaysApply: true
 
 # Clinic Model Structure and Field Mappings
 
-## CRITICAL: Model Uses MSSQL Field Names
+## CRITICAL: Model Uses Nested Document Structure
 
-The [src/models/Clinic.ts](mdc:src/models/Clinic.ts) uses MSSQL source field names directly:
+The [src/models/Clinic.ts](mdc:src/models/Clinic.ts) uses a nested address object, NOT flat MSSQL field names:
 
-### Correct Field Access (MSSQL Aligned):
+### Correct Field Access:
 ```typescript
-clinic.clinicId           // ✓ Primary key from MSSQL
-clinic.clinicName         // ✓ Name - from MSSQL
-clinic.clinicAddress      // ✓ Street address
-clinic.city               // ✓ City from MSSQL
-clinic.province           // ✓ Province from MSSQL
-clinic.postalCode         // ✓ PostalCode from MSSQL
-clinic.completeName       // ✓ Full name
-clinic.isRetainedClinic   // ✓ Business rule flag
-clinic.stats              // ✓ Computed analytics
-
-// Instance methods
-clinic.getDisplayName()   // ✓ Get formatted name
-clinic.getFullAddress()   // ✓ Get complete address
-clinic.isActive()         // ✓ Check if active
+clinic.clinicId           // Primary key from MSSQL
+clinic.name               // Main clinic identifier (string)
+clinic.displayName        // Human-readable name (string)
+clinic.address.street     // Street address (nested object)
+clinic.address.city       // City (nested object)
+clinic.address.province   // Province (nested object)
+clinic.address.postalCode // Postal code (nested object)
+clinic.isRetainedClinic   // Business rule flag (boolean)
+clinic.active             // FHIR active status (boolean)
+clinic.status             // Status string (active, historical, inactive)
+clinic.services           // Services offered (string array)
+clinic.type               // Organization type (string array)
 ```
 
-### ❌ WRONG - Old field names (don't exist):
+### WRONG - Old/incorrect field names (don't exist):
 ```typescript
-clinic.name               // ❌ USE clinicName INSTEAD
-clinic.displayName        // ❌ USE getDisplayName() INSTEAD
-clinic.address            // ❌ Use clinicAddress + city + province + postalCode
-clinic.telecom            // ❌ Not in current model
-clinic.contact            // ❌ Not in current model
-clinic.services           // ❌ Not in current model
-clinic.status             // ❌ USE stats INSTEAD
-clinic.clientCount        // ❌ Access via stats.totalClients
+clinic.clinicName         // USE clinic.name INSTEAD
+clinic.clinicAddress      // USE clinic.address.street INSTEAD
+clinic.city               // USE clinic.address.city INSTEAD
+clinic.province           // USE clinic.address.province INSTEAD
+clinic.postalCode         // USE clinic.address.postalCode INSTEAD
+clinic.completeName       // USE clinic.displayName INSTEAD
+clinic.getDisplayName()   // USE clinic.displayName INSTEAD (it's a field, not a method)
+clinic.telecom            // Not in current model
+clinic.contact            // Not in current model
 ```
 
 ## Controllers Must Use Correct Fields
@@ -43,21 +42,20 @@ clinic.clientCount        // ❌ Access via stats.totalClients
 [src/controllers/ClinicController.ts](mdc:src/controllers/ClinicController.ts) accessing clinic properties:
 
 ```typescript
-// ✓ CORRECT
-clinic.clinicName
-clinic.getDisplayName()
-clinic.clinicAddress
-clinic.city
-clinic.province
-clinic.isRetainedClinic
-
-// ❌ WRONG - These don't exist
+// CORRECT
 clinic.name
 clinic.displayName
-clinic.address
-clinic.telecom
-clinic.status
-clinic.clientCount
+clinic.address.street
+clinic.address.city
+clinic.address.province
+clinic.address.postalCode
+clinic.isRetainedClinic
+
+// WRONG - These don't exist as flat fields
+clinic.clinicName
+clinic.clinicAddress
+clinic.city              // Must use clinic.address.city
+clinic.province          // Must use clinic.address.province
 ```
 
 ## Views Must Use Correct Fields
@@ -65,45 +63,44 @@ clinic.clientCount
 [src/views/ClinicView.ts](mdc:src/views/ClinicView.ts) formatting clinic data:
 
 ```typescript
-// ✓ CORRECT response format
+// CORRECT response format
 {
   id: clinic.clinicId,
-  name: clinic.clinicName,              // Use clinicName from model
-  displayName: clinic.getDisplayName(),  // Use method
-  address: clinic.clinicAddress,        // Use clinicAddress
-  city: clinic.city,
-  province: clinic.province,
-  stats: clinic.stats
-}
-
-// ❌ WRONG
-{
-  name: clinic.name,                // Doesn't exist
-  displayName: clinic.displayName,  // Doesn't exist
-  address: clinic.address,          // Doesn't exist
+  name: clinic.name,
+  displayName: clinic.displayName,
+  address: {
+    street: clinic.address.street,
+    city: clinic.address.city,
+    province: clinic.address.province,
+    postalCode: clinic.address.postalCode
+  },
+  isRetainedClinic: clinic.isRetainedClinic,
+  active: clinic.active
 }
 ```
 
 ## Property Mapping Summary
 
-| Controller/View Access | Model Field | Type | Notes |
-|------------------------|------------|------|-------|
-| name | clinicName | string | Actual clinic name from MSSQL |
-| displayName() | getDisplayName() | method | Returns formatted name |
-| address | clinicAddress | string | Street address only |
-| city | city | string | City name |
-| province | province | string | Province/state |
-| status | stats.* | object | Use stats object |
-| clientCount | stats.totalClients | number | From stats object |
-| address array | N/A - Use individual fields | - | Model flattens address |
+| API Response Field | Model Field | Type | Notes |
+|---|---|---|---|
+| name | name | string | Main clinic name |
+| displayName | displayName | string | Human-readable name |
+| address.street | address.street | string | Street address |
+| address.city | address.city | string | City name |
+| address.province | address.province | string | Province/state |
+| address.postalCode | address.postalCode | string | Postal code |
+| active | active | boolean | FHIR active status |
+| isRetainedClinic | isRetainedClinic | boolean | Business rule flag |
 
-## Required Fixes
+## Migration Field Mapping (MSSQL to MongoDB)
 
-All references to these **must be updated**:
-- `clinic.name` → `clinic.clinicName`
-- `clinic.displayName` → `clinic.getDisplayName()`
-- `clinic.address` → `clinic.clinicAddress` (for street only)
-- `clinic.telecom` → REMOVED (not in model)
-- `clinic.contact` → REMOVED (not in model)
-- `clinic.status` → `clinic.stats`
-- `clinic.clientCount` → `clinic.stats.totalClients`
+| MSSQL Column | MongoDB Field |
+|---|---|
+| ClinicId | clinicId |
+| ClinicName | name |
+| CompleteName | displayName |
+| ClinicAddress | address.street |
+| City | address.city |
+| Province | address.province |
+| PostalCode | address.postalCode |
+| IsRetainedClinic | isRetainedClinic |

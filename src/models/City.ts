@@ -18,7 +18,7 @@ export interface ICity extends Document {
   
   // Administrative
   createdAt: Date;
-  modifiedAt?: Date;
+  updatedAt?: Date;
 }
 
 const CitySchema = new Schema<ICity>({
@@ -80,17 +80,10 @@ const CitySchema = new Schema<ICity>({
       index: true
     }
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    index: true
-  },
-  modifiedAt: {
-    type: Date,
-    index: true
-  }
+  // createdAt and updatedAt managed by timestamps: true
 }, {
-  timestamps: true,
+  id: false, // Disable Mongoose virtual 'id' getter to avoid shadowing explicit id: Number field
+  timestamps: true, // Auto-manages createdAt and updatedAt
   collection: 'cities'
 });
 
@@ -115,7 +108,7 @@ CitySchema.methods.updateStats = function(type: 'client' | 'clinic', increment =
   }
   
   this.stats.lastUsed = new Date();
-  this.modifiedAt = new Date();
+  this.updatedAt = new Date();
 };
 
 CitySchema.methods.getFullName = function(): string {
@@ -176,9 +169,7 @@ CitySchema.statics.getCityStats = function() {
 
 // Pre-save middleware
 CitySchema.pre('save', function(next) {
-  if (this.isModified() && !this.isNew) {
-    this.modifiedAt = new Date();
-  }
+  // updatedAt is auto-managed by timestamps: true
   
   // Normalize city name and province
   if (this.cityName) {

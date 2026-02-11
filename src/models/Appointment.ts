@@ -187,8 +187,8 @@ const AppointmentSchema = new Schema<IAppointment>({
   },
   recurrenceInfo: {
     type: String,
-    trim: true,
-    maxlength: -1 // Matches MSSQL varchar(-1) max length
+    trim: true
+    // MSSQL varchar(MAX) - no length restriction in MongoDB
   },
   isActive: {
     type: Boolean,
@@ -207,6 +207,7 @@ const AppointmentSchema = new Schema<IAppointment>({
     default: Date.now
   }
 }, {
+  id: false, // Disable Mongoose virtual 'id' getter to avoid shadowing the explicit id: Number field from MSSQL
   timestamps: { createdAt: 'dateCreated', updatedAt: 'dateModified' },
   toJSON: {
     transform: function(doc, ret: any) {

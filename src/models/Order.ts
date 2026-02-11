@@ -45,6 +45,7 @@ export interface IOrder extends Document {
   totalAmount: number;
   billDate?: Date;
   readyToBill: boolean;
+  invoiceNumber?: string;
   invoiceDate?: Date;
   location?: string;
   description?: string;
@@ -82,13 +83,11 @@ const OrderLineItemSchema = new Schema<IOrderLineItem>({
   },
   unitPrice: {
     type: Number,
-    required: true,
-    min: [0, 'Unit price cannot be negative']
+    required: true
   },
   subtotal: {
     type: Number,
-    required: true,
-    min: [0, 'Subtotal cannot be negative']
+    required: true
   }
 }, { _id: false });
 
@@ -104,8 +103,7 @@ const OrderSchema = new Schema<IOrder>({
   appointmentId: {
     type: Number,
     required: false,
-    unique: true,
-    sparse: true // Allow multiple null values for orders without appointments
+    sparse: true
   },
   clientId: {
     type: Schema.Types.Mixed, // Accept both String and Number for legacy data compatibility (matches Client model)
@@ -148,14 +146,19 @@ const OrderSchema = new Schema<IOrder>({
   items: [OrderLineItemSchema],
   totalAmount: {
     type: Number,
-    required: true,
-    min: [0, 'Order amount cannot be negative']
+    required: true
   },
   billDate: Date,
   readyToBill: {
     type: Boolean,
     required: true,
     default: false
+  },
+  invoiceNumber: {
+    type: String,
+    trim: true,
+    sparse: true,
+    maxlength: 50
   },
   invoiceDate: Date,
   location: {

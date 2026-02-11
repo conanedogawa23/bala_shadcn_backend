@@ -166,7 +166,7 @@ export class ClientClinicRelationshipService {
           },
           { 
             isPrimary: false,
-            modifiedAt: new Date()
+            updatedAt: new Date()
           }
         );
       } else {
@@ -228,7 +228,7 @@ export class ClientClinicRelationshipService {
       }
 
       // Update fields efficiently using Object.assign
-      Object.assign(relationship, updateData, { modifiedAt: new Date() });
+      Object.assign(relationship, updateData, { updatedAt: new Date() });
 
       const updatedRelationship = await relationship.save();
       logger.info(`🏥 Updated relationship: ${id}`);

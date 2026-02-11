@@ -184,7 +184,7 @@ export class ContactHistoryService {
       }
 
       // Update fields efficiently using Object.assign
-      Object.assign(contact, updateData, { modifiedAt: new Date() });
+      Object.assign(contact, updateData, { updatedAt: new Date() });
 
       const updatedContact = await contact.save();
       logger.info(`📞 Updated contact history: ${id}`);
@@ -209,7 +209,7 @@ export class ContactHistoryService {
       }
 
       contact.isActive = false;
-      contact.modifiedAt = new Date();
+      contact.updatedAt = new Date();
       await contact.save();
 
       logger.info(`📞 Deleted contact history: ${id}`);

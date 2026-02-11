@@ -18,7 +18,7 @@ export interface IContactHistory extends Document {
   tags?: string[];
   createdBy?: string;
   createdAt: Date;
-  modifiedAt?: Date;
+  updatedAt?: Date;
   isActive: boolean;
   
   // Communication details
@@ -127,15 +127,7 @@ const ContactHistorySchema = new Schema<IContactHistory>({
     type: String,
     maxlength: 100
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    index: true
-  },
-  modifiedAt: {
-    type: Date,
-    index: true
-  },
+  // createdAt and updatedAt managed by timestamps: true
   isActive: {
     type: Boolean,
     default: true,
@@ -187,7 +179,8 @@ const ContactHistorySchema = new Schema<IContactHistory>({
     }
   }
 }, {
-  timestamps: true,
+  id: false, // Disable Mongoose virtual 'id' getter to avoid shadowing the explicit id: Number field
+  timestamps: true, // Auto-manages createdAt and updatedAt
   collection: 'contact_history'
 });
 
@@ -210,13 +203,13 @@ ContactHistorySchema.index({
 // Instance methods
 ContactHistorySchema.methods.markAsFollowedUp = function(): void {
   this.followUpRequired = false;
-  this.modifiedAt = new Date();
+  this.updatedAt = new Date();
 };
 
 ContactHistorySchema.methods.addTag = function(tag: string): void {
   if (!this.tags.includes(tag)) {
     this.tags.push(tag);
-    this.modifiedAt = new Date();
+    this.updatedAt = new Date();
   }
 };
 
@@ -290,9 +283,7 @@ ContactHistorySchema.pre('save', async function(next) {
     this.id = (highestIdDoc?.id || 0) + 1;
   }
   
-  if (this.isModified() && !this.isNew) {
-    this.modifiedAt = new Date();
-  }
+  // updatedAt is auto-managed by timestamps: true
   
   // Auto-set follow-up date if not provided but required
   if (this.followUpRequired && !this.followUpDate) {

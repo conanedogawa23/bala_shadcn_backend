@@ -54,7 +54,7 @@ export interface IClientClinicRelationship extends Document {
   };
   
   createdAt: Date;
-  modifiedAt?: Date;
+  updatedAt?: Date;
   createdBy?: string;
   modifiedBy?: string;
   
@@ -234,15 +234,7 @@ const ClientClinicRelationshipSchema = new Schema<IClientClinicRelationship>({
       min: 0
     }
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    index: true
-  },
-  modifiedAt: {
-    type: Date,
-    index: true
-  },
+  // createdAt and updatedAt managed by timestamps: true
   createdBy: {
     type: String,
     maxlength: 100
@@ -252,7 +244,8 @@ const ClientClinicRelationshipSchema = new Schema<IClientClinicRelationship>({
     maxlength: 100
   }
 }, {
-  timestamps: true,
+  id: false, // Disable Mongoose virtual 'id' getter to avoid shadowing the explicit id: Number field
+  timestamps: true, // Auto-manages createdAt and updatedAt
   collection: 'client_clinic_relationships'
 });
 
@@ -276,7 +269,7 @@ ClientClinicRelationshipSchema.index({
 ClientClinicRelationshipSchema.methods.deactivate = function(reason?: string): void {
   this.isActive = false;
   this.endDate = new Date();
-  this.modifiedAt = new Date();
+  this.updatedAt = new Date();
   
   if (reason && this.details) {
     this.details.notes = (this.details.notes || '') + `\nDeactivated: ${reason}`;
@@ -293,13 +286,13 @@ ClientClinicRelationshipSchema.methods.makePrimary = async function(): Promise<v
     },
     { 
       isPrimary: false,
-      modifiedAt: new Date()
+      updatedAt: new Date()
     }
   );
   
   // Then make this one primary
   this.isPrimary = true;
-  this.modifiedAt = new Date();
+  this.updatedAt = new Date();
 };
 
 ClientClinicRelationshipSchema.methods.updateStats = function(appointmentData: {
@@ -346,7 +339,7 @@ ClientClinicRelationshipSchema.methods.updateStats = function(appointmentData: {
     );
   }
   
-  this.modifiedAt = new Date();
+  this.updatedAt = new Date();
 };
 
 // Static methods
@@ -415,7 +408,7 @@ ClientClinicRelationshipSchema.statics.getClientDistribution = function() {
 // Pre-save middleware
 ClientClinicRelationshipSchema.pre('save', function(next) {
   if (this.isModified() && !this.isNew) {
-    this.modifiedAt = new Date();
+    this.updatedAt = new Date();
   }
   
   // Ensure only one primary relationship per client
@@ -428,7 +421,7 @@ ClientClinicRelationshipSchema.pre('save', function(next) {
       },
       { 
         isPrimary: false,
-        modifiedAt: new Date()
+        updatedAt: new Date()
       }
     ).exec();
   }

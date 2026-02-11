@@ -63,7 +63,7 @@ export interface IClientCompany extends Document {
   notes?: string;
   tags?: string[];
   createdAt: Date;
-  modifiedAt?: Date;
+  updatedAt?: Date;
   createdBy?: string;
 }
 
@@ -254,21 +254,14 @@ const ClientCompanySchema = new Schema<IClientCompany>({
     type: String,
     maxlength: 50
   }],
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    index: true
-  },
-  modifiedAt: {
-    type: Date,
-    index: true
-  },
+  // createdAt and updatedAt managed by timestamps: true
   createdBy: {
     type: String,
     maxlength: 100
   }
 }, {
-  timestamps: true,
+  id: false, // Disable Mongoose virtual 'id' getter to avoid shadowing explicit id: Number field
+  timestamps: true, // Auto-manages createdAt and updatedAt
   collection: 'client_companies'
 });
 
@@ -317,18 +310,18 @@ ClientCompanySchema.methods.updateStats = function(statsUpdate: {
   }
   
   this.stats.lastActivityDate = new Date();
-  this.modifiedAt = new Date();
+  this.updatedAt = new Date();
 };
 
 ClientCompanySchema.methods.addEmployee = function(): void {
   this.stats.totalEmployees += 1;
-  this.modifiedAt = new Date();
+  this.updatedAt = new Date();
 };
 
 ClientCompanySchema.methods.removeEmployee = function(): void {
   if (this.stats.totalEmployees > 0) {
     this.stats.totalEmployees -= 1;
-    this.modifiedAt = new Date();
+    this.updatedAt = new Date();
   }
 };
 
@@ -451,9 +444,7 @@ ClientCompanySchema.statics.getCompanySizeDistribution = function() {
 
 // Pre-save middleware
 ClientCompanySchema.pre('save', function(next) {
-  if (this.isModified() && !this.isNew) {
-    this.modifiedAt = new Date();
-  }
+  // updatedAt is auto-managed by timestamps: true
   
   // Auto-generate display name if not provided
   if (!this.displayName) {

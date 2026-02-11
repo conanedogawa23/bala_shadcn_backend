@@ -43,7 +43,7 @@ export class ContactHistoryView {
       // Metadata
       createdBy: contact.createdBy,
       createdAt: contact.createdAt,
-      modifiedAt: contact.modifiedAt,
+      updatedAt: contact.updatedAt,
       isActive: contact.isActive
     };
   }

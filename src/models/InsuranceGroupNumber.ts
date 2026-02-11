@@ -87,7 +87,7 @@ export interface IInsuranceGroupNumber extends Document {
   internalNotes?: string;
   tags?: string[];
   createdAt: Date;
-  modifiedAt?: Date;
+  updatedAt?: Date;
   createdBy?: string;
 }
 
@@ -368,21 +368,14 @@ const InsuranceGroupNumberSchema = new Schema<IInsuranceGroupNumber>({
     type: String,
     maxlength: 50
   }],
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    index: true
-  },
-  modifiedAt: {
-    type: Date,
-    index: true
-  },
+  // createdAt and updatedAt managed by timestamps: true
   createdBy: {
     type: String,
     maxlength: 100
   }
 }, {
-  timestamps: true,
+  id: false, // Disable Mongoose virtual 'id' getter to avoid shadowing explicit id: Number field
+  timestamps: true, // Auto-manages createdAt and updatedAt
   collection: 'insurance_group_numbers'
 });
 
@@ -426,19 +419,19 @@ InsuranceGroupNumberSchema.methods.updateClaimStats = function(claimData: {
     break;
   }
   
-  this.modifiedAt = new Date();
+  this.updatedAt = new Date();
 };
 
 InsuranceGroupNumberSchema.methods.addMember = function(): void {
   this.stats.totalMembers += 1;
   this.stats.activeMembers += 1;
-  this.modifiedAt = new Date();
+  this.updatedAt = new Date();
 };
 
 InsuranceGroupNumberSchema.methods.removeMember = function(): void {
   if (this.stats.activeMembers > 0) {
     this.stats.activeMembers -= 1;
-    this.modifiedAt = new Date();
+    this.updatedAt = new Date();
   }
 };
 
@@ -617,9 +610,7 @@ InsuranceGroupNumberSchema.statics.getCoverageReport = function() {
 
 // Pre-save middleware
 InsuranceGroupNumberSchema.pre('save', function(next) {
-  if (this.isModified() && !this.isNew) {
-    this.modifiedAt = new Date();
-  }
+  // updatedAt is auto-managed by timestamps: true
   
   // Normalize group number
   if (this.groupNumber) {

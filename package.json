@@ -8,7 +8,21 @@
     "build": "tsc",
     "start": "node dist/bootstrap.js",
     "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix"
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "migrate:status": "ts-node -r tsconfig-paths/register src/migrations/check-migration-status.ts",
+    "migrate:full": "ts-node -r tsconfig-paths/register src/migrations/run-full-migration.ts",
+    "migrate:pre-validate": "ts-node -r tsconfig-paths/register src/migrations/pre-migration-validation.ts",
+    "migrate:lookups": "ts-node -r tsconfig-paths/register src/migrations/migrate-lookups.ts",
+    "migrate:clients": "ts-node -r tsconfig-paths/register src/migrations/migrate-clients.ts",
+    "migrate:appointments": "ts-node -r tsconfig-paths/register src/migrations/migrate-appointments.ts",
+    "migrate:orders": "ts-node -r tsconfig-paths/register src/migrations/migrate-orders.ts",
+    "migrate:payments": "ts-node -r tsconfig-paths/register src/migrations/migrate-payments.ts",
+    "migrate:contact-history": "ts-node -r tsconfig-paths/register src/migrations/migrate-contact-history.ts",
+    "migrate:client-clinic": "ts-node -r tsconfig-paths/register src/migrations/migrate-client-clinic.ts",
+    "migrate:reference-tables": "ts-node -r tsconfig-paths/register src/migrations/migrate-reference-tables.ts",
+    "migrate:post-validate": "ts-node -r tsconfig-paths/register src/migrations/post-migration-validation.ts",
+    "migrate:test-performance": "ts-node -r tsconfig-paths/register src/migrations/test-performance.ts",
+    "migrate:uat": "ts-node -r tsconfig-paths/register src/migrations/user-acceptance-tests.ts"
   },
   "keywords": [
     "clinic",

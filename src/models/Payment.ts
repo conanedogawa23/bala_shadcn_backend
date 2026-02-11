@@ -118,33 +118,34 @@ export interface IPayment extends Document {
 }
 
 // Payment Amounts Schema
+// Note: min validators removed to accommodate legacy MSSQL data ($0 payments, refunds, adjustments)
 const PaymentAmountsSchema = new Schema<IPaymentAmounts>({
-  totalPaymentAmount: { type: Number, default: 0, min: [0.01, 'Payment amount must be positive'] },
-  totalPaid: { type: Number, default: 0, min: [0, 'Total paid cannot be negative'] },
-  totalOwed: { type: Number, default: 0, min: [0, 'Total owed cannot be negative'] },
+  totalPaymentAmount: { type: Number, default: 0 },
+  totalPaid: { type: Number, default: 0 },
+  totalOwed: { type: Number, default: 0 },
   
   // Canadian Healthcare Payment Types
-  popAmount: { type: Number, default: 0, min: 0 },
-  popfpAmount: { type: Number, default: 0, min: 0 },
-  dpaAmount: { type: Number, default: 0, min: 0 },
-  dpafpAmount: { type: Number, default: 0, min: 0 },
+  popAmount: { type: Number, default: 0 },
+  popfpAmount: { type: Number, default: 0 },
+  dpaAmount: { type: Number, default: 0 },
+  dpafpAmount: { type: Number, default: 0 },
   
   // Coordination of Benefits
-  cob1Amount: { type: Number, default: 0, min: 0 },
-  cob2Amount: { type: Number, default: 0, min: 0 },
-  cob3Amount: { type: Number, default: 0, min: 0 },
+  cob1Amount: { type: Number, default: 0 },
+  cob2Amount: { type: Number, default: 0 },
+  cob3Amount: { type: Number, default: 0 },
   
   // Insurance Payments
-  insurance1stAmount: { type: Number, default: 0, min: 0 },
-  insurance2ndAmount: { type: Number, default: 0, min: 0 },
-  insurance3rdAmount: { type: Number, default: 0, min: 0 },
+  insurance1stAmount: { type: Number, default: 0 },
+  insurance2ndAmount: { type: Number, default: 0 },
+  insurance3rdAmount: { type: Number, default: 0 },
   
   // Other Amounts
-  refundAmount: { type: Number, default: 0, min: 0 },
-  salesRefundAmount: { type: Number, default: 0, min: 0 },
-  writeoffAmount: { type: Number, default: 0, min: 0 },
-  noInsurFpAmount: { type: Number, default: 0, min: 0 },
-  badDebtAmount: { type: Number, default: 0, min: 0 }
+  refundAmount: { type: Number, default: 0 },
+  salesRefundAmount: { type: Number, default: 0 },
+  writeoffAmount: { type: Number, default: 0 },
+  noInsurFpAmount: { type: Number, default: 0 },
+  badDebtAmount: { type: Number, default: 0 }
 });
 
 // Payment Schema
@@ -284,22 +285,6 @@ PaymentSchema.pre<IPayment>('save', async function(next) {
   if (this.isNew && !this.paymentNumber) {
     // Generate unique payment ID using timestamp + random (no counter needed)
     this.paymentNumber = generatePaymentId();
-  }
-  
-  // Validate no negative amounts
-  if (this.amounts) {
-    const amountFields = [
-      'popAmount', 'popfpAmount', 'dpaAmount', 'dpafpAmount',
-      'cob1Amount', 'cob2Amount', 'cob3Amount',
-      'insurance1stAmount', 'insurance2ndAmount', 'insurance3rdAmount',
-      'refundAmount', 'salesRefundAmount', 'writeoffAmount', 'noInsurFpAmount', 'badDebtAmount'
-    ];
-    
-    for (const field of amountFields) {
-      if (this.amounts[field as keyof IPaymentAmounts] < 0) {
-        throw new Error(`${field} cannot be negative`);
-      }
-    }
   }
   
   // Calculate totals if amounts changed

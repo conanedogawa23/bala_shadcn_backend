@@ -103,7 +103,7 @@ export interface IInsuranceCompany extends Document {
   priority: 'low' | 'medium' | 'high';
   tags?: string[];
   createdAt: Date;
-  modifiedAt?: Date;
+  updatedAt?: Date;
   createdBy?: string;
   modifiedBy?: string;
 }
@@ -419,15 +419,7 @@ const InsuranceCompanySchema = new Schema<IInsuranceCompany>({
     type: String,
     maxlength: 50
   }],
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    index: true
-  },
-  modifiedAt: {
-    type: Date,
-    index: true
-  },
+  // createdAt and updatedAt managed by timestamps: true
   createdBy: {
     type: String,
     maxlength: 100
@@ -437,7 +429,8 @@ const InsuranceCompanySchema = new Schema<IInsuranceCompany>({
     maxlength: 100
   }
 }, {
-  timestamps: true,
+  id: false, // Disable Mongoose virtual 'id' getter to avoid shadowing the explicit id: Number field
+  timestamps: true, // Auto-manages createdAt and updatedAt
   collection: 'insurance_companies'
 });
 
@@ -493,7 +486,7 @@ InsuranceCompanySchema.methods.updateStats = function(claimData: {
     );
   }
   
-  this.modifiedAt = new Date();
+  this.updatedAt = new Date();
 };
 
 InsuranceCompanySchema.methods.getCoverageForService = function(serviceType: string) {
@@ -578,9 +571,7 @@ InsuranceCompanySchema.statics.searchCompanies = function(searchTerm: string) {
 
 // Pre-save middleware
 InsuranceCompanySchema.pre('save', function(next) {
-  if (this.isModified() && !this.isNew) {
-    this.modifiedAt = new Date();
-  }
+  // updatedAt is auto-managed by timestamps: true
   
   // Auto-generate display name if not provided
   if (!this.displayName) {
