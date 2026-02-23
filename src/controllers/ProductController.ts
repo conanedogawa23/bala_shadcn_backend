@@ -47,8 +47,9 @@ export class ProductController {
       const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
       const skip = (pageNum - 1) * limitNum;
 
-      // Build filter query
+      // Build filter query using $and to avoid $or overwrites
       const filter: any = {};
+      const andConditions: any[] = [];
       
       if (status) {
         filter.status = status;
@@ -59,18 +60,29 @@ export class ProductController {
       }
       
       if (clinicName) {
-        filter.$or = [
-          { clinics: clinicName },
-          { applicableClinics: clinicName }
-        ];
+        andConditions.push({
+          $or: [
+            { clinics: clinicName },
+            { applicableClinics: clinicName },
+            { isAvailableForAllClinics: true },
+            { clinics: { $size: 0 }, applicableClinics: { $exists: false } },
+            { clinics: { $size: 0 }, applicableClinics: { $size: 0 } }
+          ]
+        });
       }
 
       if (search) {
         const searchRegex = new RegExp(search, 'i');
-        filter.$or = [
-          { name: searchRegex },
-          { description: searchRegex }
-        ];
+        andConditions.push({
+          $or: [
+            { name: searchRegex },
+            { description: searchRegex }
+          ]
+        });
+      }
+
+      if (andConditions.length > 0) {
+        filter.$and = andConditions;
       }
 
       // Build sort query
@@ -176,7 +188,10 @@ export class ProductController {
       const products = await Product.find({
         $or: [
           { clinics: clinicName },
-          { applicableClinics: clinicName }
+          { applicableClinics: clinicName },
+          { isAvailableForAllClinics: true },
+          { clinics: { $size: 0 }, applicableClinics: { $exists: false } },
+          { clinics: { $size: 0 }, applicableClinics: { $size: 0 } }
         ],
         status,
         isActive: true
