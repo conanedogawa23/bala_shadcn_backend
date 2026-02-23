@@ -161,8 +161,6 @@ process.on('uncaughtException', (error: Error) => {
 });
 
 // Start the server
-if (require.main === module) {
-  startServer();
-}
+startServer();
 
 export default app;
