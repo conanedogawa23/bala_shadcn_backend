@@ -16,6 +16,9 @@ import userRoutes from './user-routes';
 import reportRoutes from './report-routes';
 import invoiceRoutes from './invoice-routes';
 import notificationRoutes from './notification-routes';
+import referringDoctorRoutes from './referring-doctor-routes';
+import clientCompanyRoutes from './client-company-routes';
+import cityRoutes from './city-routes';
 import { authenticate, optionalAuthenticate, trackActivity } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -360,5 +363,8 @@ router.use('/advanced-billing', authenticate, trackActivity, advancedBillingRout
 router.use('/insurance-reference', authenticate, trackActivity, insuranceReferenceRoutes);
 router.use('/invoices', authenticate, trackActivity, invoiceRoutes);
 router.use('/notifications', authenticate, trackActivity, notificationRoutes); // PROTECTED - Notification management
+router.use('/referring-doctors', authenticate, trackActivity, referringDoctorRoutes); // PROTECTED - Referring doctor management
+router.use('/companies', authenticate, trackActivity, clientCompanyRoutes); // PROTECTED - Company management
+router.use('/cities', authenticate, trackActivity, cityRoutes); // PROTECTED - City management
 
 export default router;

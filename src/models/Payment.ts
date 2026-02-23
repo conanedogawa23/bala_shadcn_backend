@@ -18,10 +18,10 @@ export enum PaymentType {
   DPAFP = 'DPAFP',               // DPA Final Payment
   COB_1 = 'COB_1',               // Coordination of Benefits - Primary
   COB_2 = 'COB_2',               // Coordination of Benefits - Secondary
-  COB_3 = 'COB_3',               // Coordination of Benefits - Tertiary
+  // COB_3 removed per visio_req.md (3rd insurance tier eliminated)
   INSURANCE_1ST = 'INSURANCE_1ST', // 1st Insurance Payment
   INSURANCE_2ND = 'INSURANCE_2ND', // 2nd Insurance Payment
-  INSURANCE_3RD = 'INSURANCE_3RD', // 3rd Insurance Payment
+  // INSURANCE_3RD removed per visio_req.md (3rd insurance tier eliminated)
   SALES_REFUND = 'SALES_REFUND',   // Sales Refund
   WRITEOFF = 'WRITEOFF',           // Write-off Amount
   NO_INSUR_FP = 'NO_INSUR_FP'     // No Insurance Final Payment
@@ -53,12 +53,10 @@ export interface IPaymentAmounts {
   // Coordination of Benefits
   cob1Amount: number;              // sb_payment_COB_1_amount
   cob2Amount: number;              // sb_payment_COB_2_amount
-  cob3Amount: number;              // sb_payment_COB_3_amount
   
   // Insurance Payments
   insurance1stAmount: number;      // sb_payment_1st_insurance_cheque_amount
   insurance2ndAmount: number;      // sb_payment_2nd_insurance_cheque_amount
-  insurance3rdAmount: number;      // sb_payment_3rd_insurance_cheque_amount
   
   // Other Amounts
   refundAmount: number;            // sb_payment_refund_amount
@@ -133,12 +131,10 @@ const PaymentAmountsSchema = new Schema<IPaymentAmounts>({
   // Coordination of Benefits
   cob1Amount: { type: Number, default: 0 },
   cob2Amount: { type: Number, default: 0 },
-  cob3Amount: { type: Number, default: 0 },
   
   // Insurance Payments
   insurance1stAmount: { type: Number, default: 0 },
   insurance2ndAmount: { type: Number, default: 0 },
-  insurance3rdAmount: { type: Number, default: 0 },
   
   // Other Amounts
   refundAmount: { type: Number, default: 0 },
@@ -321,8 +317,8 @@ PaymentSchema.methods.calculateTotal = function(): number {
   // Sum all payment amounts (excluding refunds and writeoffs)
   const totalPaid = amounts.popAmount + amounts.popfpAmount + 
                    amounts.dpaAmount + amounts.dpafpAmount +
-                   amounts.cob1Amount + amounts.cob2Amount + amounts.cob3Amount +
-                   amounts.insurance1stAmount + amounts.insurance2ndAmount + amounts.insurance3rdAmount +
+                   amounts.cob1Amount + amounts.cob2Amount +
+                   amounts.insurance1stAmount + amounts.insurance2ndAmount +
                    amounts.noInsurFpAmount;
   
   this.amounts.totalPaid = Math.round(totalPaid * 100) / 100;
@@ -395,17 +391,11 @@ PaymentSchema.methods.addPaymentAmount = function(paymentType: PaymentType, amou
     case PaymentType.COB_2:
       this.amounts.cob2Amount += roundedAmount;
       break;
-    case PaymentType.COB_3:
-      this.amounts.cob3Amount += roundedAmount;
-      break;
     case PaymentType.INSURANCE_1ST:
       this.amounts.insurance1stAmount += roundedAmount;
       break;
     case PaymentType.INSURANCE_2ND:
       this.amounts.insurance2ndAmount += roundedAmount;
-      break;
-    case PaymentType.INSURANCE_3RD:
-      this.amounts.insurance3rdAmount += roundedAmount;
       break;
     case PaymentType.NO_INSUR_FP:
       this.amounts.noInsurFpAmount += roundedAmount;

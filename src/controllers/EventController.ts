@@ -6,6 +6,27 @@ import { AppError } from '../utils/errors';
 
 export class EventController {
   /**
+   * Get bulletin/news events (public, approved, recent)
+   * GET /api/events/bulletin
+   */
+  static getBulletinEvents = asyncHandler(async (req: Request, res: Response) => {
+    const { limit = 10 } = req.query as any;
+
+    const result = await EventService.getAllEvents({
+      isPublic: true,
+      isApproved: true,
+      page: 1,
+      limit: parseInt(limit)
+    });
+
+    res.json({
+      success: true,
+      data: result.events || [],
+      total: result.total || 0
+    });
+  });
+
+  /**
    * Get all events
    * GET /api/events
    */

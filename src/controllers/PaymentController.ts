@@ -499,8 +499,8 @@ export class PaymentController {
       // Validate all amount fields are not negative
       const amountFields = [
         'popAmount', 'popfpAmount', 'dpaAmount', 'dpafpAmount',
-        'cob1Amount', 'cob2Amount', 'cob3Amount',
-        'insurance1stAmount', 'insurance2ndAmount', 'insurance3rdAmount',
+        'cob1Amount', 'cob2Amount',
+        'insurance1stAmount', 'insurance2ndAmount',
         'refundAmount', 'salesRefundAmount', 'writeoffAmount', 'noInsurFpAmount', 'badDebtAmount'
       ];
       
@@ -535,10 +535,8 @@ export class PaymentController {
         dpafpAmount: amounts.dpafpAmount || 0,
         cob1Amount: amounts.cob1Amount || 0,
         cob2Amount: amounts.cob2Amount || 0,
-        cob3Amount: amounts.cob3Amount || 0,
         insurance1stAmount: amounts.insurance1stAmount || 0,
         insurance2ndAmount: amounts.insurance2ndAmount || 0,
-        insurance3rdAmount: amounts.insurance3rdAmount || 0,
         refundAmount: amounts.refundAmount || 0,
         salesRefundAmount: amounts.salesRefundAmount || 0,
         writeoffAmount: amounts.writeoffAmount || 0,
@@ -1273,6 +1271,117 @@ export class PaymentController {
       res.status(500).json({
         success: false,
         message: 'Failed to dispute payment',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Batch create payments for multiple orders/invoices at once
+   */
+  static async batchCreatePayments(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Authentication required' });
+        return;
+      }
+
+      const { payments } = req.body;
+
+      if (!payments || !Array.isArray(payments) || payments.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'payments array is required and must not be empty'
+        });
+        return;
+      }
+
+      if (payments.length > 100) {
+        res.status(400).json({
+          success: false,
+          message: 'Maximum 100 payments per batch'
+        });
+        return;
+      }
+
+      const results: { created: any[]; errors: any[] } = { created: [], errors: [] };
+
+      for (const paymentData of payments) {
+        try {
+          const {
+            orderNumber, clientId, clientName, clinicName,
+            paymentMethod, paymentType, amounts, notes, referringNo
+          } = paymentData;
+
+          if (!clientId || !clinicName || !paymentMethod || !paymentType || !amounts) {
+            results.errors.push({
+              orderNumber: orderNumber || 'unknown',
+              error: 'Missing required fields'
+            });
+            continue;
+          }
+
+          const sanitizedAmounts = {
+            totalPaymentAmount: amounts.totalPaymentAmount || 0,
+            totalPaid: amounts.totalPaid || 0,
+            totalOwed: amounts.totalOwed || amounts.totalPaymentAmount || 0,
+            popAmount: amounts.popAmount || 0,
+            popfpAmount: amounts.popfpAmount || 0,
+            dpaAmount: amounts.dpaAmount || 0,
+            dpafpAmount: amounts.dpafpAmount || 0,
+            cob1Amount: amounts.cob1Amount || 0,
+            cob2Amount: amounts.cob2Amount || 0,
+            insurance1stAmount: amounts.insurance1stAmount || 0,
+            insurance2ndAmount: amounts.insurance2ndAmount || 0,
+            refundAmount: amounts.refundAmount || 0,
+            salesRefundAmount: amounts.salesRefundAmount || 0,
+            writeoffAmount: amounts.writeoffAmount || 0,
+            noInsurFpAmount: amounts.noInsurFpAmount || 0,
+            badDebtAmount: amounts.badDebtAmount || 0
+          };
+
+          const payment = new PaymentModel({
+            orderNumber,
+            clientId: Number(clientId),
+            clientName,
+            clinicName,
+            paymentMethod,
+            paymentType,
+            amounts: sanitizedAmounts,
+            notes,
+            referringNo,
+            status: PaymentStatus.COMPLETED,
+            paymentDate: new Date(),
+            createdBy: req.user._id,
+            updatedBy: req.user._id
+          });
+
+          const saved = await payment.save();
+          results.created.push({
+            _id: saved._id,
+            paymentNumber: saved.paymentNumber,
+            orderNumber: saved.orderNumber,
+            clientName: saved.clientName,
+            amount: saved.amounts.totalPaymentAmount
+          });
+        } catch (err) {
+          results.errors.push({
+            orderNumber: paymentData.orderNumber || 'unknown',
+            error: err instanceof Error ? err.message : 'Unknown error'
+          });
+        }
+      }
+
+      res.status(201).json({
+        success: true,
+        data: results,
+        message: `Batch complete: ${results.created.length} created, ${results.errors.length} errors`
+      });
+    } catch (error) {
+      logger.error('Error in batch create payments:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to batch create payments',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }

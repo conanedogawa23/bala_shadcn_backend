@@ -12,7 +12,8 @@ export enum NotificationType {
 export enum NotificationCategory {
   PAYMENT = 'payment',
   ORDER = 'order',
-  APPOINTMENT = 'appointment'
+  APPOINTMENT = 'appointment',
+  TODO = 'todo'
 }
 
 // Notification Action Enum
@@ -54,6 +55,7 @@ export interface INotification extends Document {
   metadata?: INotificationMetadata;
   read: boolean;
   readBy: Types.ObjectId[];
+  priority?: 'low' | 'medium' | 'high';
   createdBy?: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -135,6 +137,12 @@ const NotificationSchema = new Schema<INotification>(
       type: Schema.Types.ObjectId,
       ref: 'User'
     }],
+    priority: {
+      type: String,
+      enum: ['low', 'medium', 'high'],
+      default: 'medium',
+      index: true
+    },
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: 'User'

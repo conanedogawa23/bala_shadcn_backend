@@ -27,6 +27,7 @@ export interface GetNotificationsOptions {
   limit?: number;
   read?: boolean;
   category?: NotificationCategory;
+  priority?: 'low' | 'medium' | 'high';
 }
 
 export interface NotificationServiceResponse<T = any> {
@@ -101,7 +102,8 @@ class NotificationServiceClass {
         page = 1,
         limit = 20,
         read,
-        category
+        category,
+        priority
       } = options;
 
       const skip = (page - 1) * limit;
@@ -115,6 +117,10 @@ class NotificationServiceClass {
 
       if (category) {
         query.category = category;
+      }
+
+      if (priority) {
+        query.priority = priority;
       }
 
       // Execute query with pagination

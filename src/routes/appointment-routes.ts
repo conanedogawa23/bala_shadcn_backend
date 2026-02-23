@@ -471,4 +471,15 @@ router.get(
   AppointmentController.getClientAppointmentHistory
 );
 
+/**
+ * @route   GET /api/v1/appointments/today/:clinicName
+ * @desc    Get today's appointments for a clinic
+ * @access  Public
+ */
+router.get(
+  '/today/:clinicName',
+  clinicNameValidation,
+  AppointmentController.getTodaysAppointments
+);
+
 export default router;

@@ -524,4 +524,35 @@ export class AppointmentController {
     const response = AppointmentView.formatStats(stats);
     return res.status(200).json(response);
   });
+
+  /**
+   * Get today's appointments for a clinic
+   */
+  static getTodaysAppointments = asyncHandler(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const clinicName = req.params.clinicName as string;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const appointments = await AppointmentService.getAppointmentsByClinic({
+      clinicName,
+      startDate: today,
+      endDate: tomorrow,
+      page: 1,
+      limit: 100
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: appointments.appointments || [],
+      total: appointments.total || 0,
+      date: today.toISOString().split('T')[0]
+    });
+  });
 }

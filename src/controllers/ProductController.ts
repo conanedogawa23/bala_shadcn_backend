@@ -530,6 +530,54 @@ export class ProductController {
   }
 
   /**
+   * Batch deactivate products by name list
+   */
+  static async batchDeactivateProducts(req: Request, res: Response): Promise<void> {
+    try {
+      const { productNames } = req.body;
+
+      if (!productNames || !Array.isArray(productNames) || productNames.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'productNames array is required and must not be empty'
+        });
+        return;
+      }
+
+      const result = await Product.updateMany(
+        {
+          name: { $in: productNames },
+          status: { $ne: ProductStatus.INACTIVE }
+        },
+        {
+          $set: {
+            status: ProductStatus.INACTIVE,
+            isActive: false,
+            isDiscontinued: true,
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      res.status(200).json({
+        success: true,
+        data: {
+          matched: result.matchedCount,
+          modified: result.modifiedCount
+        },
+        message: `Deactivated ${result.modifiedCount} products`
+      });
+    } catch (error) {
+      logger.error('Error batch deactivating products:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to batch deactivate products',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
    * Get product analytics
    */
   static async getProductAnalytics(req: Request, res: Response): Promise<void> {

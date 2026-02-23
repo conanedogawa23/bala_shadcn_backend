@@ -20,6 +20,9 @@ router.get('/category/:categoryId', EventController.getEventsByCategory);
 router.get('/clinic/:clinicName', EventController.getEventsByClinic);
 router.get('/event-id/:eventId', EventController.getEventByEventId);
 
+// Bulletin: public approved events as news items
+router.get('/bulletin', EventController.getBulletinEvents);
+
 // General event management
 router.get('/', EventController.getAllEvents);
 router.get('/:id', EventController.getEventById);

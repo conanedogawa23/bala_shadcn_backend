@@ -57,6 +57,13 @@ router.get('/clinic/:clinicName', ProductController.getProductsByClinic);
 router.get('/:id', ProductController.getProductById);
 
 /**
+ * @route   POST /api/v1/products/batch-deactivate
+ * @desc    Batch deactivate products by name list
+ * @access  Private (Admin)
+ */
+router.post('/batch-deactivate', ProductController.batchDeactivateProducts);
+
+/**
  * @route   POST /api/v1/products
  * @desc    Create new product
  * @access  Private (Admin)

@@ -93,6 +93,18 @@ router.get('/revenue/:clinicName',
 );
 
 /**
+ * @route   POST /api/v1/payments/batch
+ * @desc    Batch create payments for multiple orders/invoices
+ * @access  Private - Requires 'canCreatePayments' permission
+ */
+router.post('/batch',
+  authenticate,
+  requirePermission('canCreatePayments'),
+  trackActivity,
+  PaymentController.batchCreatePayments
+);
+
+/**
  * @route   POST /api/v1/payments
  * @desc    Create new payment
  * @access  Private - Requires 'canCreatePayments' permission
