@@ -1,15 +1,79 @@
-import { IAppointment } from '@/models/Appointment';
-
 export class AppointmentView {
+
+  private static getDurationMinutes(appointment: any): number {
+    if (appointment.duration > 0) return appointment.duration;
+    const start = new Date(appointment.startDate);
+    const end = new Date(appointment.endDate);
+    return Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+  }
+
+  private static getFormattedDuration(appointment: any): string {
+    const minutes = this.getDurationMinutes(appointment);
+    const hours = Math.floor(minutes / 60);
+    const remaining = minutes % 60;
+    return hours > 0 ? `${hours}h ${remaining}m` : `${minutes}m`;
+  }
+
+  private static isCompleted(appointment: any): boolean {
+    return appointment.status === 1;
+  }
+
+  private static isPast(appointment: any): boolean {
+    return new Date(appointment.endDate) < new Date();
+  }
+
+  private static isFuture(appointment: any): boolean {
+    return new Date(appointment.startDate) > new Date();
+  }
+
+  private static isToday(appointment: any): boolean {
+    const today = new Date();
+    const aptDate = new Date(appointment.startDate);
+    return today.getFullYear() === aptDate.getFullYear() &&
+           today.getMonth() === aptDate.getMonth() &&
+           today.getDate() === aptDate.getDate();
+  }
+
+  private static canBeBilled(appointment: any): boolean {
+    return this.isCompleted(appointment) && appointment.readyToBill && !appointment.invoiceDate;
+  }
+
+  /**
+   * Extract client info from the $lookup-joined clientDetails subdocument.
+   */
+  private static buildClientInfo(appointment: any) {
+    const cd = appointment.clientDetails;
+    if (!cd) return null;
+
+    const firstName = cd.personalInfo?.firstName || '';
+    const lastName = cd.personalInfo?.lastName || '';
+    const fullName = cd.personalInfo?.fullName || `${lastName}, ${firstName}`.trim();
+    const email = cd.contact?.email || '';
+    const phone = cd.contact?.phones?.cell?.full
+      || cd.contact?.phones?.home?.full
+      || cd.contact?.phones?.work?.full
+      || '';
+
+    return {
+      id: cd.clientId,
+      clientKey: cd.clientKey,
+      firstName,
+      lastName,
+      name: fullName,
+      email: email !== 'none@dmo.com' ? email : '',
+      phone
+    };
+  }
+
   /**
    * Format single appointment for API response
    */
-  static formatAppointment(appointment: IAppointment) {
+  static formatAppointment(appointment: any) {
     return {
       success: true,
       data: {
         id: appointment._id,
-        appointmentId: (appointment as any).appointmentId,
+        appointmentId: appointment.appointmentId,
         type: appointment.type,
         startDate: appointment.startDate,
         endDate: appointment.endDate,
@@ -21,31 +85,27 @@ export class AppointmentView {
         statusText: this.getStatusText(appointment.status),
         label: appointment.label,
         resourceId: appointment.resourceId,
-        resourceName: (appointment as any).resourceName,
-        duration: appointment.getDurationMinutes(),
-        formattedDuration: appointment.getFormattedDuration(),
-        
-        // Client information
+        resourceName: appointment.resourceName,
+        duration: this.getDurationMinutes(appointment),
+        formattedDuration: this.getFormattedDuration(appointment),
+
         clientId: appointment.clientId,
-        
-        // Clinic information
+        clientInfo: this.buildClientInfo(appointment),
+
         clinicName: appointment.clinicName,
-        
-        // Billing information
+
         billDate: appointment.billDate,
         invoiceDate: appointment.invoiceDate,
         readyToBill: appointment.readyToBill,
-        canBeBilled: appointment.canBeBilled(),
+        canBeBilled: this.canBeBilled(appointment),
         advancedBilling: appointment.advancedBilling,
         advancedBillingId: appointment.advancedBillingId,
-        
-        // Status helpers
-        isCompleted: appointment.isCompleted(),
-        isPast: appointment.isPast(),
-        isFuture: appointment.isFuture(),
-        isToday: appointment.isToday(),
-        
-        // Metadata
+
+        isCompleted: this.isCompleted(appointment),
+        isPast: this.isPast(appointment),
+        isFuture: this.isFuture(appointment),
+        isToday: this.isToday(appointment),
+
         isActive: appointment.isActive,
         dateCreated: appointment.dateCreated,
         dateModified: appointment.dateModified
@@ -56,12 +116,12 @@ export class AppointmentView {
   /**
    * Format appointment list with pagination
    */
-  static formatAppointmentList(appointments: IAppointment[], page: number, limit: number, total: number) {
+  static formatAppointmentList(appointments: any[], page: number, limit: number, total: number) {
     return {
       success: true,
       data: appointments.map(appointment => ({
         id: appointment._id,
-        appointmentId: (appointment as any).appointmentId,
+        appointmentId: appointment.appointmentId,
         type: appointment.type,
         startDate: appointment.startDate,
         endDate: appointment.endDate,
@@ -69,16 +129,18 @@ export class AppointmentView {
         status: appointment.status,
         statusText: this.getStatusText(appointment.status),
         resourceId: appointment.resourceId,
-        resourceName: (appointment as any).resourceName,
+        resourceName: appointment.resourceName,
         clientId: appointment.clientId,
+        clientName: this.buildClientInfo(appointment)?.name || appointment.subject,
+        clientInfo: this.buildClientInfo(appointment),
         clinicName: appointment.clinicName,
-        duration: appointment.getDurationMinutes(),
-        formattedDuration: appointment.getFormattedDuration(),
+        duration: this.getDurationMinutes(appointment),
+        formattedDuration: this.getFormattedDuration(appointment),
         readyToBill: appointment.readyToBill,
-        isCompleted: appointment.isCompleted(),
-        isPast: appointment.isPast(),
-        isFuture: appointment.isFuture(),
-        isToday: appointment.isToday()
+        isCompleted: this.isCompleted(appointment),
+        isPast: this.isPast(appointment),
+        isFuture: this.isFuture(appointment),
+        isToday: this.isToday(appointment)
       })),
       pagination: {
         page,
@@ -92,30 +154,27 @@ export class AppointmentView {
   }
 
   /**
-   * Format appointments ready for billing
+   * Format appointments ready for billing with client info from aggregation $lookup.
    */
   static formatBillingAppointments(appointments: any[]) {
     return {
       success: true,
       data: appointments.map(appointment => ({
         id: appointment._id,
-        appointmentId: (appointment as any).appointmentId,
+        appointmentId: appointment.appointmentId,
         startDate: appointment.startDate,
         endDate: appointment.endDate,
         subject: appointment.subject,
         clinicName: appointment.clinicName,
         resourceId: appointment.resourceId,
+        resourceName: appointment.resourceName,
         clientId: appointment.clientId,
-        clientInfo: appointment.clientId ? {
-          name: appointment.clientId.personalInfo?.firstName + ' ' + appointment.clientId.personalInfo?.lastName,
-          insurance: appointment.clientId.insurance?.map((ins: any) => ({
-            type: ins.type,
-            company: ins.company,
-            dpa: ins.dpa
-          }))
-        } : null,
+        clientInfo: this.buildClientInfo(appointment) || {
+          name: appointment.subject,
+          insurance: []
+        },
         billDate: appointment.billDate,
-        duration: appointment.getDurationMinutes(),
+        duration: this.getDurationMinutes(appointment),
         amount: this.calculateBillingAmount(appointment)
       })),
       summary: {
@@ -136,16 +195,16 @@ export class AppointmentView {
         client: history.client,
         appointments: history.appointments.map((appointment: any) => ({
           id: appointment._id,
-          appointmentId: (appointment as any).appointmentId,
+          appointmentId: appointment.appointmentId,
           startDate: appointment.startDate,
           endDate: appointment.endDate,
           subject: appointment.subject,
           status: appointment.status,
           statusText: this.getStatusText(appointment.status),
-          resourceName: (appointment as any).resourceName,
+          resourceName: appointment.resourceName,
           clinicName: appointment.clinicName,
           duration: appointment.duration,
-          formattedDuration: appointment.getFormattedDuration ? appointment.getFormattedDuration() : `${appointment.duration}m`,
+          formattedDuration: this.getFormattedDuration(appointment),
           description: appointment.description,
           billDate: appointment.billDate,
           invoiceDate: appointment.invoiceDate
@@ -184,7 +243,7 @@ export class AppointmentView {
   /**
    * Format appointment summary for dashboard
    */
-  static formatAppointmentSummary(appointments: IAppointment[]) {
+  static formatAppointmentSummary(appointments: any[]) {
     const today = new Date();
     const todayStart = new Date(today);
     todayStart.setHours(0, 0, 0, 0);

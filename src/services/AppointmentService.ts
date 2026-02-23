@@ -1,3 +1,4 @@
+import mongoose, { PipelineStage } from 'mongoose';
 import { AppointmentModel, IAppointment } from '@/models/Appointment';
 import { ResourceModel } from '@/models/Resource';
 import { ClientModel } from '@/models/Client';
@@ -12,12 +13,59 @@ export class AppointmentService {
    * clinics collection uses different naming than appointments collection
    */
   private static getAppointmentClinicName(clinicName: string): string {
-    // Since appointments are stored with both "bodyblissphysio" and "BodyBlissPhysio"
-    // we need to query for both formats using case-insensitive regex
-    return clinicName; // Return as-is, we'll handle case-insensitive search in query
+    return clinicName;
+  }
+
+  /**
+   * Aggregation stages to join client data from the clients collection.
+   * Handles the type mismatch: appointments.clientId (Number|String) vs clients.clientId (String).
+   */
+  private static getClientLookupStages(): PipelineStage[] {
+    return [
+      { $addFields: { clientIdStr: { $toString: '$clientId' } } },
+      {
+        $lookup: {
+          from: 'clients',
+          localField: 'clientIdStr',
+          foreignField: 'clientId',
+          as: 'clientDetails'
+        }
+      },
+      { $unwind: { path: '$clientDetails', preserveNullAndEmptyArrays: true } }
+    ];
+  }
+
+  /**
+   * Aggregation stages to join resource data from the resources collection.
+   */
+  private static getResourceLookupStages(): PipelineStage[] {
+    return [
+      {
+        $lookup: {
+          from: 'resources',
+          localField: 'resourceId',
+          foreignField: 'resourceId',
+          as: 'resourceDetails'
+        }
+      },
+      { $unwind: { path: '$resourceDetails', preserveNullAndEmptyArrays: true } }
+    ];
+  }
+
+  /**
+   * Derive resourceName from a plain resource object (mirrors Resource.getFullName()).
+   */
+  private static deriveResourceName(resource: any): string {
+    if (!resource) return 'Unknown Resource';
+    if (resource.type === 'practitioner' && resource.practitioner) {
+      const { firstName, lastName } = resource.practitioner;
+      if (firstName && lastName) return `${firstName} ${lastName}`;
+      if (firstName || lastName) return firstName || lastName;
+    }
+    return resource.resourceName || 'Unknown Resource';
   }
   /**
-   * Get appointments by clinic with filtering and pagination
+   * Get appointments by clinic with filtering, pagination, and client/resource lookups.
    */
   static async getAppointmentsByClinic(params: {
     clinicName: string;
@@ -41,19 +89,6 @@ export class AppointmentService {
         clientId
       } = params;
 
-      // For debugging - log the input parameters
-      logger.info('getAppointmentsByClinic called with:', {
-        clinicName,
-        startDate,
-        endDate,
-        page,
-        limit,
-        status,
-        resourceId,
-        clientId
-      });
-
-      // Verify clinic exists - use case-insensitive search due to naming inconsistencies
       const clinic = await ClinicModel.findOne({ 
         name: new RegExp(`^${clinicName}$`, 'i') 
       });
@@ -61,84 +96,79 @@ export class AppointmentService {
         throw new NotFoundError('Clinic', clinicName);
       }
 
-      logger.info('Clinic found:', { name: clinic.clinicName, displayName: clinic.getDisplayName() });
-
-      // Map to appointment collection clinic name due to data inconsistency
       const appointmentClinicName = AppointmentService.getAppointmentClinicName(clinicName);
-      logger.info('Mapped clinic name:', { original: clinicName, mapped: appointmentClinicName });
 
-      // Build query using case-insensitive regex to handle inconsistent naming
-      const query: any = {
-        clinicName: new RegExp(`^${appointmentClinicName}$`, 'i'), // Case-insensitive exact match
+      const matchStage: any = {
+        clinicName: { $regex: new RegExp(`^${appointmentClinicName}$`, 'i') },
         isActive: true
       };
 
-      // Date range filter
       if (startDate && endDate) {
-        query.startDate = { $gte: startDate, $lte: endDate };
+        matchStage.startDate = { $gte: startDate, $lte: endDate };
       } else if (startDate) {
-        query.startDate = { $gte: startDate };
+        matchStage.startDate = { $gte: startDate };
       } else if (endDate) {
-        query.startDate = { $lte: endDate };
+        matchStage.startDate = { $lte: endDate };
       }
 
-      // Additional filters
       if (status !== undefined) {
-        query.status = status;
+        matchStage.status = status;
       }
-
       if (resourceId) {
-        query.resourceId = resourceId;
+        matchStage.resourceId = resourceId;
       }
-
       if (clientId) {
-        query.clientId = clientId;
+        matchStage.clientId = clientId;
       }
 
-      logger.info('MongoDB query:', query);
-
-      // Execute query with pagination - ultra-simplified for debugging
       const skip = (page - 1) * limit;
-      
-      // Test count first
-      const total = await AppointmentModel.countDocuments(query);
-      logger.info('Count result:', total);
-      
-      // Test find - Remove .lean() to preserve Mongoose methods for view layer
-      const appointments = await AppointmentModel.find(query)
-        .sort({ startDate: 1 })
-        .skip(skip)
-        .limit(limit);
-        
-      logger.info('Found appointments:', appointments.length);
 
-      return { appointments, page, limit, total };
+      const [countResult, appointments] = await Promise.all([
+        AppointmentModel.countDocuments(matchStage),
+        AppointmentModel.aggregate([
+          { $match: matchStage },
+          { $sort: { startDate: 1 } },
+          { $skip: skip },
+          { $limit: limit },
+          ...this.getClientLookupStages(),
+          ...this.getResourceLookupStages()
+        ])
+      ]);
+
+      const total = countResult;
+
+      const enriched = appointments.map((apt: any) => ({
+        ...apt,
+        resourceName: this.deriveResourceName(apt.resourceDetails)
+      }));
+
+      return { appointments: enriched, page, limit, total };
     } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
       }
-      
       logger.error('Error in getAppointmentsByClinic:', error);
       throw new DatabaseError('Failed to retrieve appointments', error as Error);
     }
   }
 
   /**
-   * Get appointment by ID
+   * Get appointment by MongoDB ObjectId with client and resource details.
    */
-  static async getAppointmentById(appointmentId: string): Promise<IAppointment> {
+  static async getAppointmentById(appointmentId: string): Promise<any> {
     try {
-      const appointment = await AppointmentModel.findById(appointmentId);
-      
-      if (!appointment) {
+      const results = await AppointmentModel.aggregate([
+        { $match: { _id: new mongoose.Types.ObjectId(appointmentId) } },
+        ...this.getClientLookupStages(),
+        ...this.getResourceLookupStages()
+      ]);
+
+      if (!results || results.length === 0) {
         throw new NotFoundError('Appointment', appointmentId);
       }
 
-      // Populate resource information manually (populate was causing issues)
-      const resource = await ResourceModel.findOne({ resourceId: appointment.resourceId });
-      if (resource) {
-        (appointment as any).resourceName = resource.getFullName() || resource.resourceName;
-      }
+      const appointment = results[0];
+      appointment.resourceName = this.deriveResourceName(appointment.resourceDetails);
 
       return appointment;
     } catch (error) {
@@ -151,32 +181,29 @@ export class AppointmentService {
   }
 
   /**
-   * Get appointment by business appointmentId
+   * Get appointment by business appointmentId with client and resource details.
    */
-  static async getAppointmentByBusinessId(appointmentId: number): Promise<IAppointment> {
+  static async getAppointmentByBusinessId(appointmentId: number): Promise<any> {
     try {
-      // Query by either id or appointmentId field
-      const appointment = await AppointmentModel.findOne({ 
-        $or: [
-          { id: appointmentId },
-          { appointmentId: appointmentId }
-        ]
-      });
-      
-      if (!appointment) {
+      const results = await AppointmentModel.aggregate([
+        {
+          $match: {
+            $or: [
+              { id: appointmentId },
+              { appointmentId: appointmentId }
+            ]
+          }
+        },
+        ...this.getClientLookupStages(),
+        ...this.getResourceLookupStages()
+      ]);
+
+      if (!results || results.length === 0) {
         throw new NotFoundError('Appointment', appointmentId.toString());
       }
 
-      // Try to get resource information (optional - won't fail if resource not found)
-      try {
-        const resource = await ResourceModel.findOne({ resourceId: appointment.resourceId });
-        if (resource) {
-          (appointment as any).resourceName = resource.getFullName() || resource.resourceName;
-        }
-      } catch (resourceError) {
-        logger.warn('Could not populate resource information:', resourceError);
-        // Continue without resource information
-      }
+      const appointment = results[0];
+      appointment.resourceName = this.deriveResourceName(appointment.resourceDetails);
 
       return appointment;
     } catch (error) {
@@ -530,20 +557,31 @@ export class AppointmentService {
   }
 
   /**
-   * Get appointments ready for billing
+   * Get appointments ready for billing with client details via aggregation.
    */
   static async getAppointmentsReadyToBill(clinicName?: string) {
     try {
-      const appointments = await AppointmentModel.findReadyToBill(clinicName);
-      
-      // Populate client information for billing
-      const populatedAppointments = await AppointmentModel.populate(appointments, {
-        path: 'clientId',
-        select: 'personalInfo contact insurance defaultClinic',
-        model: ClientModel
-      });
+      const matchStage: any = {
+        readyToBill: true,
+        invoiceDate: { $exists: false },
+        isActive: true
+      };
 
-      return populatedAppointments;
+      if (clinicName) {
+        matchStage.clinicName = clinicName;
+      }
+
+      const appointments = await AppointmentModel.aggregate([
+        { $match: matchStage },
+        { $sort: { billDate: 1 } },
+        ...this.getClientLookupStages(),
+        ...this.getResourceLookupStages()
+      ]);
+
+      return appointments.map((apt: any) => ({
+        ...apt,
+        resourceName: this.deriveResourceName(apt.resourceDetails)
+      }));
     } catch (error) {
       logger.error('Error in getAppointmentsReadyToBill:', error);
       throw new DatabaseError('Failed to retrieve appointments ready for billing', error as Error);
@@ -596,11 +634,10 @@ export class AppointmentService {
   }
 
   /**
-   * Get client appointment history
+   * Get client appointment history with resource details via aggregation.
    */
   static async getClientAppointmentHistory(clientId: string) {
     try {
-      // Verify client exists
       const numericClientId = Number(clientId);
       const client = await ClientModel.findOne({
         $or: [
@@ -613,19 +650,24 @@ export class AppointmentService {
         throw new NotFoundError('Client', clientId);
       }
 
-      // MongoDB stores clientId as string, so don't convert to Number
-      const appointments = await AppointmentModel.findByClient(clientId);
+      const appointments = await AppointmentModel.aggregate([
+        {
+          $match: {
+            $or: [
+              { clientId: numericClientId },
+              { clientId: clientId }
+            ],
+            isActive: true
+          }
+        },
+        { $sort: { startDate: -1 } },
+        ...this.getResourceLookupStages()
+      ]);
 
-      // Populate resource information
-      const populatedAppointments = await Promise.all(
-        appointments.map(async (apt: any) => {
-          const resource = await ResourceModel.findOne({ resourceId: apt.resourceId });
-          return {
-            ...apt.toObject(),
-            resourceName: resource?.getFullName() || resource?.resourceName || 'Unknown Resource'
-          };
-        })
-      );
+      const enriched = appointments.map((apt: any) => ({
+        ...apt,
+        resourceName: this.deriveResourceName(apt.resourceDetails)
+      }));
 
       return {
         client: {
@@ -633,7 +675,7 @@ export class AppointmentService {
           name: client.getFullName(),
           defaultClinic: client.defaultClinic
         },
-        appointments: populatedAppointments
+        appointments: enriched
       };
     } catch (error) {
       if (error instanceof NotFoundError) {

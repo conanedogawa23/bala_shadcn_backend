@@ -292,8 +292,17 @@ AppointmentSchema.statics.findByClinic = function(clinicName: string, startDate?
   return this.find(query).sort({ startDate: 1 });
 };
 
-// Note: findByClient is defined later in the file (line ~390) with correct string type
-// Removed duplicate definition here to avoid confusion
+AppointmentSchema.statics.findByClient = function(clientId: string) {
+  const numericId = Number(clientId);
+  const query: any = {
+    $or: [
+      { clientId: numericId },
+      { clientId: clientId }
+    ],
+    isActive: true
+  };
+  return this.find(query).sort({ startDate: -1 });
+};
 
 AppointmentSchema.statics.findByResource = function(resourceId: number, date?: Date) {
   const query: any = {
@@ -398,8 +407,5 @@ AppointmentSchema.pre('save', async function(next) {
   
   next();
 });
-
-// Note: Static methods findReadyToBill, findByResource, and findByClient are already defined above
-// Removed duplicate definitions to avoid conflicts
 
 export const AppointmentModel = model<IAppointment, IAppointmentModel>('Appointment', AppointmentSchema);
