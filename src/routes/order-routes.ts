@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { OrderController } from '../controllers/OrderController';
+import { requireClinicAccess } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.get('/report/overdue', OrderController.getOrdersOverdueReport);
  * @access  Public
  * @params  clinicName (required), startDate, endDate
  */
-router.get('/analytics/revenue', OrderController.getRevenueAnalytics);
+router.get('/analytics/revenue', requireClinicAccess('clinicName'), OrderController.getRevenueAnalytics);
 
 /**
  * @route   GET /api/v1/orders/analytics/products
@@ -65,7 +66,7 @@ router.get('/client/:clientId', OrderController.getOrdersByClient);
  * @access  Public
  * @params  startDate, endDate, status
  */
-router.get('/clinic/:clinicName', OrderController.getOrdersByClinic);
+router.get('/clinic/:clinicName', requireClinicAccess('clinicName'), OrderController.getOrdersByClinic);
 
 /**
  * @route   GET /api/v1/orders/:id
@@ -122,7 +123,7 @@ router.put('/:id/cancel', OrderController.cancelOrder);
  * @access  Public
  * @params  clinicName (required), startDate, endDate
  */
-router.get('/report/status', OrderController.getOrderStatusReport);
+router.get('/report/status', requireClinicAccess('clinicName'), OrderController.getOrderStatusReport);
 
 /**
  * @route   GET /api/v1/orders/client/:clientId/details

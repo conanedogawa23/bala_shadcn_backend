@@ -53,7 +53,14 @@ export class ContactHistoryService {
       const filter: any = { isActive: true };
 
       if (clinicName) {filter.clinicName = clinicName;}
-      if (clientId) {filter.clientId = clientId;}
+      if (clientId) {
+        const numericClientId = Number(clientId);
+        const clientIdFilters: Array<{ clientId: string | number }> = [{ clientId }];
+        if (!Number.isNaN(numericClientId)) {
+          clientIdFilters.push({ clientId: numericClientId });
+        }
+        filter.$or = clientIdFilters;
+      }
       if (contactType) {filter.contactType = contactType;}
       if (direction) {filter.direction = direction;}
       if (priority) {filter.priority = priority;}

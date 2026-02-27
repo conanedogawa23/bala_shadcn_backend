@@ -1,11 +1,6 @@
 import { Router } from 'express';
 import { ReportController } from '../controllers/ReportController';
-import { 
-  authenticate, 
-  requirePermission,
-  requireClinicAccess,
-  verifyClinicExists
-} from '../middleware/authMiddleware';
+import { requireClinicAccess } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -16,28 +11,28 @@ const router = Router();
 
 // Get all available reports (with optional clinic filter)
 router.get('/', ReportController.getAvailableReports);
-router.get('/:clinicName/available', ReportController.getAvailableReports);
+router.get('/:clinicName/available', requireClinicAccess('clinicName'), ReportController.getAvailableReports);
 
 // Client statistics (aggregated, no data transfer)
-router.get('/:clinicName/client-statistics', ReportController.getClientStatistics);
+router.get('/:clinicName/client-statistics', requireClinicAccess('clinicName'), ReportController.getClientStatistics);
 
 // Account Summary Reports (with clinic as query param or path param)
-router.get('/account-summary', ReportController.getAccountSummary);
-router.get('/:clinicName/account-summary', ReportController.getAccountSummary);
+router.get('/account-summary', requireClinicAccess('clinicName'), ReportController.getAccountSummary);
+router.get('/:clinicName/account-summary', requireClinicAccess('clinicName'), ReportController.getAccountSummary);
 
 // Payment Summary by Day Range
-router.get('/:clinicName/payment-summary', ReportController.getPaymentSummary);
+router.get('/:clinicName/payment-summary', requireClinicAccess('clinicName'), ReportController.getPaymentSummary);
 
 // Time Sheet Report
-router.get('/:clinicName/timesheet', ReportController.getTimesheetReport);
+router.get('/:clinicName/timesheet', requireClinicAccess('clinicName'), ReportController.getTimesheetReport);
 
 // Order Status Report
-router.get('/:clinicName/order-status', ReportController.getOrderStatusReport);
+router.get('/:clinicName/order-status', requireClinicAccess('clinicName'), ReportController.getOrderStatusReport);
 
 // Co Pay Summary Report (Renamed from Sales Refund Summary)
-router.get('/:clinicName/copay-summary', ReportController.getCoPaySummary);
+router.get('/:clinicName/copay-summary', requireClinicAccess('clinicName'), ReportController.getCoPaySummary);
 
 // Marketing Budget Summary Report (Renamed from Shoe Allowance Summary)
-router.get('/:clinicName/marketing-budget', ReportController.getMarketingBudgetSummary);
+router.get('/:clinicName/marketing-budget', requireClinicAccess('clinicName'), ReportController.getMarketingBudgetSummary);
 
 export default router;

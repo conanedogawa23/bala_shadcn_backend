@@ -410,7 +410,7 @@ PaymentSchema.methods.addPaymentAmount = function(paymentType: PaymentType, amou
 // Static Methods Interface
 interface IPaymentModel extends Model<IPayment> {
   findByClinic(clinicName: string): Promise<IPayment[]>;
-  findByClient(clientId: number): Promise<IPayment[]>;
+  findByClient(clientId: number | string): Promise<IPayment[]>;
   findByOrder(orderNumber: string): Promise<IPayment[]>;
   findByStatus(status: PaymentStatus): Promise<IPayment[]>;
   findOutstandingPayments(clinicName?: string): Promise<IPayment[]>;
@@ -422,11 +422,20 @@ interface IPaymentModel extends Model<IPayment> {
 
 // Static Methods
 PaymentSchema.statics.findByClinic = function(clinicName: string) {
-  return this.find({ clinicName }).sort({ paymentDate: -1 });
+  const escapedClinicName = clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return this.find({ clinicName: new RegExp(`^${escapedClinicName}$`, 'i') }).sort({ paymentDate: -1 });
 };
 
-PaymentSchema.statics.findByClient = function(clientId: number) {
-  return this.find({ clientId }).sort({ paymentDate: -1 });
+PaymentSchema.statics.findByClient = function(clientId: number | string) {
+  const normalizedClientId = String(clientId).trim();
+  const numericClientId = Number(normalizedClientId);
+  const clientFilters: Array<{ clientId: string | number }> = [{ clientId: normalizedClientId }];
+
+  if (!Number.isNaN(numericClientId)) {
+    clientFilters.push({ clientId: numericClientId });
+  }
+
+  return this.find({ $or: clientFilters }).sort({ paymentDate: -1 });
 };
 
 PaymentSchema.statics.findByOrder = function(orderNumber: string) {
@@ -440,7 +449,8 @@ PaymentSchema.statics.findByStatus = function(status: PaymentStatus) {
 PaymentSchema.statics.findOutstandingPayments = function(clinicName?: string) {
   const match: any = { 'amounts.totalOwed': { $gt: 0 } };
   if (clinicName) {
-    match.clinicName = clinicName;
+    const escapedClinicName = clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    match.clinicName = new RegExp(`^${escapedClinicName}$`, 'i');
   }
   return this.find(match).sort({ paymentDate: 1 });
 };
@@ -452,7 +462,8 @@ PaymentSchema.statics.findByPaymentType = function(paymentType: PaymentType) {
 PaymentSchema.statics.getTotalRevenue = function(clinicName?: string, startDate?: Date, endDate?: Date) {
   const match: any = {};
   if (clinicName) {
-    match.clinicName = clinicName;
+    const escapedClinicName = clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    match.clinicName = new RegExp(`^${escapedClinicName}$`, 'i');
   }
   if (startDate || endDate) {
     match.paymentDate = {};
@@ -469,7 +480,8 @@ PaymentSchema.statics.getTotalRevenue = function(clinicName?: string, startDate?
 PaymentSchema.statics.getPaymentStats = function(clinicName?: string) {
   const match: any = {};
   if (clinicName) {
-    match.clinicName = clinicName;
+    const escapedClinicName = clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    match.clinicName = new RegExp(`^${escapedClinicName}$`, 'i');
   }
   
   return this.aggregate([
@@ -489,7 +501,8 @@ PaymentSchema.statics.getPaymentStats = function(clinicName?: string) {
 PaymentSchema.statics.getPaymentMethodStats = function(clinicName?: string) {
   const match: any = {};
   if (clinicName) {
-    match.clinicName = clinicName;
+    const escapedClinicName = clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    match.clinicName = new RegExp(`^${escapedClinicName}$`, 'i');
   }
   
   return this.aggregate([

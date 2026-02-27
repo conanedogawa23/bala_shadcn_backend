@@ -73,7 +73,13 @@ export class OrderController {
       }
 
       if (clientId) {
-        filter.clientId = parseInt(clientId);
+        const numericClientId = parseInt(clientId, 10);
+        const clientIdFilters: Array<{ clientId: string | number }> = [{ clientId }];
+        if (!Number.isNaN(numericClientId)) {
+          clientIdFilters.push({ clientId: numericClientId });
+        }
+        filter.$and = filter.$and || [];
+        filter.$and.push({ $or: clientIdFilters });
       }
 
       if (readyToBill === 'true') {
@@ -94,11 +100,17 @@ export class OrderController {
       // Search filter
       if (search) {
         const searchRegex = new RegExp(search, 'i');
-        filter.$or = [
+        const searchFilters = [
           { clientName: searchRegex },
           { orderNumber: searchRegex },
           { description: searchRegex }
         ];
+
+        if (filter.$and) {
+          filter.$and.push({ $or: searchFilters });
+        } else {
+          filter.$or = searchFilters;
+        }
       }
 
       // Execute queries

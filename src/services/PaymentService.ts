@@ -8,6 +8,11 @@ import { logger } from '../utils/logger';
 import { ClinicService } from './ClinicService';
 
 export class PaymentService {
+  private static getClinicNameRegex(clinicName: string): RegExp {
+    const escapedClinicName = clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^${escapedClinicName}$`, 'i');
+  }
+
   /**
    * Get account summary report by clinic
    */
@@ -20,10 +25,11 @@ export class PaymentService {
     try {
       const skip = (page - 1) * limit;
       const sortField: Record<string, 1 | -1> = sortBy === 'amountDue' ? { amountDue: -1 } : { clientName: 1 };
+      const clinicNameRegex = this.getClinicNameRegex(clinicName);
 
       const [summary, total] = await Promise.all([
         PaymentModel.aggregate([
-          { $match: { clinicName } },
+          { $match: { clinicName: clinicNameRegex } },
           {
             $group: {
               _id: '$clientId',
@@ -41,7 +47,7 @@ export class PaymentService {
           { $limit: limit }
         ]),
         PaymentModel.aggregate([
-          { $match: { clinicName } },
+          { $match: { clinicName: clinicNameRegex } },
           { $group: { _id: '$clientId' } },
           { $count: 'count' }
         ])
@@ -64,7 +70,7 @@ export class PaymentService {
     endDate?: Date
   ): Promise<{ paymentTypeSummary: any[]; dailySummary: any[] }> {
     try {
-      const matchCriteria: any = { clinicName };
+      const matchCriteria: any = { clinicName: this.getClinicNameRegex(clinicName) };
 
       if (startDate || endDate) {
         matchCriteria.paymentDate = {};
@@ -112,23 +118,32 @@ export class PaymentService {
    * Get complete payment history for a client
    */
   static async getClientPaymentHistory(
-    clientId: number,
+    clientId: number | string,
     page = 1,
     limit = 50,
     sortBy = 'paymentDate'
   ): Promise<{ payments: IPayment[]; stats: any; page: number; limit: number; total: number }> {
     try {
       const skip = (page - 1) * limit;
+      const normalizedClientId = String(clientId).trim();
+      const numericClientId = Number(normalizedClientId);
+      const clientIdFilters: Array<{ clientId: string | number }> = [{ clientId: normalizedClientId }];
+
+      if (!Number.isNaN(numericClientId)) {
+        clientIdFilters.push({ clientId: numericClientId });
+      }
+
+      const clientMatch = { $or: clientIdFilters };
 
       const [payments, total, stats] = await Promise.all([
-        PaymentModel.find({ clientId })
+        PaymentModel.find(clientMatch)
           .sort({ [sortBy]: -1 })
           .skip(skip)
           .limit(limit)
           .populate('orderId', 'orderNumber status'),
-        PaymentModel.countDocuments({ clientId }),
+        PaymentModel.countDocuments(clientMatch),
         PaymentModel.aggregate([
-          { $match: { clientId } },
+          { $match: clientMatch },
           {
             $group: {
               _id: null,
@@ -163,12 +178,13 @@ export class PaymentService {
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
       const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const clinicNameRegex = this.getClinicNameRegex(clinicName);
 
       const [agingByClient, summaryData] = await Promise.all([
         PaymentModel.aggregate([
           {
             $match: {
-              clinicName,
+              clinicName: clinicNameRegex,
               'amounts.totalOwed': { $gt: 0 }
             }
           },
@@ -222,7 +238,7 @@ export class PaymentService {
         PaymentModel.aggregate([
           {
             $match: {
-              clinicName,
+              clinicName: clinicNameRegex,
               'amounts.totalOwed': { $gt: 0 }
             }
           },
@@ -512,8 +528,9 @@ export class PaymentService {
    */
   static async getOutstandingAmountsByClinic(clinicName: string) {
     try {
+      const clinicNameRegex = this.getClinicNameRegex(clinicName);
       const result = await PaymentModel.aggregate([
-        { $match: { clinicName } },
+        { $match: { clinicName: clinicNameRegex } },
         {
           $group: {
             _id: null,
@@ -537,10 +554,11 @@ export class PaymentService {
    */
   static async getPaymentReconciliation(clinicName: string, startDate: Date, endDate: Date) {
     try {
+      const clinicNameRegex = this.getClinicNameRegex(clinicName);
       const result = await PaymentModel.aggregate([
         {
           $match: {
-            clinicName,
+            clinicName: clinicNameRegex,
             paymentDate: { $gte: startDate, $lte: endDate }
           }
         },

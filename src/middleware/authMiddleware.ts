@@ -261,7 +261,12 @@ export const requireClinicAccess = (clinicParam: string = 'clinicName') => {
       });
     }
 
-    const clinicName = req.params[clinicParam] || req.body.clinicName || req.query.clinicName as string;
+    const clinicName =
+      (req.params[clinicParam] as string | undefined) ||
+      (req.body?.[clinicParam] as string | undefined) ||
+      (req.body?.clinicName as string | undefined) ||
+      (req.query?.[clinicParam] as string | undefined) ||
+      (req.query?.clinicName as string | undefined);
 
     if (!clinicName) {
       return res.status(400).json({

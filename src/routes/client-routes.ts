@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { query, body, param } from 'express-validator';
 import { ClientController } from '@/controllers/ClientController';
+import { requireClinicAccess } from '@/middleware/authMiddleware';
 
 const router = Router();
 
@@ -240,7 +241,7 @@ router.get('/export', ClientController.exportClients);
  * @access  Public
  * @params  clinicName (query), page, limit
  */
-router.get('/dpa', ClientController.getClientsWithDPA);
+router.get('/dpa', requireClinicAccess('clinicName'), ClientController.getClientsWithDPA);
 
 /**
  * @route   GET /api/v1/clients/insurance/company
@@ -283,28 +284,28 @@ router.delete('/:id', clientIdValidation, ClientController.deleteClient);
  * @desc    Get clients by clinic with pagination and search
  * @access  Public
  */
-router.get('/clinic/:clinicName', clinicNameValidation.concat(paginationValidation), ClientController.getClientsByClinic);
+router.get('/clinic/:clinicName', requireClinicAccess('clinicName'), clinicNameValidation.concat(paginationValidation), ClientController.getClientsByClinic);
 
 /**
  * @route   GET /api/v1/clients/clinic/:clinicName/insurance
  * @desc    Get clients with insurance for a clinic
  * @access  Public
  */
-router.get('/clinic/:clinicName/insurance', clinicNameValidation, ClientController.getClientsWithInsurance);
+router.get('/clinic/:clinicName/insurance', requireClinicAccess('clinicName'), clinicNameValidation, ClientController.getClientsWithInsurance);
 
 /**
  * @route   GET /api/v1/clients/clinic/:clinicName/stats
  * @desc    Get client statistics for a clinic
  * @access  Public
  */
-router.get('/clinic/:clinicName/stats', clinicNameValidation, ClientController.getClientStats);
+router.get('/clinic/:clinicName/stats', requireClinicAccess('clinicName'), clinicNameValidation, ClientController.getClientStats);
 
 /**
  * @route   GET /api/v1/clients/clinic/:clinicName/frontend-compatible
  * @desc    Get clients by clinic in frontend-compatible format
  * @access  Public
  */
-router.get('/clinic/:clinicName/frontend-compatible', clinicNameValidation.concat(paginationValidation), ClientController.getClientsByClinicCompatible);
+router.get('/clinic/:clinicName/frontend-compatible', requireClinicAccess('clinicName'), clinicNameValidation.concat(paginationValidation), ClientController.getClientsByClinicCompatible);
 
 /**
  * @route   GET /api/v1/clients/:id/frontend-compatible
@@ -348,7 +349,7 @@ router.put('/:id/insurance', clientIdValidation, ClientController.updateClientIn
  * @access  Public
  * @params  page, limit
  */
-router.get('/clinic/:clinicName/dpa', clinicNameValidation, ClientController.getClientsWithDPA);
+router.get('/clinic/:clinicName/dpa', requireClinicAccess('clinicName'), clinicNameValidation, ClientController.getClientsWithDPA);
 
 /**
  * @route   POST /api/v1/clients/bulk-update

@@ -35,12 +35,38 @@ app.use(helmet({
   }
 }));
 
-// CORS configuration - Allow specific origins with credentials
+const configuredCorsOrigins = (
+  process.env.CORS_ALLOWED_ORIGINS ||
+  process.env.FRONTEND_URL ||
+  'http://localhost:3000,http://127.0.0.1:3000'
+)
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(origin => origin.length > 0);
+
+const allowedCorsOrigins = new Set(configuredCorsOrigins);
+
+// CORS configuration - Restrict to explicit allowed origins
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow all origins by reflecting the requesting origin
-    // This is required when credentials: true is set (can't use wildcard *)
-    callback(null, origin || '*');
+    // Allow requests without origin (server-to-server, curl, health checks)
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    const isConfiguredOrigin = allowedCorsOrigins.has(origin);
+    const isLocalDevOrigin =
+      process.env.NODE_ENV !== 'production' &&
+      /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
+    if (isConfiguredOrigin || isLocalDevOrigin) {
+      callback(null, true);
+      return;
+    }
+
+    logger.warn(`Blocked CORS origin: ${origin}`);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   optionsSuccessStatus: 200,

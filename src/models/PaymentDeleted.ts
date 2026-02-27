@@ -144,7 +144,8 @@ PaymentDeletedSchema.statics.findByClient = function(clientId: number) {
 
 // Static method to find archived payments by clinic
 PaymentDeletedSchema.statics.findByClinic = function(clinicName: string) {
-  return this.find({ sb_clinic_name: clinicName }).sort({ archivedAt: -1 });
+  const escapedClinicName = clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return this.find({ sb_clinic_name: new RegExp(`^${escapedClinicName}$`, 'i') }).sort({ archivedAt: -1 });
 };
 
 // Static method to find unrestored archives

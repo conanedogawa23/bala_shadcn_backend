@@ -201,6 +201,11 @@ interface MarketingBudgetData {
 }
 
 export class ReportController {
+  private static getClinicNameRegex(clinicName: string): RegExp {
+    const escapedClinicName = clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^${escapedClinicName}$`, 'i');
+  }
+
   /**
    * Generate Account Summary Report
    */
@@ -218,6 +223,7 @@ export class ReportController {
 
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
+      const clinicRegex = this.getClinicNameRegex(clinic);
 
       // Validate date range
       const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -233,7 +239,7 @@ export class ReportController {
 
       // Get orders for the clinic in date range
       const orders = await Order.find({
-        clinicName: clinic,
+        clinicName: clinicRegex,
         createdAt: { $gte: start, $lte: end }
       })
         .limit(5000) // Reasonable limit for reports
@@ -244,7 +250,7 @@ export class ReportController {
       const totalRevenue = orders.reduce((sum: number, order: any) => sum + order.totalAmount, 0);
       const totalOrders = orders.length;
       const completedOrders = orders.filter((order: any) => order.status === 'completed').length;
-      const pendingOrders = orders.filter((order: any) => order.status === 'pending').length;
+      const pendingOrders = orders.filter((order: any) => order.status === 'scheduled').length;
       const cancelledOrders = orders.filter((order: any) => order.status === 'cancelled').length;
 
       // Get unique clients
@@ -263,7 +269,7 @@ export class ReportController {
           }
           const stats = serviceStats.get(key);
           stats.quantity += item.quantity;
-          stats.revenue += item.total;
+          stats.revenue += item.subtotal;
         });
       });
 
@@ -339,9 +345,8 @@ export class ReportController {
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
       
-      // Use case-insensitive regex for clinic name matching
-      // This handles variations like "BodyBlissPhysio", "bodyblissphysio", etc.
-      const clinicRegex = new RegExp(`^${clinic.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      // Use case-insensitive exact matching to support mixed clinic casing.
+      const clinicRegex = this.getClinicNameRegex(clinic);
 
       // Aggregation pipeline for efficient stats calculation
       const stats = await ClientModel.aggregate([
@@ -425,13 +430,14 @@ export class ReportController {
 
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
+      const clinicRegex = this.getClinicNameRegex(clinic);
 
       const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const end = endDate ? new Date(endDate as string) : new Date();
 
       // Fetch actual Payment data from database
       const payments = await PaymentModel.find({
-        clinicName: clinic,
+        clinicName: clinicRegex,
         paymentDate: { $gte: start, $lte: end }
       }).lean();
 
@@ -528,13 +534,14 @@ export class ReportController {
 
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
+      const clinicRegex = this.getClinicNameRegex(clinic);
 
       const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const end = endDate ? new Date(endDate as string) : new Date();
 
       // Get appointments for the clinic in date range
       const appointments = await AppointmentModel.find({
-        clinicName: clinic,
+        clinicName: clinicRegex,
         startDate: { $gte: start, $lte: end }
       })
         .limit(10000)
@@ -575,7 +582,7 @@ export class ReportController {
       // Get orders for appointments in the date range
       const appointmentIds = appointments.map((appt: any) => appt._id);
       const relatedOrders = await Order.find({
-        clinicName: clinic,
+        clinicName: clinicRegex,
         appointmentId: { $in: appointmentIds },
         createdAt: { $gte: start, $lte: end }
       }).lean();
@@ -706,24 +713,24 @@ export class ReportController {
 
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
+      const clinicRegex = this.getClinicNameRegex(clinic);
 
       // Get all orders for the clinic
-      const orders = await Order.find({ clinicName: clinic })
+      const orders = await Order.find({ clinicName: clinicRegex })
         .sort({ createdAt: -1 })
         .limit(1000)
-        .lean()
-        .populate('clientId', 'profile.firstName profile.lastName');
+        .lean();
 
       // Calculate status breakdown
       const statusStats = new Map();
-      const statusOptions = ['pending', 'processing', 'completed', 'cancelled', 'ready_to_bill'];
+      const statusOptions = ['scheduled', 'in_progress', 'completed', 'cancelled', 'no_show'];
       
       statusOptions.forEach(status => {
         statusStats.set(status, { status, count: 0, totalValue: 0 });
       });
 
       orders.forEach((order: any) => {
-        const status = order.status || 'pending';
+        const status = order.status || 'scheduled';
         if (!statusStats.has(status)) {
           statusStats.set(status, { status, count: 0, totalValue: 0 });
         }
@@ -742,17 +749,15 @@ export class ReportController {
 
       // Get recent orders
       const recentOrders = orders
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 20)
-        .map(order => ({
+        .map((order: any) => ({
           orderId: String(order._id),
           orderNumber: order.orderNumber || '',
-          clientName: (order.clientId && typeof order.clientId === 'object' && (order.clientId as any).profile) ? 
-            `${(order.clientId as any).profile.firstName} ${(order.clientId as any).profile.lastName}` : 
-            'Unknown Client',
-          status: order.status,
-          totalAmount: order.totalAmount,
-          createdAt: order.createdAt.toISOString()
+          clientName: order.clientName || 'Unknown Client',
+          status: order.status || 'scheduled',
+          totalAmount: order.totalAmount || 0,
+          createdAt: new Date(order.createdAt).toISOString()
         }));
 
       const reportData: OrderStatusData = {
@@ -800,13 +805,14 @@ export class ReportController {
 
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
+      const clinicRegex = this.getClinicNameRegex(clinic);
 
       const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const end = endDate ? new Date(endDate as string) : new Date();
 
       // Fetch actual Payment data from database
       const payments = await PaymentModel.find({
-        clinicName: clinic,
+        clinicName: clinicRegex,
         paymentDate: { $gte: start, $lte: end },
         $or: [
           { 'amounts.cob1Amount': { $gt: 0 } },
@@ -922,13 +928,14 @@ export class ReportController {
 
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
+      const clinicRegex = this.getClinicNameRegex(clinic);
 
       const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const end = endDate ? new Date(endDate as string) : new Date();
 
       // Get clients acquired in the date range with their referral sources
       const clients = await ClientModel.find({
-        defaultClinic: clinic,
+        defaultClinic: clinicRegex,
         dateCreated: { $gte: start, $lte: end }
       }).lean();
 
@@ -938,7 +945,7 @@ export class ReportController {
       const clientIds = clients.map((c: any) => c.clientId || c.clientKey);
       const clientOrders = await Order.find({
         clientId: { $in: clientIds },
-        clinicName: clinic,
+        clinicName: clinicRegex,
         createdAt: { $gte: start, $lte: end }
       }).lean();
 
@@ -1034,7 +1041,16 @@ export class ReportController {
    */
   static async getAvailableReports(req: AuthRequest, res: Response): Promise<Response> {
     try {
-      const { clinicName } = req.params;
+      const clinicNameFromParams = req.params.clinicName;
+      const clinicNameFromQuery = typeof req.query.clinicName === 'string' ? req.query.clinicName : undefined;
+      const clinicName = clinicNameFromParams || clinicNameFromQuery;
+
+      if (!clinicName) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Clinic name is required', code: 'MISSING_CLINIC_NAME' }
+        });
+      }
 
       const reports = [
         {

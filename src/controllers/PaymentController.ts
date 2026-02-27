@@ -117,7 +117,17 @@ export class PaymentController {
         // Use case-insensitive exact match for clinic name
         filter.clinicName = new RegExp(`^${(clinicName as string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
       }
-      if (clientId) filter.clientId = Number(clientId);
+      if (clientId) {
+        const normalizedClientId = String(clientId).trim();
+        const numericClientId = Number(normalizedClientId);
+        const clientFilters: Array<{ clientId: string | number }> = [{ clientId: normalizedClientId }];
+        if (!Number.isNaN(numericClientId)) {
+          clientFilters.push({ clientId: numericClientId });
+        }
+
+        filter.$and = filter.$and || [];
+        filter.$and.push({ $or: clientFilters });
+      }
       if (orderNumber && !search) filter.orderNumber = orderNumber as string;
       if (orderId) {
         // Handle ObjectId filtering for orderId
@@ -227,7 +237,17 @@ export class PaymentController {
       // Fetch associated client data
       let clientData = null;
       try {
-        const client = await ClientModel.findOne({ clientId: payment.clientId });
+        const normalizedPaymentClientId = String(payment.clientId).trim();
+        const numericPaymentClientId = Number(normalizedPaymentClientId);
+        const clientLookupFilters: Array<Record<string, string | number>> = [
+          { clientId: normalizedPaymentClientId }
+        ];
+
+        if (!Number.isNaN(numericPaymentClientId)) {
+          clientLookupFilters.push({ clientKey: numericPaymentClientId });
+        }
+
+        const client = await ClientModel.findOne({ $or: clientLookupFilters });
         if (client) {
           clientData = {
             name: client.personalInfo?.fullName || `${client.personalInfo?.firstName || ''} ${client.personalInfo?.lastName || ''}`.trim(),
@@ -346,8 +366,9 @@ export class PaymentController {
 
       // Use clinic name directly
       const actualClinicName: string = rawClinicName;
+      const clinicNameRegex = new RegExp(`^${actualClinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
-      const filter: any = { clinicName: actualClinicName };
+      const filter: any = { clinicName: clinicNameRegex };
 
       // Text search across payment number, client name, order number
       if (search) {
@@ -422,7 +443,26 @@ export class PaymentController {
         return;
       }
 
-      const payments = await PaymentModel.findByClient(Number(clientId));
+      const normalizedClientId = String(clientId).trim();
+      const numericClientId = Number(normalizedClientId);
+
+      let paymentLookupId: string | number = normalizedClientId;
+      if (!Number.isNaN(numericClientId)) {
+        const client = await ClientModel.findOne({
+          $or: [
+            { clientId: normalizedClientId },
+            { clientKey: numericClientId }
+          ]
+        }).select({ clientKey: 1, clientId: 1 });
+
+        if (client?.clientKey !== undefined) {
+          paymentLookupId = client.clientKey;
+        } else {
+          paymentLookupId = numericClientId;
+        }
+      }
+
+      const payments = await PaymentModel.findByClient(paymentLookupId);
 
       res.json({
         success: true,
@@ -941,7 +981,7 @@ export class PaymentController {
         PaymentModel.getPaymentMethodStats(clinicName),
         PaymentModel.getTotalRevenue(clinicName),
         PaymentModel.countDocuments({
-          clinicName,
+          clinicName: new RegExp(`^${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
           'amounts.totalOwed': { $gt: 0 }
         })
       ]);
@@ -984,17 +1024,18 @@ export class PaymentController {
       }
 
       const skip = (Number(page) - 1) * Number(limit);
+      const clinicNameRegex = new RegExp(`^${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
       const [payments, total] = await Promise.all([
         PaymentModel.find({
-          clinicName,
+          clinicName: clinicNameRegex,
           'amounts.totalOwed': { $gt: 0 }
         })
           .sort({ paymentDate: 1 })
           .skip(skip)
           .limit(Number(limit)),
         PaymentModel.countDocuments({
-          clinicName,
+          clinicName: clinicNameRegex,
           'amounts.totalOwed': { $gt: 0 }
         })
       ]);
@@ -1174,8 +1215,23 @@ export class PaymentController {
         return;
       }
 
+      const normalizedClientId = String(clientId).trim();
+      const numericClientId = Number(normalizedClientId);
+      let paymentHistoryClientId: string | number = normalizedClientId;
+
+      if (!Number.isNaN(numericClientId)) {
+        const client = await ClientModel.findOne({
+          $or: [
+            { clientId: normalizedClientId },
+            { clientKey: numericClientId }
+          ]
+        }).select({ clientKey: 1 });
+
+        paymentHistoryClientId = client?.clientKey ?? numericClientId;
+      }
+
       const result = await PaymentService.getClientPaymentHistory(
-        Number(clientId),
+        paymentHistoryClientId,
         Number(page),
         Number(limit),
         sortBy as string

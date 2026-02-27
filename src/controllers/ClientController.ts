@@ -34,11 +34,12 @@ export class ClientController {
     });
 
     // Get enrichment data (next appointments, total orders) for all clients in the result
-    const clientIds = result.clients.map(client => 
-      typeof client.clientId === 'number' ? client.clientId : Number(client.clientId)
-    ).filter(id => !isNaN(id));
+    const clientRefs = result.clients.map(client => ({
+      clientId: client.clientId,
+      clientKey: client.clientKey
+    }));
     
-    const enrichmentMap = await ClientService.getClientEnrichmentData(clientIds);
+    const enrichmentMap = await ClientService.getClientEnrichmentData(clientRefs);
 
     // Format response using view layer with enrichment data
     const response = ClientView.formatClientList(
@@ -245,20 +246,19 @@ export class ClientController {
     });
 
     // Get enrichment data (next appointments, total orders) for all clients
-    const clientIds = result.clients.map(client => {
-      // Handle both string and number clientId formats
-      const id = client.clientId;
-      return typeof id === 'number' ? id : Number(id);
-    }).filter(id => !isNaN(id));
+    const clientRefs = result.clients.map(client => ({
+      clientId: client.clientId,
+      clientKey: client.clientKey
+    }));
     
-    const enrichmentMap = await ClientService.getClientEnrichmentData(clientIds);
+    const enrichmentMap = await ClientService.getClientEnrichmentData(clientRefs);
 
     // Format response using frontend-compatible view with enrichment data
     const clientsData = result.clients.map(client => {
-      const clientIdNum = typeof client.clientId === 'number' 
-        ? client.clientId 
+      const enrichmentKey = typeof client.clientKey === 'number'
+        ? client.clientKey
         : Number(client.clientId);
-      const enrichment = enrichmentMap.get(clientIdNum);
+      const enrichment = Number.isNaN(enrichmentKey) ? undefined : enrichmentMap.get(enrichmentKey);
       
       // Get base formatted data
       const formattedClient = ClientView.formatClientForFrontend(client);

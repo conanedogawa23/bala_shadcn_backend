@@ -239,10 +239,10 @@ export class ClientView {
     return {
       success: true,
       data: clients.map(client => {
-        const clientIdNum = typeof client.clientId === 'number' 
-          ? client.clientId 
+        const enrichmentKey = typeof client.clientKey === 'number'
+          ? client.clientKey
           : Number(client.clientId);
-        const enrichment = enrichmentMap?.get(clientIdNum);
+        const enrichment = Number.isNaN(enrichmentKey) ? undefined : enrichmentMap?.get(enrichmentKey);
         return this.formatClientSummary(client, enrichment);
       }),
       pagination: {

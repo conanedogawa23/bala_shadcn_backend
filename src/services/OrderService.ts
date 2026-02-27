@@ -326,9 +326,10 @@ export class OrderService {
     try {
       const start = startDate || new Date('2018-01-01');
       const end = endDate || new Date('2025-12-31');
+      const clinicRegex = new RegExp(`^${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
       const matchCriteria: any = {
-        clinicName,
+        clinicName: clinicRegex,
         monthlyAggregate: { $ne: true },
         status: { $ne: OrderStatus.CANCELLED }
       };

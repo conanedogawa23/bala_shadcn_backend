@@ -2,7 +2,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IContactHistory extends Document {
   id?: number; // Auto-generated if not provided
-  clientId?: number; // Changed from string to number for consistency with other models
+  clientId?: string | number; // Legacy data can be string or number
   clinicName?: string;
   contactType: 'call' | 'email' | 'sms' | 'visit' | 'note' | 'appointment' | 'other';
   direction: 'inbound' | 'outbound' | 'internal';
@@ -220,8 +220,19 @@ ContactHistorySchema.methods.isOverdue = function(): boolean {
 };
 
 // Static methods
-ContactHistorySchema.statics.findByClient = function(clientId: string, limit = 50) {
-  return this.find({ clientId, isActive: true })
+ContactHistorySchema.statics.findByClient = function(clientId: string | number, limit = 50) {
+  const stringClientId = String(clientId).trim();
+  const numericClientId = Number(stringClientId);
+  const clientIdFilters: Array<{ clientId: string | number }> = [{ clientId: stringClientId }];
+
+  if (!Number.isNaN(numericClientId)) {
+    clientIdFilters.push({ clientId: numericClientId });
+  }
+
+  return this.find({
+    isActive: true,
+    $or: clientIdFilters
+  })
     .sort({ contactDate: -1 })
     .limit(limit)
     .lean();
@@ -306,7 +317,7 @@ ContactHistorySchema.pre('save', async function(next) {
 
 // ContactHistory model interface with static methods
 interface IContactHistoryModel extends Model<IContactHistory> {
-  findByClient(clientId: string, options?: any): any;
+  findByClient(clientId: string | number, options?: any): any;
   findByClinic(clinicName: string, options?: any): any;
   findFollowUpsRequired(clinicName?: string): any;
   getRecentActivity(limit?: any, clinicName?: any): any;

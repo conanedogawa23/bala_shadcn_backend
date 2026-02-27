@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import { AppointmentController } from '@/controllers/AppointmentController';
+import { requireClinicAccess } from '@/middleware/authMiddleware';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -199,7 +200,7 @@ const completeAppointmentValidation = [
  * @desc    Simple test for appointments by clinic - no validation
  * @access  Public
  */
-router.get('/test/:clinicName', async (req, res): Promise<void> => {
+router.get('/test/:clinicName', requireClinicAccess('clinicName'), async (req, res): Promise<void> => {
   try {
     const { clinicName } = req.params;
     logger.info('=== SIMPLE TEST ENDPOINT ===');
@@ -303,6 +304,7 @@ router.get('/test/:clinicName', async (req, res): Promise<void> => {
  */
 router.get(
   '/clinic/:clinicName',
+  requireClinicAccess('clinicName'),
   // Temporarily disable validation to debug
   // clinicNameValidation.concat(paginationValidation).concat(dateRangeValidation).concat(appointmentFiltersValidation),
   AppointmentController.getAppointmentsByClinic
@@ -386,6 +388,7 @@ router.get(
  */
 router.post(
   '/',
+  requireClinicAccess('clinicName'),
   createAppointmentValidation,
   AppointmentController.createAppointment
 );
@@ -430,6 +433,7 @@ router.put(
  */
 router.get(
   '/ready-for-billing',
+  requireClinicAccess('clinicName'),
   [
     query('clinicName')
       .optional()
@@ -445,6 +449,7 @@ router.get(
  */
 router.get(
   '/stats/clinic/:clinicName',
+  requireClinicAccess('clinicName'),
   clinicNameValidation.concat(dateRangeValidation),
   AppointmentController.getClinicAppointmentStats
 );
@@ -478,6 +483,7 @@ router.get(
  */
 router.get(
   '/today/:clinicName',
+  requireClinicAccess('clinicName'),
   clinicNameValidation,
   AppointmentController.getTodaysAppointments
 );

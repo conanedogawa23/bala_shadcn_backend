@@ -53,7 +53,7 @@ interface IAppointmentModel extends Model<IAppointment> {
   checkTimeSlotConflict(resourceId: number, startDate: Date, endDate: Date, excludeId?: string): any;
   findReadyToBill(clinicName?: string): any;
   findByResource(resourceId: number, date: Date): any;
-  findByClient(clientId: string): any; // MongoDB stores clientId as string
+  findByClient(clientId: string | number): any;
 }
 
 const AppointmentSchema = new Schema<IAppointment>({
@@ -280,8 +280,9 @@ AppointmentSchema.methods.getFormattedDuration = function(): string {
 
 // Static methods
 AppointmentSchema.statics.findByClinic = function(clinicName: string, startDate?: Date, endDate?: Date) {
+  const escapedClinicName = clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const query: any = {
-    clinicName: clinicName,
+    clinicName: new RegExp(`^${escapedClinicName}$`, 'i'),
     isActive: true
   };
 
@@ -292,15 +293,17 @@ AppointmentSchema.statics.findByClinic = function(clinicName: string, startDate?
   return this.find(query).sort({ startDate: 1 });
 };
 
-AppointmentSchema.statics.findByClient = function(clientId: string) {
-  const numericId = Number(clientId);
-  const query: any = {
-    $or: [
-      { clientId: numericId },
-      { clientId: clientId }
-    ],
-    isActive: true
-  };
+AppointmentSchema.statics.findByClient = function(clientId: string | number) {
+  const normalizedClientId = String(clientId).trim();
+  const numericClientId = Number(normalizedClientId);
+  const filters: any[] = [{ clientId: normalizedClientId }];
+
+  if (!Number.isNaN(numericClientId)) {
+    filters.push({ clientId: numericClientId });
+    filters.push({ clientKey: numericClientId });
+  }
+
+  const query: any = { $or: filters, isActive: true };
   return this.find(query).sort({ startDate: -1 });
 };
 
@@ -330,7 +333,8 @@ AppointmentSchema.statics.findReadyToBill = function(clinicName?: string) {
   };
 
   if (clinicName) {
-    query.clinicName = clinicName;
+    const escapedClinicName = clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    query.clinicName = new RegExp(`^${escapedClinicName}$`, 'i');
   }
 
   return this.find(query).sort({ billDate: 1 });

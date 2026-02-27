@@ -1,6 +1,7 @@
 import { ClientModel, IClient } from '@/models/Client';
 import { AppointmentModel } from '@/models/Appointment';
 import Order from '@/models/Order';
+import ContactHistoryModel from '@/models/ContactHistory';
 import { NotFoundError, ValidationError, DatabaseError } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import { ClinicService } from './ClinicService';
@@ -14,6 +15,11 @@ export interface ClientEnrichmentData {
     status: number;
   } | null;
   totalOrders: number;
+}
+
+interface ClientEnrichmentRef {
+  clientId: string;
+  clientKey?: number;
 }
 
 // Add proper type definitions for client data
@@ -162,6 +168,71 @@ function safeStringify(obj: unknown): string {
 }
 
 export class ClientService {
+  private static getExactClinicRegex(clinicName: string): RegExp {
+    const escapedClinicName = clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^${escapedClinicName}$`, 'i');
+  }
+
+  private static getClientIdentifiers(client: Pick<IClient, 'clientId' | 'clientKey'>): Array<string | number> {
+    const identifiers = new Set<string | number>();
+    const normalizedClientId = String(client.clientId || '').trim();
+
+    if (normalizedClientId) {
+      identifiers.add(normalizedClientId);
+      const numericClientId = Number(normalizedClientId);
+      if (!Number.isNaN(numericClientId)) {
+        identifiers.add(numericClientId);
+      }
+    }
+
+    if (typeof client.clientKey === 'number' && !Number.isNaN(client.clientKey)) {
+      identifiers.add(client.clientKey);
+      identifiers.add(String(client.clientKey));
+    }
+
+    return Array.from(identifiers);
+  }
+
+  private static getEnrichmentKey(client: Pick<IClient, 'clientId' | 'clientKey'>): number | null {
+    if (typeof client.clientKey === 'number' && !Number.isNaN(client.clientKey)) {
+      return client.clientKey;
+    }
+
+    const numericClientId = Number(client.clientId);
+    return Number.isNaN(numericClientId) ? null : numericClientId;
+  }
+
+  private static getIdentifierLookupKeys(identifier: string | number): string[] {
+    if (typeof identifier === 'number') {
+      return [`n:${identifier}`, `s:${String(identifier)}`];
+    }
+
+    const normalized = identifier.trim();
+    const keys = [`s:${normalized}`];
+    const numericValue = Number(normalized);
+    if (!Number.isNaN(numericValue)) {
+      keys.push(`n:${numericValue}`);
+    }
+    return keys;
+  }
+
+  private static resolveEnrichmentKey(
+    identifier: unknown,
+    identifierToEnrichmentKey: Map<string, number>
+  ): number | null {
+    if (typeof identifier !== 'string' && typeof identifier !== 'number') {
+      return null;
+    }
+
+    for (const key of this.getIdentifierLookupKeys(identifier)) {
+      const enrichmentKey = identifierToEnrichmentKey.get(key);
+      if (typeof enrichmentKey === 'number') {
+        return enrichmentKey;
+      }
+    }
+
+    return null;
+  }
 
   /**
    * Get clients by clinic with pagination and filtering
@@ -314,151 +385,171 @@ export class ClientService {
    * - Orders.clientId is typically Number  
    * - We query with both types to handle all data
    */
-  static async getClientEnrichmentData(clientIds: number[]): Promise<Map<number, ClientEnrichmentData>> {
+  static async getClientEnrichmentData(clientRefs: ClientEnrichmentRef[]): Promise<Map<number, ClientEnrichmentData>> {
     const enrichmentMap = new Map<number, ClientEnrichmentData>();
     
-    if (clientIds.length === 0) {
+    if (clientRefs.length === 0) {
       return enrichmentMap;
     }
 
     try {
+      const normalizedRefs = clientRefs
+        .map(ref => {
+          const enrichmentKey = this.getEnrichmentKey(ref as Pick<IClient, 'clientId' | 'clientKey'>);
+          if (enrichmentKey === null) {
+            return null;
+          }
+
+          const identifiers = this.getClientIdentifiers(ref as Pick<IClient, 'clientId' | 'clientKey'>);
+          if (identifiers.length === 0) {
+            return null;
+          }
+
+          return {
+            enrichmentKey,
+            identifiers
+          };
+        })
+        .filter((ref): ref is { enrichmentKey: number; identifiers: Array<string | number> } => ref !== null);
+
+      if (normalizedRefs.length === 0) {
+        return enrichmentMap;
+      }
+
+      const identifierToEnrichmentKey = new Map<string, number>();
+      const stringIdentifiers = new Set<string>();
+      const numberIdentifiers = new Set<number>();
+
+      for (const ref of normalizedRefs) {
+        for (const identifier of ref.identifiers) {
+          for (const lookupKey of this.getIdentifierLookupKeys(identifier)) {
+            if (!identifierToEnrichmentKey.has(lookupKey)) {
+              identifierToEnrichmentKey.set(lookupKey, ref.enrichmentKey);
+            }
+          }
+
+          if (typeof identifier === 'string') {
+            stringIdentifiers.add(identifier);
+          } else {
+            numberIdentifiers.add(identifier);
+          }
+        }
+      }
+
       const now = new Date();
-      
-      // Prepare both string and number versions of clientIds for flexible matching
-      // This handles MongoDB's Mixed type which stores data as either String or Number
-      const clientIdStrings = clientIds.map(id => String(id));
-      const clientIdNumbers = clientIds; // Already numbers
+      const appointmentMatchOr: any[] = [];
+
+      if (stringIdentifiers.size > 0) {
+        appointmentMatchOr.push({ clientId: { $in: Array.from(stringIdentifiers) } });
+      }
+      if (numberIdentifiers.size > 0) {
+        const numericIdentifiers = Array.from(numberIdentifiers);
+        appointmentMatchOr.push({ clientId: { $in: numericIdentifiers } });
+        appointmentMatchOr.push({ clientKey: { $in: numericIdentifiers } });
+      }
+
+      const appointmentMap = new Map<number, { date: Date; subject: string; status: number }>();
 
       // First, try to get future appointments (next upcoming appointment)
-      // Use $or to match clientId as either string OR number (Mixed type compatibility)
-      const futureAppointmentsAggregation = await AppointmentModel.aggregate([
-        {
-          $match: {
-            $or: [
-              { clientId: { $in: clientIdStrings } }, // Match as strings
-              { clientId: { $in: clientIdNumbers } }  // Match as numbers
-            ],
-            startDate: { $gte: now },
-            status: { $in: [0, 1] }, // Scheduled (0) or Confirmed (1) status
-            isActive: true
+      if (appointmentMatchOr.length > 0) {
+        const futureAppointments = await AppointmentModel.find({
+          $or: appointmentMatchOr,
+          startDate: { $gte: now },
+          status: { $in: [0, 1] },
+          isActive: true
+        })
+          .sort({ startDate: 1 })
+          .select({ clientId: 1, startDate: 1, subject: 1, status: 1 })
+          .lean();
+
+        for (const appointment of futureAppointments) {
+          const enrichmentKey = this.resolveEnrichmentKey(appointment.clientId, identifierToEnrichmentKey);
+          if (enrichmentKey !== null && !appointmentMap.has(enrichmentKey)) {
+            appointmentMap.set(enrichmentKey, {
+              date: appointment.startDate,
+              subject: appointment.subject,
+              status: appointment.status
+            });
           }
-        },
-        {
-          $sort: { startDate: 1 }
-        },
-        {
-          $group: {
-            _id: '$clientId',
-            nextAppointment: {
-              $first: {
-                date: '$startDate',
-                subject: '$subject',
-                status: '$status'
-              }
+        }
+
+        const missingEnrichmentKeys = new Set(
+          normalizedRefs
+            .map(ref => ref.enrichmentKey)
+            .filter(enrichmentKey => !appointmentMap.has(enrichmentKey))
+        );
+
+        if (missingEnrichmentKeys.size > 0) {
+          const pastAppointments = await AppointmentModel.find({
+            $or: appointmentMatchOr,
+            startDate: { $lt: now },
+            isActive: true
+          })
+            .sort({ startDate: -1 })
+            .select({ clientId: 1, startDate: 1, subject: 1, status: 1 })
+            .lean();
+
+          for (const appointment of pastAppointments) {
+            const enrichmentKey = this.resolveEnrichmentKey(appointment.clientId, identifierToEnrichmentKey);
+            if (
+              enrichmentKey !== null &&
+              missingEnrichmentKeys.has(enrichmentKey) &&
+              !appointmentMap.has(enrichmentKey)
+            ) {
+              appointmentMap.set(enrichmentKey, {
+                date: appointment.startDate,
+                subject: appointment.subject,
+                status: appointment.status
+              });
             }
           }
         }
-      ]);
+      }
 
-      // For clients without future appointments, get their most recent past appointment
-      // This provides better UX by showing appointment history
-      const clientsWithFutureAppointments = new Set(
-        futureAppointmentsAggregation.map(item => String(item._id))
-      );
-      
-      const clientsNeedingPastAppointments = clientIdStrings.filter(
-        id => !clientsWithFutureAppointments.has(id)
-      );
+      const orderMatchOr: any[] = [];
+      if (stringIdentifiers.size > 0) {
+        orderMatchOr.push({ clientId: { $in: Array.from(stringIdentifiers) } });
+      }
+      if (numberIdentifiers.size > 0) {
+        orderMatchOr.push({ clientId: { $in: Array.from(numberIdentifiers) } });
+      }
 
-      let pastAppointmentsAggregation: any[] = [];
-      if (clientsNeedingPastAppointments.length > 0) {
-        pastAppointmentsAggregation = await AppointmentModel.aggregate([
+      const orderCountMap = new Map<number, number>();
+
+      if (orderMatchOr.length > 0) {
+        const orderCountsAggregation = await Order.aggregate([
           {
             $match: {
-              $or: [
-                { clientId: { $in: clientsNeedingPastAppointments } },
-                { clientId: { $in: clientsNeedingPastAppointments.map(id => Number(id)) } }
-              ],
-              startDate: { $lt: now },
-              isActive: true
+              $or: orderMatchOr
             }
-          },
-          {
-            $sort: { startDate: -1 } // Most recent first
           },
           {
             $group: {
               _id: '$clientId',
-              nextAppointment: {
-                $first: {
-                  date: '$startDate',
-                  subject: '$subject',
-                  status: '$status'
-                }
-              }
+              totalOrders: { $sum: 1 }
             }
           }
         ]);
-      }
 
-      // Combine both future and past appointment results
-      const nextAppointmentsAggregation = [
-        ...futureAppointmentsAggregation,
-        ...pastAppointmentsAggregation
-      ];
-
-      // Create a map for quick lookup of next appointments
-      // Handle both string and number _id from aggregation results
-      const appointmentMap = new Map<number, { date: Date; subject: string; status: number }>();
-      for (const item of nextAppointmentsAggregation) {
-        // Convert _id to number regardless of whether it was stored as string or number
-        const numericId = typeof item._id === 'number' ? item._id : Number(item._id);
-        if (!isNaN(numericId)) {
-          appointmentMap.set(numericId, item.nextAppointment);
-        }
-      }
-
-      // Batch query for total order counts per client
-      // Orders typically use numeric clientId, but also check for string values
-      const orderCountsAggregation = await Order.aggregate([
-        {
-          $match: {
-            $or: [
-              { clientId: { $in: clientIdNumbers } }, // Match as numbers
-              { clientId: { $in: clientIdStrings } }  // Match as strings (for any legacy data)
-            ]
+        for (const item of orderCountsAggregation) {
+          const enrichmentKey = this.resolveEnrichmentKey(item._id, identifierToEnrichmentKey);
+          if (enrichmentKey !== null) {
+            const existingCount = orderCountMap.get(enrichmentKey) || 0;
+            orderCountMap.set(enrichmentKey, existingCount + item.totalOrders);
           }
-        },
-        {
-          $group: {
-            _id: '$clientId',
-            totalOrders: { $sum: 1 }
-          }
-        }
-      ]);
-
-      // Create a map for quick lookup of order counts
-      // Handle both string and number _id from aggregation results
-      const orderCountMap = new Map<number, number>();
-      for (const item of orderCountsAggregation) {
-        const numericId = typeof item._id === 'number' ? item._id : Number(item._id);
-        if (!isNaN(numericId)) {
-          // Accumulate if the same clientId appears with different types
-          const existing = orderCountMap.get(numericId) || 0;
-          orderCountMap.set(numericId, existing + item.totalOrders);
         }
       }
 
       // Build enrichment data for each client
-      for (const clientId of clientIds) {
-        enrichmentMap.set(clientId, {
-          nextAppointment: appointmentMap.get(clientId) || null,
-          totalOrders: orderCountMap.get(clientId) || 0
+      for (const enrichmentKey of Array.from(new Set(normalizedRefs.map(ref => ref.enrichmentKey)))) {
+        enrichmentMap.set(enrichmentKey, {
+          nextAppointment: appointmentMap.get(enrichmentKey) || null,
+          totalOrders: orderCountMap.get(enrichmentKey) || 0
         });
       }
 
       logger.debug('Client enrichment data loaded', {
-        requestedClientIds: clientIds.length,
+        requestedClientIds: normalizedRefs.length,
         appointmentsFound: appointmentMap.size,
         ordersFound: orderCountMap.size
       });
@@ -467,8 +558,13 @@ export class ClientService {
     } catch (error) {
       logger.error('Error in getClientEnrichmentData:', error);
       // Return empty enrichment on error - don't fail the whole request
-      for (const clientId of clientIds) {
-        enrichmentMap.set(clientId, {
+      for (const clientRef of clientRefs) {
+        const enrichmentKey = this.getEnrichmentKey(clientRef as Pick<IClient, 'clientId' | 'clientKey'>);
+        if (enrichmentKey === null) {
+          continue;
+        }
+
+        enrichmentMap.set(enrichmentKey, {
           nextAppointment: null,
           totalOrders: 0
         });
@@ -976,8 +1072,9 @@ export class ClientService {
    */
   static async getClientsWithInsurance(clinicName: string): Promise<IClient[]> {
     try {
+      const clinicRegex = this.getExactClinicRegex(clinicName);
       const clients = await ClientModel.find({
-        defaultClinic: clinicName,
+        defaultClinic: clinicRegex,
         isActive: true,
         'insurance.0': { $exists: true }
       }).sort({ 'personalInfo.lastName': 1, 'personalInfo.firstName': 1 });
@@ -1294,12 +1391,13 @@ export class ClientService {
   static async getClientContactHistory(clientId: string, limit = 50): Promise<any[]> {
     try {
       const client = await this.getClientById(clientId);
-
-      // Query contact history from ContactHistory model if it exists
-      const ContactHistoryModel = mongoose.model('ContactHistory');
+      const clientIdentifiers = this.getClientIdentifiers(client);
       const history = await ContactHistoryModel
-        .find({ clientId: client._id })
-        .sort({ createdAt: -1 })
+        .find({
+          isActive: true,
+          $or: clientIdentifiers.map(identifier => ({ clientId: identifier }))
+        })
+        .sort({ contactDate: -1, createdAt: -1 })
         .limit(limit);
 
       return history;
@@ -1361,10 +1459,11 @@ export class ClientService {
   static async getClientsWithDPA(clinicName: string, page = 1, limit = 20): Promise<{ clients: IClient[]; page: number; limit: number; total: number }> {
     try {
       const skip = (page - 1) * limit;
+      const clinicRegex = this.getExactClinicRegex(clinicName);
 
       const [clients, total] = await Promise.all([
         ClientModel.find({
-          defaultClinic: clinicName,
+          defaultClinic: clinicRegex,
           'insurance.dpa': true,
           isActive: true
         })
@@ -1372,7 +1471,7 @@ export class ClientService {
           .limit(limit)
           .sort({ 'personalInfo.lastName': 1, 'personalInfo.firstName': 1 }),
         ClientModel.countDocuments({
-          defaultClinic: clinicName,
+          defaultClinic: clinicRegex,
           'insurance.dpa': true,
           isActive: true
         })
@@ -1485,13 +1584,10 @@ export class ClientService {
   private static async getClientOrders(clientId: string): Promise<any[]> {
     try {
       const Order = mongoose.model('Order');
-      const numericClientId = Number(clientId);
-      // Use defensive $or query to handle both string and numeric clientId types in MongoDB
+      const client = await this.getClientById(clientId);
+      const clientIdentifiers = this.getClientIdentifiers(client);
       return await Order.find({
-        $or: [
-          { clientId: numericClientId },
-          { clientId: clientId }
-        ]
+        $or: clientIdentifiers.map(identifier => ({ clientId: identifier }))
       }).sort({ createdAt: -1 });
     } catch (error) {
       logger.warn('Could not retrieve client orders:', error);
@@ -1506,9 +1602,10 @@ export class ClientService {
     try {
       const Payment = mongoose.model('Payment');
       const client = await this.getClientById(clientId);
-      // ✓ FIXED: Convert numeric clientId (client.clientKey or client.clientId) for Payment model
-      const numericClientId = client.clientKey || Number(client.clientId);
-      return await Payment.find({ clientId: numericClientId }).sort({ paymentDate: -1 });
+      const clientIdentifiers = this.getClientIdentifiers(client);
+      return await Payment.find({
+        $or: clientIdentifiers.map(identifier => ({ clientId: identifier }))
+      }).sort({ paymentDate: -1 });
     } catch (error) {
       logger.warn('Could not retrieve client payments:', error);
       return [];
@@ -1522,9 +1619,14 @@ export class ClientService {
     try {
       const Appointment = mongoose.model('Appointment');
       const client = await this.getClientById(clientId);
-      // ✓ FIXED: Convert numeric clientId (client.clientKey or client.clientId) for Appointment model
-      const numericClientId = client.clientKey || Number(client.clientId);
-      return await Appointment.find({ clientId: numericClientId }).sort({ startDate: -1 });
+      const clientIdentifiers = this.getClientIdentifiers(client);
+      const numericIdentifiers = clientIdentifiers.filter((identifier): identifier is number => typeof identifier === 'number');
+      const appointmentFilter: any[] = [{ clientId: { $in: clientIdentifiers } }];
+      if (numericIdentifiers.length > 0) {
+        appointmentFilter.push({ clientKey: { $in: numericIdentifiers } });
+      }
+
+      return await Appointment.find({ $or: appointmentFilter }).sort({ startDate: -1 });
     } catch (error) {
       logger.warn('Could not retrieve client appointments:', error);
       return [];

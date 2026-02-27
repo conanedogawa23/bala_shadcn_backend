@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import User, { IUser, UserRole, UserStatus } from '../models/User';
+import { EmailService } from '../services/EmailService';
 import { logger } from '../utils/logger';
 
 // Extended Request interface for authenticated requests
@@ -659,8 +660,11 @@ export class AuthController {
       const resetToken = user.generatePasswordResetToken();
       await user.save();
 
-      // TODO: Send password reset email
-      // await EmailService.sendPasswordResetEmail(user.email, resetToken);
+      try {
+        await EmailService.sendPasswordResetEmail(user.email, resetToken);
+      } catch (emailError) {
+        logger.error('Failed to send password reset email:', emailError);
+      }
 
       return res.status(200).json({
         success: true,

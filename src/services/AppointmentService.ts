@@ -7,7 +7,6 @@ import { NotFoundError, ValidationError, DatabaseError, ConflictError } from '@/
 import { logger } from '@/utils/logger';
 
 export class AppointmentService {
-  
   /**
    * Map clinic names between collections due to data inconsistency
    * clinics collection uses different naming than appointments collection
@@ -22,12 +21,44 @@ export class AppointmentService {
    */
   private static getClientLookupStages(): PipelineStage[] {
     return [
-      { $addFields: { clientIdStr: { $toString: '$clientId' } } },
       {
         $lookup: {
           from: 'clients',
-          localField: 'clientIdStr',
-          foreignField: 'clientId',
+          let: {
+            appointmentClientId: '$clientId',
+            appointmentClientKey: '$clientKey'
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $or: [
+                    {
+                      $and: [
+                        { $ne: ['$$appointmentClientId', null] },
+                        { $eq: ['$clientId', { $toString: '$$appointmentClientId' }] }
+                      ]
+                    },
+                    {
+                      $and: [
+                        { $ne: ['$$appointmentClientId', null] },
+                        { $ne: ['$clientKey', null] },
+                        { $eq: [{ $toString: '$clientKey' }, { $toString: '$$appointmentClientId' }] }
+                      ]
+                    },
+                    {
+                      $and: [
+                        { $ne: ['$$appointmentClientKey', null] },
+                        { $ne: ['$clientKey', null] },
+                        { $eq: ['$clientKey', '$$appointmentClientKey'] }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            { $limit: 1 }
+          ],
           as: 'clientDetails'
         }
       },
@@ -118,7 +149,16 @@ export class AppointmentService {
         matchStage.resourceId = resourceId;
       }
       if (clientId) {
-        matchStage.clientId = clientId;
+        const normalizedClientId = String(clientId).trim();
+        const numericClientId = Number(normalizedClientId);
+        const clientIdFilters: any[] = [{ clientId: normalizedClientId }];
+
+        if (!Number.isNaN(numericClientId)) {
+          clientIdFilters.push({ clientId: numericClientId });
+          clientIdFilters.push({ clientKey: numericClientId });
+        }
+
+        matchStage.$or = clientIdFilters;
       }
 
       const skip = (page - 1) * limit;
@@ -300,6 +340,13 @@ export class AppointmentService {
         throw new NotFoundError('Client', appointmentData.clientId);
       }
 
+      const normalizedAppointmentClientId = typeof client.clientKey === 'number'
+        ? client.clientKey
+        : numericClientId;
+      const normalizedAppointmentClientKey = typeof client.clientKey === 'number'
+        ? client.clientKey
+        : (!Number.isNaN(numericClientId) ? numericClientId : undefined);
+
       // Verify resource exists
       const resource = await ResourceModel.findOne({ resourceId: appointmentData.resourceId });
       if (!resource) {
@@ -338,6 +385,8 @@ export class AppointmentService {
       // Create appointment
       const appointment = new AppointmentModel({
         ...appointmentData,
+        clientId: normalizedAppointmentClientId,
+        clientKey: normalizedAppointmentClientKey,
         subject: appointmentData.subject || client.getFullName(),
         type: appointmentData.type || 0,
         status: appointmentData.status || 0,
@@ -568,7 +617,8 @@ export class AppointmentService {
       };
 
       if (clinicName) {
-        matchStage.clinicName = clinicName;
+        const escapedClinicName = clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        matchStage.clinicName = new RegExp(`^${escapedClinicName}$`, 'i');
       }
 
       const appointments = await AppointmentModel.aggregate([
@@ -650,13 +700,40 @@ export class AppointmentService {
         throw new NotFoundError('Client', clientId);
       }
 
+      const clientMatchFilters: Array<Record<string, string | number>> = [];
+      const clientIdStrings = new Set<string>();
+      const clientIdNumbers = new Set<number>();
+
+      clientIdStrings.add(client.clientId);
+
+      const numericRequestedClientId = Number(clientId);
+      if (!Number.isNaN(numericRequestedClientId)) {
+        clientIdNumbers.add(numericRequestedClientId);
+      }
+
+      const numericClientIdFromClientRecord = Number(client.clientId);
+      if (!Number.isNaN(numericClientIdFromClientRecord)) {
+        clientIdNumbers.add(numericClientIdFromClientRecord);
+      }
+
+      if (typeof client.clientKey === 'number' && !Number.isNaN(client.clientKey)) {
+        clientIdNumbers.add(client.clientKey);
+        clientIdStrings.add(String(client.clientKey));
+      }
+
+      for (const idString of clientIdStrings) {
+        clientMatchFilters.push({ clientId: idString });
+      }
+
+      for (const idNumber of clientIdNumbers) {
+        clientMatchFilters.push({ clientId: idNumber });
+        clientMatchFilters.push({ clientKey: idNumber });
+      }
+
       const appointments = await AppointmentModel.aggregate([
         {
           $match: {
-            $or: [
-              { clientId: numericClientId },
-              { clientId: clientId }
-            ],
+            $or: clientMatchFilters,
             isActive: true
           }
         },
