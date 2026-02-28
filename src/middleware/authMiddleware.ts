@@ -393,8 +393,11 @@ export const verifyClinicExists = async (
       return next(); // Skip validation if no clinic name provided
     }
 
-    // Verify clinic exists
-    const clinic = await ClinicModel.findOne({ name: clinicName });
+    // Verify clinic exists (case-insensitive exact match)
+    const escapedClinicName = clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const clinic = await ClinicModel.findOne({
+      name: new RegExp(`^${escapedClinicName}$`, 'i')
+    });
 
     if (!clinic) {
       return res.status(404).json({

@@ -443,7 +443,24 @@ ClientCompanySchema.statics.getCompanySizeDistribution = function() {
 };
 
 // Pre-save middleware
-ClientCompanySchema.pre('save', function(next) {
+ClientCompanySchema.pre('save', async function(next) {
+  try {
+    // Auto-generate incremental business id for new records
+    if (this.isNew && !this.id) {
+      const model = this.constructor as mongoose.Model<IClientCompany>;
+      const highestIdDoc = await model
+        .findOne()
+        .sort({ id: -1 })
+        .select('id')
+        .lean() as { id?: number } | null;
+
+      this.id = (highestIdDoc?.id || 0) + 1;
+    }
+  } catch (error) {
+    next(error as Error);
+    return;
+  }
+
   // updatedAt is auto-managed by timestamps: true
   
   // Auto-generate display name if not provided

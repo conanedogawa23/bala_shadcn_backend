@@ -168,7 +168,24 @@ CitySchema.statics.getCityStats = function() {
 };
 
 // Pre-save middleware
-CitySchema.pre('save', function(next) {
+CitySchema.pre('save', async function(next) {
+  try {
+    // Auto-generate incremental business id for new records
+    if (this.isNew && !this.id) {
+      const model = this.constructor as mongoose.Model<ICity>;
+      const highestIdDoc = await model
+        .findOne()
+        .sort({ id: -1 })
+        .select('id')
+        .lean() as { id?: number } | null;
+
+      this.id = (highestIdDoc?.id || 0) + 1;
+    }
+  } catch (error) {
+    next(error as Error);
+    return;
+  }
+
   // updatedAt is auto-managed by timestamps: true
   
   // Normalize city name and province

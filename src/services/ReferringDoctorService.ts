@@ -13,18 +13,30 @@ export class ReferringDoctorService {
     const skip = (page - 1) * limit;
 
     const filter: any = {};
+    const andConditions: any[] = [];
+
     if (isActive !== undefined) filter.isActive = isActive;
+
     if (clinicName) {
-      filter.$or = [{ clinicName }, { clinicName: { $exists: false } }];
+      andConditions.push({
+        $or: [{ clinicName }, { clinicName: { $exists: false } }]
+      });
     }
+
     if (search) {
       const regex = new RegExp(search, 'i');
-      filter.$or = [
-        { firstName: regex },
-        { lastName: regex },
-        { fullName: regex },
-        { specialty: regex }
-      ];
+      andConditions.push({
+        $or: [
+          { firstName: regex },
+          { lastName: regex },
+          { fullName: regex },
+          { specialty: regex }
+        ]
+      });
+    }
+
+    if (andConditions.length > 0) {
+      filter.$and = andConditions;
     }
 
     const [doctors, total] = await Promise.all([

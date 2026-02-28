@@ -223,7 +223,7 @@ export class ReportController {
 
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
-      const clinicRegex = this.getClinicNameRegex(clinic);
+      const clinicRegex = ReportController.getClinicNameRegex(clinic);
 
       // Validate date range
       const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -346,7 +346,7 @@ export class ReportController {
       const clinic = clinicName as string;
       
       // Use case-insensitive exact matching to support mixed clinic casing.
-      const clinicRegex = this.getClinicNameRegex(clinic);
+      const clinicRegex = ReportController.getClinicNameRegex(clinic);
 
       // Aggregation pipeline for efficient stats calculation
       const stats = await ClientModel.aggregate([
@@ -430,7 +430,7 @@ export class ReportController {
 
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
-      const clinicRegex = this.getClinicNameRegex(clinic);
+      const clinicRegex = ReportController.getClinicNameRegex(clinic);
 
       const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const end = endDate ? new Date(endDate as string) : new Date();
@@ -534,7 +534,7 @@ export class ReportController {
 
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
-      const clinicRegex = this.getClinicNameRegex(clinic);
+      const clinicRegex = ReportController.getClinicNameRegex(clinic);
 
       const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const end = endDate ? new Date(endDate as string) : new Date();
@@ -713,7 +713,7 @@ export class ReportController {
 
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
-      const clinicRegex = this.getClinicNameRegex(clinic);
+      const clinicRegex = ReportController.getClinicNameRegex(clinic);
 
       // Get all orders for the clinic
       const orders = await Order.find({ clinicName: clinicRegex })
@@ -751,14 +751,21 @@ export class ReportController {
       const recentOrders = orders
         .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 20)
-        .map((order: any) => ({
-          orderId: String(order._id),
-          orderNumber: order.orderNumber || '',
-          clientName: order.clientName || 'Unknown Client',
-          status: order.status || 'scheduled',
-          totalAmount: order.totalAmount || 0,
-          createdAt: new Date(order.createdAt).toISOString()
-        }));
+        .map((order: any) => {
+          const createdAtDate = order.createdAt ? new Date(order.createdAt) : null;
+          const createdAt = createdAtDate && !Number.isNaN(createdAtDate.getTime())
+            ? createdAtDate.toISOString()
+            : '';
+
+          return {
+            orderId: String(order._id),
+            orderNumber: order.orderNumber || '',
+            clientName: order.clientName || 'Unknown Client',
+            status: order.status || 'scheduled',
+            totalAmount: typeof order.totalAmount === 'number' ? order.totalAmount : 0,
+            createdAt
+          };
+        });
 
       const reportData: OrderStatusData = {
         clinicName: clinic,
@@ -805,7 +812,7 @@ export class ReportController {
 
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
-      const clinicRegex = this.getClinicNameRegex(clinic);
+      const clinicRegex = ReportController.getClinicNameRegex(clinic);
 
       const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const end = endDate ? new Date(endDate as string) : new Date();
@@ -928,7 +935,7 @@ export class ReportController {
 
       // Type assertion for clinicName (validated above)
       const clinic = clinicName as string;
-      const clinicRegex = this.getClinicNameRegex(clinic);
+      const clinicRegex = ReportController.getClinicNameRegex(clinic);
 
       const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const end = endDate ? new Date(endDate as string) : new Date();
