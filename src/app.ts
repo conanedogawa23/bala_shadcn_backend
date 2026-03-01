@@ -142,7 +142,7 @@ async function startServer() {
     await connectDatabase();
     
     // Seed payment lookup tables
-    await seedAllPaymentLookups();
+    // await seedAllPaymentLookups();
     
     // Start listening
     const server = app.listen(PORT, () => {
