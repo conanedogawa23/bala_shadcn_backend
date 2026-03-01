@@ -2,6 +2,8 @@ import mongoose, { Document, Schema, Model } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
 
+const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '1h';
+
 // Enums for type safety
 export enum UserRole {
   ADMIN = 'admin',
@@ -300,7 +302,7 @@ UserSchema.methods.generateAccessToken = function (): string {
 
   const secret = process.env.JWT_ACCESS_SECRET!;
   return jwt.sign(payload, secret, {
-    expiresIn: '15m',
+    expiresIn: ACCESS_TOKEN_EXPIRES_IN,
     issuer: 'visio-health',
     audience: 'visio-health-client'
   });

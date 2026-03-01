@@ -69,6 +69,41 @@ interface AuthResponse {
   };
 }
 
+const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '1h';
+
+const parseExpiryToSeconds = (expiry: string): number => {
+  const trimmedExpiry = expiry.trim();
+
+  // Plain numeric value treated as seconds
+  if (/^\d+$/.test(trimmedExpiry)) {
+    return Number(trimmedExpiry);
+  }
+
+  // Supports values like 15m, 1h, 7d, 30s
+  const match = trimmedExpiry.match(/^(\d+)([smhd])$/i);
+  if (!match) {
+    return 3600;
+  }
+
+  const value = Number(match[1]);
+  const unit = match[2].toLowerCase();
+
+  switch (unit) {
+    case 's':
+      return value;
+    case 'm':
+      return value * 60;
+    case 'h':
+      return value * 60 * 60;
+    case 'd':
+      return value * 60 * 60 * 24;
+    default:
+      return 3600;
+  }
+};
+
+const ACCESS_TOKEN_EXPIRES_IN_SECONDS = parseExpiryToSeconds(ACCESS_TOKEN_EXPIRES_IN);
+
 export class AuthController {
   /**
    * User Registration
@@ -296,7 +331,7 @@ export class AuthController {
           user: user.toSafeObject(),
           accessToken,
           refreshToken,
-          expiresIn: 15 * 60 // 15 minutes in seconds
+          expiresIn: ACCESS_TOKEN_EXPIRES_IN_SECONDS
         }
       });
 
@@ -385,7 +420,7 @@ export class AuthController {
           user: user.toSafeObject(),
           accessToken: newAccessToken,
           refreshToken: token,
-          expiresIn: 15 * 60 // 15 minutes in seconds
+          expiresIn: ACCESS_TOKEN_EXPIRES_IN_SECONDS
         }
       });
 
