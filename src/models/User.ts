@@ -2,7 +2,19 @@ import mongoose, { Document, Schema, Model } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
 
-const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '1h';
+const getAccessTokenExpiry = (): SignOptions['expiresIn'] => {
+  const configuredExpiry = process.env.JWT_ACCESS_EXPIRES_IN;
+  if (!configuredExpiry) return '1h';
+
+  // Numeric env values are treated as seconds.
+  if (/^\d+$/.test(configuredExpiry)) {
+    return Number(configuredExpiry);
+  }
+
+  return configuredExpiry as SignOptions['expiresIn'];
+};
+
+const ACCESS_TOKEN_EXPIRES_IN = getAccessTokenExpiry();
 
 // Enums for type safety
 export enum UserRole {

@@ -85,8 +85,10 @@ const parseExpiryToSeconds = (expiry: string): number => {
     return 3600;
   }
 
-  const value = Number(match[1]);
-  const unit = match[2].toLowerCase();
+  const rawValue = match[1] || '1';
+  const rawUnit = match[2] || 'h';
+  const value = Number(rawValue);
+  const unit = rawUnit.toLowerCase();
 
   switch (unit) {
     case 's':
