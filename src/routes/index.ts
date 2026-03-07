@@ -19,6 +19,7 @@ import notificationRoutes from './notification-routes';
 import referringDoctorRoutes from './referring-doctor-routes';
 import clientCompanyRoutes from './client-company-routes';
 import cityRoutes from './city-routes';
+import emailRoutes from './email-routes';
 import { authenticate, optionalAuthenticate, trackActivity } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -62,7 +63,8 @@ router.get('/', (req: Request, res: Response) => {
       orders: '/api/v1/orders',
       payments: '/api/v1/payments',
       reports: '/api/v1/reports',
-      notifications: '/api/v1/notifications'
+      notifications: '/api/v1/notifications',
+      email: '/api/v1/email'
     }
   });
 });
@@ -366,5 +368,6 @@ router.use('/notifications', authenticate, trackActivity, notificationRoutes); /
 router.use('/referring-doctors', authenticate, trackActivity, referringDoctorRoutes); // PROTECTED - Referring doctor management
 router.use('/companies', authenticate, trackActivity, clientCompanyRoutes); // PROTECTED - Company management
 router.use('/cities', authenticate, trackActivity, cityRoutes); // PROTECTED - City management
+router.use('/email', authenticate, trackActivity, emailRoutes); // PROTECTED - Client communication emails
 
 export default router;

@@ -7,6 +7,60 @@ import { NotFoundError, ValidationError, DatabaseError, ConflictError } from '@/
 import { logger } from '@/utils/logger';
 
 export class AppointmentService {
+  private static readonly WEEKDAY_FORMATTER = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
+
+  private static toMinutes(time: string): number {
+    const [hoursPart, minutesPart] = time.split(':');
+    if (hoursPart === undefined || minutesPart === undefined) {
+      return NaN;
+    }
+
+    const hours = Number(hoursPart);
+    const minutes = Number(minutesPart);
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+      return NaN;
+    }
+
+    return hours * 60 + minutes;
+  }
+
+  private static toHHMM(date: Date): string {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+
+  private static validateResourceOperationalTiming(resource: any, startDate: Date, endDate: Date): void {
+    const dayOfWeek = AppointmentService.WEEKDAY_FORMATTER.format(startDate).toLowerCase();
+    const availabilityInfo = resource.getAvailabilityForDay(dayOfWeek);
+
+    if (!availabilityInfo || !availabilityInfo.available) {
+      throw new ValidationError(
+        `Resource "${resource.resourceName}" is not available on ${dayOfWeek}`
+      );
+    }
+
+    const slotStartMinutes = this.toMinutes(this.toHHMM(startDate));
+    const slotEndMinutes = this.toMinutes(this.toHHMM(endDate));
+    const availableStartMinutes = this.toMinutes(availabilityInfo.start);
+    const availableEndMinutes = this.toMinutes(availabilityInfo.end);
+
+    if (
+      Number.isNaN(slotStartMinutes) ||
+      Number.isNaN(slotEndMinutes) ||
+      Number.isNaN(availableStartMinutes) ||
+      Number.isNaN(availableEndMinutes)
+    ) {
+      throw new ValidationError(`Resource "${resource.resourceName}" has invalid availability configuration`);
+    }
+
+    if (slotStartMinutes < availableStartMinutes || slotEndMinutes > availableEndMinutes) {
+      throw new ValidationError(
+        `Appointment time (${this.toHHMM(startDate)}-${this.toHHMM(endDate)}) falls outside resource "${resource.resourceName}" operating hours (${availabilityInfo.start}-${availabilityInfo.end})`
+      );
+    }
+  }
+
   /**
    * Map clinic names between collections due to data inconsistency
    * clinics collection uses different naming than appointments collection
@@ -87,11 +141,18 @@ export class AppointmentService {
    * Derive resourceName from a plain resource object (mirrors Resource.getFullName()).
    */
   private static deriveResourceName(resource: any): string {
-    if (!resource) return 'Unknown Resource';
+    if (!resource) {
+      return 'Unknown Resource';
+    }
+
     if (resource.type === 'practitioner' && resource.practitioner) {
       const { firstName, lastName } = resource.practitioner;
-      if (firstName && lastName) return `${firstName} ${lastName}`;
-      if (firstName || lastName) return firstName || lastName;
+      if (firstName && lastName) {
+        return `${firstName} ${lastName}`;
+      }
+      if (firstName || lastName) {
+        return firstName || lastName;
+      }
     }
     return resource.resourceName || 'Unknown Resource';
   }
@@ -265,9 +326,24 @@ export class AppointmentService {
 
       // If time or resource is being changed, check for conflicts
       if (updateData.startDate || updateData.endDate || updateData.resourceId) {
-        const startDate = updateData.startDate ? new Date(updateData.startDate) : existingAppointment.startDate;
-        const endDate = updateData.endDate ? new Date(updateData.endDate) : existingAppointment.endDate;
-        const resourceId = updateData.resourceId || existingAppointment.resourceId;
+        const startDate = updateData.startDate ? new Date(updateData.startDate) : new Date(existingAppointment.startDate);
+        const endDate = updateData.endDate ? new Date(updateData.endDate) : new Date(existingAppointment.endDate);
+        const resourceId = Number(updateData.resourceId ?? existingAppointment.resourceId);
+
+        if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+          throw new ValidationError('Invalid appointment start/end date');
+        }
+        if (endDate <= startDate) {
+          throw new ValidationError('End date must be after start date');
+        }
+        if (Number.isNaN(resourceId) || resourceId <= 0) {
+          throw new ValidationError('Resource ID must be a positive integer');
+        }
+
+        const resource = await ResourceModel.findOne({ resourceId });
+        if (!resource) {
+          throw new NotFoundError('Resource', resourceId.toString());
+        }
 
         const conflicts = await AppointmentModel.checkTimeSlotConflict(
           resourceId,
@@ -279,6 +355,8 @@ export class AppointmentService {
         if (conflicts.length > 0) {
           throw new ConflictError('Time slot conflict: Resource is already booked during this time');
         }
+
+        this.validateResourceOperationalTiming(resource, startDate, endDate);
       }
 
       const updatedAppointment = await AppointmentModel.findByIdAndUpdate(
@@ -346,11 +424,24 @@ export class AppointmentService {
       const normalizedAppointmentClientKey = typeof client.clientKey === 'number'
         ? client.clientKey
         : (!Number.isNaN(numericClientId) ? numericClientId : undefined);
+      const normalizedResourceId = Number(appointmentData.resourceId);
+      const appointmentStartDate = new Date(appointmentData.startDate);
+      const appointmentEndDate = new Date(appointmentData.endDate);
+
+      if (Number.isNaN(normalizedResourceId) || normalizedResourceId <= 0) {
+        throw new ValidationError('Resource ID must be a positive integer');
+      }
+      if (Number.isNaN(appointmentStartDate.getTime()) || Number.isNaN(appointmentEndDate.getTime())) {
+        throw new ValidationError('Invalid appointment start/end date');
+      }
+      if (appointmentEndDate <= appointmentStartDate) {
+        throw new ValidationError('End date must be after start date');
+      }
 
       // Verify resource exists
-      const resource = await ResourceModel.findOne({ resourceId: appointmentData.resourceId });
+      const resource = await ResourceModel.findOne({ resourceId: normalizedResourceId });
       if (!resource) {
-        throw new NotFoundError('Resource', appointmentData.resourceId.toString());
+        throw new NotFoundError('Resource', normalizedResourceId.toString());
       }
 
       // Verify clinic exists - use case-insensitive search due to naming inconsistencies
@@ -363,28 +454,22 @@ export class AppointmentService {
 
       // Check for time slot conflicts
       const conflicts = await AppointmentModel.checkTimeSlotConflict(
-        appointmentData.resourceId,
-        new Date(appointmentData.startDate),
-        new Date(appointmentData.endDate)
+        normalizedResourceId,
+        appointmentStartDate,
+        appointmentEndDate
       );
 
       if (conflicts.length > 0) {
         throw new ConflictError('Time slot conflict: Resource is already booked during this time');
       }
 
-      // Check resource availability for the day
-      const appointmentDate = new Date(appointmentData.startDate);
-      const dayOfWeek = appointmentDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-      
-      if (!resource.isAvailableOnDay(dayOfWeek)) {
-        const availabilityInfo = resource.getAvailabilityForDay(dayOfWeek);
-        const errorMessage = `Resource "${resource.resourceName}" is not available on ${dayOfWeek}${availabilityInfo ? ` (availability: ${availabilityInfo.available ? 'available' : 'not available'} ${availabilityInfo.start}-${availabilityInfo.end})` : ''}`;
-        throw new ValidationError(errorMessage);
-      }
+      // Validate clinic operational timing against resource availability window
+      this.validateResourceOperationalTiming(resource, appointmentStartDate, appointmentEndDate);
 
       // Create appointment
       const appointment = new AppointmentModel({
         ...appointmentData,
+        resourceId: normalizedResourceId,
         clientId: normalizedAppointmentClientId,
         clientKey: normalizedAppointmentClientKey,
         subject: appointmentData.subject || client.getFullName(),
@@ -399,7 +484,7 @@ export class AppointmentService {
       const savedAppointment = await appointment.save();
 
       // Update resource statistics
-      await AppointmentService.updateResourceStats(appointmentData.resourceId);
+      await AppointmentService.updateResourceStats(normalizedResourceId);
 
       logger.info(`Appointment created: ${savedAppointment._id} for client ${client.getFullName()}`);
 
@@ -423,9 +508,24 @@ export class AppointmentService {
 
       // If time or resource is being changed, check for conflicts
       if (updateData.startDate || updateData.endDate || updateData.resourceId) {
-        const startDate = updateData.startDate ? new Date(updateData.startDate) : existingAppointment.startDate;
-        const endDate = updateData.endDate ? new Date(updateData.endDate) : existingAppointment.endDate;
-        const resourceId = updateData.resourceId || existingAppointment.resourceId;
+        const startDate = updateData.startDate ? new Date(updateData.startDate) : new Date(existingAppointment.startDate);
+        const endDate = updateData.endDate ? new Date(updateData.endDate) : new Date(existingAppointment.endDate);
+        const resourceId = Number(updateData.resourceId ?? existingAppointment.resourceId);
+
+        if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+          throw new ValidationError('Invalid appointment start/end date');
+        }
+        if (endDate <= startDate) {
+          throw new ValidationError('End date must be after start date');
+        }
+        if (Number.isNaN(resourceId) || resourceId <= 0) {
+          throw new ValidationError('Resource ID must be a positive integer');
+        }
+
+        const resource = await ResourceModel.findOne({ resourceId });
+        if (!resource) {
+          throw new NotFoundError('Resource', resourceId.toString());
+        }
 
         const conflicts = await AppointmentModel.checkTimeSlotConflict(
           resourceId,
@@ -437,6 +537,8 @@ export class AppointmentService {
         if (conflicts.length > 0) {
           throw new ConflictError('Time slot conflict: Resource is already booked during this time');
         }
+
+        this.validateResourceOperationalTiming(resource, startDate, endDate);
       }
 
       const updatedAppointment = await AppointmentModel.findByIdAndUpdate(

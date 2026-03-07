@@ -9,6 +9,28 @@ interface EmailPayload {
   html: string;
 }
 
+interface AppointmentReminderDetails {
+  clientName?: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  location?: string;
+  practitionerName?: string;
+  notes?: string;
+  subject?: string;
+  message?: string;
+}
+
+interface BillingInvoiceDetails {
+  clientName?: string;
+  invoiceNumber?: string;
+  totalAmount: number;
+  currency?: string;
+  dueDate?: string;
+  summary?: string;
+  subject?: string;
+  message?: string;
+}
+
 export class EmailService {
   private static transporter: Transporter | null = null;
   private static transporterVerified = false;
@@ -87,6 +109,156 @@ export class EmailService {
     });
 
     logger.info(`Email sent successfully: ${info.messageId} -> ${payload.to}`);
+  }
+
+  static async sendAppointmentReminder(
+    email: string,
+    appointmentDetails: AppointmentReminderDetails
+  ): Promise<void> {
+    const {
+      clientName,
+      appointmentDate,
+      appointmentTime,
+      location,
+      practitionerName,
+      notes,
+      subject,
+      message
+    } = appointmentDetails;
+
+    const recipientName = clientName?.trim() || 'Client';
+    const normalizedSubject = subject?.trim() || `Appointment Reminder - ${appointmentDate} at ${appointmentTime}`;
+    const customMessage = message?.trim();
+
+    const text = [
+      `Hi ${recipientName},`,
+      '',
+      'This is a reminder for your upcoming appointment.',
+      `Date: ${appointmentDate}`,
+      `Time: ${appointmentTime}`,
+      location ? `Location: ${location}` : null,
+      practitionerName ? `Provider: ${practitionerName}` : null,
+      notes ? `Notes: ${notes}` : null,
+      customMessage ? `Message: ${customMessage}` : null,
+      '',
+      'If you need to reschedule, please contact the clinic as soon as possible.',
+      '',
+      'Thank you,',
+      'Visio Health'
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const html = [
+      `<p>Hi ${recipientName},</p>`,
+      '<p>This is a reminder for your upcoming appointment.</p>',
+      '<ul>',
+      `<li><strong>Date:</strong> ${appointmentDate}</li>`,
+      `<li><strong>Time:</strong> ${appointmentTime}</li>`,
+      location ? `<li><strong>Location:</strong> ${location}</li>` : '',
+      practitionerName ? `<li><strong>Provider:</strong> ${practitionerName}</li>` : '',
+      notes ? `<li><strong>Notes:</strong> ${notes}</li>` : '',
+      '</ul>',
+      customMessage ? `<p><strong>Message:</strong> ${customMessage}</p>` : '',
+      '<p>If you need to reschedule, please contact the clinic as soon as possible.</p>',
+      '<p>Thank you,<br/>Visio Health</p>'
+    ].join('');
+
+    await this.sendEmail({
+      to: email,
+      subject: normalizedSubject,
+      text,
+      html
+    });
+  }
+
+  static async sendBillingInvoice(
+    email: string,
+    invoiceDetails: BillingInvoiceDetails
+  ): Promise<void> {
+    const {
+      clientName,
+      invoiceNumber,
+      totalAmount,
+      currency = 'CAD',
+      dueDate,
+      summary,
+      subject,
+      message
+    } = invoiceDetails;
+
+    const recipientName = clientName?.trim() || 'Client';
+    const safeAmount = Number.isFinite(totalAmount) ? totalAmount : 0;
+    const formattedAmount = new Intl.NumberFormat('en-CA', {
+      style: 'currency',
+      currency
+    }).format(safeAmount);
+    const normalizedInvoiceNumber = invoiceNumber?.trim() || 'N/A';
+    const normalizedSubject = subject?.trim() || `Invoice ${normalizedInvoiceNumber} - ${formattedAmount}`;
+    const customMessage = message?.trim();
+
+    const text = [
+      `Hi ${recipientName},`,
+      '',
+      'Your invoice is ready.',
+      `Invoice Number: ${normalizedInvoiceNumber}`,
+      `Amount Due: ${formattedAmount}`,
+      dueDate ? `Due Date: ${dueDate}` : null,
+      summary ? `Summary: ${summary}` : null,
+      customMessage ? `Message: ${customMessage}` : null,
+      '',
+      'Please contact the clinic if you have any billing questions.',
+      '',
+      'Thank you,',
+      'Visio Health'
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const html = [
+      `<p>Hi ${recipientName},</p>`,
+      '<p>Your invoice is ready.</p>',
+      '<ul>',
+      `<li><strong>Invoice Number:</strong> ${normalizedInvoiceNumber}</li>`,
+      `<li><strong>Amount Due:</strong> ${formattedAmount}</li>`,
+      dueDate ? `<li><strong>Due Date:</strong> ${dueDate}</li>` : '',
+      summary ? `<li><strong>Summary:</strong> ${summary}</li>` : '',
+      '</ul>',
+      customMessage ? `<p><strong>Message:</strong> ${customMessage}</p>` : '',
+      '<p>Please contact the clinic if you have any billing questions.</p>',
+      '<p>Thank you,<br/>Visio Health</p>'
+    ].join('');
+
+    await this.sendEmail({
+      to: email,
+      subject: normalizedSubject,
+      text,
+      html
+    });
+  }
+
+  static async sendFollowUp(email: string, subject: string, message: string): Promise<void> {
+    const safeSubject = subject.trim() || 'Clinic Follow-up';
+    const safeMessage = message.trim() || 'Thank you for visiting our clinic.';
+
+    const text = [
+      safeMessage,
+      '',
+      'Best regards,',
+      'Visio Health'
+    ].join('\n');
+
+    const html = [
+      `<p>${safeMessage.replace(/\n/g, '<br/>')}</p>`,
+      '<p>Best regards,<br/>Visio Health</p>'
+    ].join('');
+
+    await this.sendEmail({
+      to: email,
+      subject: safeSubject,
+      text,
+      html
+    });
   }
 
   static async sendPasswordResetEmail(email: string, resetToken: string): Promise<void> {
