@@ -35,8 +35,8 @@ app.use(helmet({
   }
 }));
 
-// CORS configuration - allow all origins
-app.use(cors({ origin: '*' }));
+// CORS configuration - wildcard mode with no credential support
+app.use(cors());
 
 // Rate limiting - more lenient in development
 const limiter = rateLimit({
