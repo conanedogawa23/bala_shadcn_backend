@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Order, { IOrder, OrderStatus, PaymentStatus } from '../models/Order';
 import Product from '../models/Product';
 import { ClinicService } from '../services/ClinicService';
+import { ClientService } from '../services/ClientService';
 import { OrderService } from '../services/OrderService';
 import NotificationService from '../services/NotificationService';
 import { NotificationType, NotificationCategory, NotificationAction } from '../models/Notification';
@@ -207,14 +208,42 @@ export class OrderController {
       }
 
       const limitNum = Math.min(100, Math.max(1, parseInt(limit as string)));
+      const normalizedClientId = clientId.trim();
+      const clientIdentifiers = new Set<string | number>();
 
-      // Use defensive $or query to handle both string and numeric clientId types in MongoDB
-      const numericClientId = parseInt(clientId);
+      clientIdentifiers.add(normalizedClientId);
+
+      const numericClientId = Number(normalizedClientId);
+      if (!Number.isNaN(numericClientId)) {
+        clientIdentifiers.add(numericClientId);
+      }
+
+      try {
+        const client = await ClientService.getClientById(normalizedClientId);
+        const resolvedClientId = String(client.clientId || '').trim();
+
+        if (resolvedClientId) {
+          clientIdentifiers.add(resolvedClientId);
+
+          const numericResolvedClientId = Number(resolvedClientId);
+          if (!Number.isNaN(numericResolvedClientId)) {
+            clientIdentifiers.add(numericResolvedClientId);
+          }
+        }
+
+        if (typeof client.clientKey === 'number' && !Number.isNaN(client.clientKey)) {
+          clientIdentifiers.add(client.clientKey);
+          clientIdentifiers.add(String(client.clientKey));
+        }
+      } catch (lookupError) {
+        logger.warn('Client lookup failed while fetching client orders; falling back to requested client ID', {
+          clientId: normalizedClientId,
+          error: lookupError instanceof Error ? lookupError.message : 'Unknown error'
+        });
+      }
+
       const orders = await Order.find({
-        $or: [
-          { clientId: numericClientId },
-          { clientId: clientId }
-        ]
+        $or: Array.from(clientIdentifiers).map(identifier => ({ clientId: identifier }))
       })
         .sort({ serviceDate: -1 })
         .limit(limitNum);
@@ -656,12 +685,16 @@ export class OrderController {
 
       // Create notification for status change
       try {
-        const notifType = status === OrderStatus.COMPLETED ? NotificationType.SUCCESS :
-                         status === OrderStatus.CANCELLED ? NotificationType.WARNING :
-                         NotificationType.INFO;
-        const notifAction = status === OrderStatus.COMPLETED ? NotificationAction.COMPLETED :
-                           status === OrderStatus.CANCELLED ? NotificationAction.CANCELLED :
-                           NotificationAction.STATUS_CHANGED;
+        const notifType = status === OrderStatus.COMPLETED
+          ? NotificationType.SUCCESS
+          : status === OrderStatus.CANCELLED
+            ? NotificationType.WARNING
+            : NotificationType.INFO;
+        const notifAction = status === OrderStatus.COMPLETED
+          ? NotificationAction.COMPLETED
+          : status === OrderStatus.CANCELLED
+            ? NotificationAction.CANCELLED
+            : NotificationAction.STATUS_CHANGED;
         
         await NotificationService.createNotification({
           type: notifType,
