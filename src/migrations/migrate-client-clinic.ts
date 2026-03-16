@@ -131,7 +131,7 @@ async function migrateClientClinic(): Promise<void> {
             failedCount += error.writeErrors.length;
             console.log(`  [WARN] Partial success: ${successCount}/${batch.length} inserted`);
           } else {
-            console.error(`  [ERROR] Batch insert failed:`, error);
+            console.error('  [ERROR] Batch insert failed:', error);
             failedCount += batch.length;
           }
         }

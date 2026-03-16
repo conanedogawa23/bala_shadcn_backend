@@ -79,7 +79,7 @@ const CitySchema = new Schema<ICity>({
       type: Date,
       index: true
     }
-  },
+  }
   // createdAt and updatedAt managed by timestamps: true
 }, {
   id: false, // Disable Mongoose virtual 'id' getter to avoid shadowing explicit id: Number field

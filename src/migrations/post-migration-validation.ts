@@ -34,7 +34,7 @@ async function runPostMigrationValidation(): Promise<void> {
       console.log('❌ Found orphaned records:\n');
       for (const orphaned of orphanedRecords) {
         console.log(`   ${orphaned.collection}: ${orphaned.count} records without valid client references`);
-        console.log(`   Sample records:`);
+        console.log('   Sample records:');
         for (const sample of orphaned.samples.slice(0, 3)) {
           console.log(`     - ${JSON.stringify(sample)}`);
         }

@@ -4,7 +4,7 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 
 const getAccessTokenExpiry = (): SignOptions['expiresIn'] => {
   const configuredExpiry = process.env.JWT_ACCESS_EXPIRES_IN;
-  if (!configuredExpiry) return '1h';
+  if (!configuredExpiry) {return '1h';}
 
   // Numeric env values are treated as seconds.
   if (/^\d+$/.test(configuredExpiry)) {

@@ -15,7 +15,7 @@ export class ReferringDoctorService {
     const filter: any = {};
     const andConditions: any[] = [];
 
-    if (isActive !== undefined) filter.isActive = isActive;
+    if (isActive !== undefined) {filter.isActive = isActive;}
 
     if (clinicName) {
       andConditions.push({

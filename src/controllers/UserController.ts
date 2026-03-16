@@ -371,8 +371,8 @@ export class UserController {
         const conflictQuery: any = { _id: { $ne: id } };
         const conflicts = [];
         
-        if (updateData.email) conflictQuery.email = updateData.email;
-        if (updateData.username) conflictQuery.username = updateData.username;
+        if (updateData.email) {conflictQuery.email = updateData.email;}
+        if (updateData.username) {conflictQuery.username = updateData.username;}
 
         const existingUser = await User.findOne(conflictQuery);
         if (existingUser) {
@@ -387,10 +387,10 @@ export class UserController {
       }
 
       // Update user fields
-      if (updateData.username) user.username = updateData.username;
-      if (updateData.email) user.email = updateData.email;
-      if (updateData.role) user.role = updateData.role;
-      if (updateData.status) user.status = updateData.status;
+      if (updateData.username) {user.username = updateData.username;}
+      if (updateData.email) {user.email = updateData.email;}
+      if (updateData.role) {user.role = updateData.role;}
+      if (updateData.status) {user.status = updateData.status;}
 
       // Update profile
       if (updateData.profile) {

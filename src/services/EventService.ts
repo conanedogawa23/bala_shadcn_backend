@@ -197,11 +197,13 @@ export class EventService {
   /**
    * Get public events
    */
-  static async getPublicEvents(startDate?: Date, endDate?: Date): Promise<IEvent[]> {
+  static async getPublicEvents(startDate?: Date, endDate?: Date, clinicName?: string): Promise<IEvent[]> {
     try {
-      const events = await EventModel.findPublicEvents(startDate, endDate).lean();
+      const events = await EventModel.findPublicEvents(startDate, endDate, clinicName).lean();
       
-      logger.info(`Retrieved ${events.length} public events`);
+      logger.info(
+        `Retrieved ${events.length} public events${clinicName ? ` for clinic: ${clinicName}` : ''}`
+      );
       return events;
     } catch (error) {
       logger.error('Error getting public events:', error);

@@ -20,8 +20,8 @@ export class OrderService {
 
       if (startDate || endDate) {
         matchCriteria.serviceDate = {};
-        if (startDate) matchCriteria.serviceDate.$gte = startDate;
-        if (endDate) matchCriteria.serviceDate.$lte = endDate;
+        if (startDate) {matchCriteria.serviceDate.$gte = startDate;}
+        if (endDate) {matchCriteria.serviceDate.$lte = endDate;}
       }
 
       const [statusReport, paymentReport] = await Promise.all([
@@ -79,8 +79,8 @@ export class OrderService {
       
       const filter: any = { ...clientIdQuery };
 
-      if (status) filter.status = status;
-      if (paymentStatus) filter.paymentStatus = paymentStatus;
+      if (status) {filter.status = status;}
+      if (paymentStatus) {filter.paymentStatus = paymentStatus;}
 
       const [orders, total, stats] = await Promise.all([
         Order.find(filter)
@@ -210,8 +210,8 @@ export class OrderService {
 
       if (startDate || endDate) {
         matchCriteria.serviceDate = {};
-        if (startDate) matchCriteria.serviceDate.$gte = startDate;
-        if (endDate) matchCriteria.serviceDate.$lte = endDate;
+        if (startDate) {matchCriteria.serviceDate.$gte = startDate;}
+        if (endDate) {matchCriteria.serviceDate.$lte = endDate;}
       }
 
       const history = await Order.aggregate([
@@ -262,8 +262,8 @@ export class OrderService {
 
       if (startDate || endDate) {
         matchCriteria.serviceDate = {};
-        if (startDate) matchCriteria.serviceDate.$gte = startDate;
-        if (endDate) matchCriteria.serviceDate.$lte = endDate;
+        if (startDate) {matchCriteria.serviceDate.$gte = startDate;}
+        if (endDate) {matchCriteria.serviceDate.$lte = endDate;}
       }
 
       const orders = await Order.find(matchCriteria)

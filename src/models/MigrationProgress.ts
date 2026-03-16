@@ -77,12 +77,12 @@ const MigrationProgressSchema = new Schema<IMigrationProgress>({
 });
 
 MigrationProgressSchema.virtual('progressPercentage').get(function() {
-  if (this.totalRecords === 0) return 0;
+  if (this.totalRecords === 0) {return 0;}
   return (this.migratedRecords / this.totalRecords) * 100;
 });
 
 MigrationProgressSchema.methods.updateEstimatedCompletion = function() {
-  if (this.status !== 'in_progress' || this.migratedRecords === 0) return;
+  if (this.status !== 'in_progress' || this.migratedRecords === 0) {return;}
 
   const elapsedMs = Date.now() - this.startTime.getTime();
   const recordsPerMs = this.migratedRecords / elapsedMs;

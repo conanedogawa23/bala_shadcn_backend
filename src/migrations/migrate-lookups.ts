@@ -38,12 +38,12 @@ function mapProductCategory(categoryId: number): string {
 // Map MSSQL product type string to a valid type for the Product model
 function mapProductType(productType: string): string {
   const pt = trimString(productType).toLowerCase();
-  if (pt.includes('physio')) return 'physiotherapy';
-  if (pt.includes('orthotic') || pt.includes('ortho')) return 'orthotic_service';
-  if (pt.includes('massage')) return 'massage';
-  if (pt.includes('assess')) return 'assessment';
-  if (pt.includes('consult')) return 'consultation';
-  if (pt.includes('device')) return 'device';
+  if (pt.includes('physio')) {return 'physiotherapy';}
+  if (pt.includes('orthotic') || pt.includes('ortho')) {return 'orthotic_service';}
+  if (pt.includes('massage')) {return 'massage';}
+  if (pt.includes('assess')) {return 'assessment';}
+  if (pt.includes('consult')) {return 'consultation';}
+  if (pt.includes('device')) {return 'device';}
   // Default to a generic service type
   return 'SERVICE';
 }

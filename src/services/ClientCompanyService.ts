@@ -1,5 +1,4 @@
-import { ClientCompanyModel } from '../models/ClientCompany';
-import { IClientCompany } from '../models/ClientCompany';
+import { ClientCompanyModel, IClientCompany } from '../models/ClientCompany';
 import { logger } from '../utils/logger';
 
 export class ClientCompanyService {
@@ -13,7 +12,7 @@ export class ClientCompanyService {
     const skip = (page - 1) * limit;
 
     const filter: any = {};
-    if (isActive !== undefined) filter.isActive = isActive;
+    if (isActive !== undefined) {filter.isActive = isActive;}
     if (search) {
       const regex = new RegExp(search, 'i');
       filter.$or = [

@@ -240,22 +240,22 @@ async function migrateOrders(): Promise<void> {
 function mapOrderStatus(mssqlStatus: string): OrderStatus {
   const statusStr = trimString(mssqlStatus).toLowerCase();
 
-  if (!statusStr) return OrderStatus.SCHEDULED;
+  if (!statusStr) {return OrderStatus.SCHEDULED;}
 
   // TRUE means the order is completed/billed
-  if (statusStr === 'true') return OrderStatus.COMPLETED;
+  if (statusStr === 'true') {return OrderStatus.COMPLETED;}
 
   // False means not yet completed
-  if (statusStr === 'false') return OrderStatus.SCHEDULED;
+  if (statusStr === 'false') {return OrderStatus.SCHEDULED;}
 
   // Pending Sales Refund -> order was completed, refund is pending
-  if (statusStr.includes('pending sales refund')) return OrderStatus.COMPLETED;
+  if (statusStr.includes('pending sales refund')) {return OrderStatus.COMPLETED;}
 
   // Pending WriteOff -> order was completed, writeoff is pending
-  if (statusStr.includes('pending writeoff') || statusStr.includes('pending write off')) return OrderStatus.COMPLETED;
+  if (statusStr.includes('pending writeoff') || statusStr.includes('pending write off')) {return OrderStatus.COMPLETED;}
 
   // Unpaid -> order was completed but not paid
-  if (statusStr === 'unpaid') return OrderStatus.COMPLETED;
+  if (statusStr === 'unpaid') {return OrderStatus.COMPLETED;}
 
   return OrderStatus.SCHEDULED;
 }
@@ -270,16 +270,16 @@ function mapOrderPaymentStatus(mssqlStatus: string, paidFlag: any): PaymentStatu
   }
 
   // Refund statuses
-  if (statusStr.includes('pending sales refund')) return PaymentStatus.REFUNDED;
+  if (statusStr.includes('pending sales refund')) {return PaymentStatus.REFUNDED;}
 
   // WriteOff statuses -> OVERDUE (closest match)
-  if (statusStr.includes('pending writeoff') || statusStr.includes('pending write off')) return PaymentStatus.OVERDUE;
+  if (statusStr.includes('pending writeoff') || statusStr.includes('pending write off')) {return PaymentStatus.OVERDUE;}
 
   // Unpaid
-  if (statusStr === 'unpaid') return PaymentStatus.PENDING;
+  if (statusStr === 'unpaid') {return PaymentStatus.PENDING;}
 
   // TRUE with no paid flag -> could be partial or pending
-  if (statusStr === 'true') return PaymentStatus.PENDING;
+  if (statusStr === 'true') {return PaymentStatus.PENDING;}
 
   return PaymentStatus.PENDING;
 }

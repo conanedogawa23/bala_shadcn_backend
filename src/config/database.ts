@@ -30,7 +30,7 @@ export const connectDatabase = async (): Promise<void> => {
         await mongoose.connect(mongoURI, options);
         break;
       } catch (err) {
-        if (attempt === maxRetries) throw err;
+        if (attempt === maxRetries) {throw err;}
         const delay = attempt * 5000;
         logger.warn(`MongoDB connection attempt ${attempt}/${maxRetries} failed, retrying in ${delay / 1000}s...`);
         await new Promise(resolve => setTimeout(resolve, delay));

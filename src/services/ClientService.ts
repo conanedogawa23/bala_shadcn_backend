@@ -845,9 +845,9 @@ export class ClientService {
           setOperations['personalInfo.birthday.month'] = (dateOfBirth.getMonth() + 1).toString().padStart(2, '0');
           setOperations['personalInfo.birthday.year'] = dateOfBirth.getFullYear().toString();
         } else if (pi.birthday) {
-          if (pi.birthday.day !== undefined) setOperations['personalInfo.birthday.day'] = pi.birthday.day;
-          if (pi.birthday.month !== undefined) setOperations['personalInfo.birthday.month'] = pi.birthday.month;
-          if (pi.birthday.year !== undefined) setOperations['personalInfo.birthday.year'] = pi.birthday.year;
+          if (pi.birthday.day !== undefined) {setOperations['personalInfo.birthday.day'] = pi.birthday.day;}
+          if (pi.birthday.month !== undefined) {setOperations['personalInfo.birthday.month'] = pi.birthday.month;}
+          if (pi.birthday.year !== undefined) {setOperations['personalInfo.birthday.year'] = pi.birthday.year;}
         }
         
         // Update full name if first or last name changed
@@ -899,7 +899,7 @@ export class ClientService {
         if (contact.phones) {
           // Helper to process phone number
           const processPhone = (phone: any, prefix: string) => {
-            if (phone === undefined) return;
+            if (phone === undefined) {return;}
             
             if (typeof phone === 'string') {
               // Parse phone string to structured format
@@ -919,11 +919,11 @@ export class ClientService {
                 setOperations[`${prefix}.full`] = phone;
               }
             } else if (phone && typeof phone === 'object') {
-              if (phone.countryCode !== undefined) setOperations[`${prefix}.countryCode`] = phone.countryCode;
-              if (phone.areaCode !== undefined) setOperations[`${prefix}.areaCode`] = phone.areaCode;
-              if (phone.number !== undefined) setOperations[`${prefix}.number`] = phone.number;
-              if (phone.full !== undefined) setOperations[`${prefix}.full`] = phone.full;
-              if (phone.extension !== undefined) setOperations[`${prefix}.extension`] = phone.extension;
+              if (phone.countryCode !== undefined) {setOperations[`${prefix}.countryCode`] = phone.countryCode;}
+              if (phone.areaCode !== undefined) {setOperations[`${prefix}.areaCode`] = phone.areaCode;}
+              if (phone.number !== undefined) {setOperations[`${prefix}.number`] = phone.number;}
+              if (phone.full !== undefined) {setOperations[`${prefix}.full`] = phone.full;}
+              if (phone.extension !== undefined) {setOperations[`${prefix}.extension`] = phone.extension;}
             }
           };
           

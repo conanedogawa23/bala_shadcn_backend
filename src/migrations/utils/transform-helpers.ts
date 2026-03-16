@@ -5,8 +5,8 @@ export function trimString(value: any): string {
 }
 
 export function toBoolean(value: any): boolean {
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'boolean') {return value;}
+  if (typeof value === 'number') {return value === 1;}
   if (typeof value === 'string') {
     const upperValue = value.toUpperCase().trim();
     return upperValue === 'YES' || upperValue === 'TRUE' || upperValue === '1';
@@ -15,13 +15,13 @@ export function toBoolean(value: any): boolean {
 }
 
 export function toNumber(value: any, defaultValue: number = 0): number {
-  if (value === null || value === undefined) return defaultValue;
+  if (value === null || value === undefined) {return defaultValue;}
   const parsed = parseFloat(value);
   return isNaN(parsed) ? defaultValue : parsed;
 }
 
 export function toDate(value: any): Date | undefined {
-  if (!value) return undefined;
+  if (!value) {return undefined;}
   const date = new Date(value);
   return isNaN(date.getTime()) ? undefined : date;
 }
@@ -31,7 +31,7 @@ export function buildPhoneObject(countryCode: string, areaCode: string, number: 
   const ac = trimString(areaCode);
   const num = trimString(number);
 
-  if (!ac || !num) return undefined;
+  if (!ac || !num) {return undefined;}
 
   const full = `(${ac}) ${num}`;
   return {
@@ -61,7 +61,7 @@ export function buildInsuranceObject(
 ): IInsurance | null {
   const company = trimString(sqlRow[`${prefix}_insurance_insurance_company`]);
 
-  if (!company) return null;
+  if (!company) {return null;}
 
   return {
     type,
@@ -103,10 +103,10 @@ export function buildInsuranceArray(sqlRow: any): IInsurance[] {
   const insurance: IInsurance[] = [];
 
   const first = buildInsuranceObject('1st', sqlRow, 'sb_clients_1st');
-  if (first) insurance.push(first);
+  if (first) {insurance.push(first);}
 
   const second = buildInsuranceObject('2nd', sqlRow, 'sb_clients_2nd');
-  if (second) insurance.push(second);
+  if (second) {insurance.push(second);}
 
   // 3rd insurance tier intentionally NOT migrated per client requirements:
   // visio_req.md: "Remove 3rd Insurance Column"
@@ -125,8 +125,8 @@ export function parseBirthday(day: string, month: string, year: string): Date | 
   const m = parseInt(trimString(month));
   const y = parseInt(trimString(year));
 
-  if (isNaN(d) || isNaN(m) || isNaN(y)) return undefined;
-  if (d <= 0 || d > 31 || m <= 0 || m > 12 || y < 1900 || y > 2030) return undefined;
+  if (isNaN(d) || isNaN(m) || isNaN(y)) {return undefined;}
+  if (d <= 0 || d > 31 || m <= 0 || m > 12 || y < 1900 || y > 2030) {return undefined;}
 
   return new Date(y, m - 1, d);
 }

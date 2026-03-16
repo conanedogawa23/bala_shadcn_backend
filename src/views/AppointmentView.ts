@@ -1,7 +1,7 @@
 export class AppointmentView {
 
   private static getDurationMinutes(appointment: any): number {
-    if (appointment.duration > 0) return appointment.duration;
+    if (appointment.duration > 0) {return appointment.duration;}
     const start = new Date(appointment.startDate);
     const end = new Date(appointment.endDate);
     return Math.round((end.getTime() - start.getTime()) / (1000 * 60));
@@ -43,7 +43,7 @@ export class AppointmentView {
    */
   private static buildClientInfo(appointment: any) {
     const cd = appointment.clientDetails;
-    if (!cd) return null;
+    if (!cd) {return null;}
 
     const firstName = cd.personalInfo?.firstName || '';
     const lastName = cd.personalInfo?.lastName || '';

@@ -83,7 +83,7 @@ async function testClientData(connection: any): Promise<UATTestResult[]> {
 
   try {
     const sampleClient = await ClientModel.findOne().lean();
-    console.log(`   Sample Client:`);
+    console.log('   Sample Client:');
     console.log(`     Name: ${sampleClient?.personalInfo?.fullName}`);
     console.log(`     Clinic: ${sampleClient?.defaultClinic}`);
     console.log(`     Insurance: ${sampleClient?.insurance?.length || 0} policies`);
@@ -107,7 +107,7 @@ async function testClientData(connection: any): Promise<UATTestResult[]> {
       { $group: { _id: '$defaultClinic', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
-    console.log(`   Clients by Clinic:`);
+    console.log('   Clients by Clinic:');
     for (const clinic of clientsByClinic) {
       console.log(`     ${clinic._id}: ${clinic.count.toLocaleString()}`);
     }
@@ -156,7 +156,7 @@ async function testPaymentData(connection: any): Promise<UATTestResult[]> {
       { $group: { _id: '$clinicName', total: { $sum: '$amounts.totalPaid' } } },
       { $sort: { total: -1 } }
     ]);
-    console.log(`   Revenue by Clinic:`);
+    console.log('   Revenue by Clinic:');
     for (const clinic of revenueByClinic.slice(0, 3)) {
       console.log(`     ${clinic._id}: $${clinic.total.toFixed(2)}`);
     }
@@ -198,7 +198,7 @@ async function testPaymentData(connection: any): Promise<UATTestResult[]> {
       { $group: { _id: '$paymentMethod', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
-    console.log(`   Payments by Method:`);
+    console.log('   Payments by Method:');
     for (const method of paymentByMethod.slice(0, 3)) {
       console.log(`     ${method._id}: ${method.count.toLocaleString()}`);
     }
@@ -244,7 +244,7 @@ async function testOrderData(connection: any): Promise<UATTestResult[]> {
 
   try {
     const sampleOrder = await OrderModel.findOne().lean();
-    console.log(`   Sample Order:`);
+    console.log('   Sample Order:');
     console.log(`     Order Number: ${sampleOrder?.orderNumber}`);
     console.log(`     Items: ${sampleOrder?.items?.length || 0}`);
     console.log(`     Total: $${sampleOrder?.totalAmount?.toFixed(2) || 0}`);
@@ -268,7 +268,7 @@ async function testOrderData(connection: any): Promise<UATTestResult[]> {
       { $group: { _id: '$status', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
-    console.log(`   Orders by Status:`);
+    console.log('   Orders by Status:');
     for (const status of ordersByStatus) {
       console.log(`     ${status._id}: ${status.count.toLocaleString()}`);
     }
@@ -317,7 +317,7 @@ async function testAppointmentData(connection: any): Promise<UATTestResult[]> {
       { $group: { _id: '$clinicName', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
-    console.log(`   Appointments by Clinic:`);
+    console.log('   Appointments by Clinic:');
     for (const clinic of appointmentsByClinic) {
       console.log(`     ${clinic._id}: ${clinic.count.toLocaleString()}`);
     }

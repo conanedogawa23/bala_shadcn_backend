@@ -330,7 +330,7 @@ ClinicSchema.methods.isActive = function(): boolean {
 };
 
 ClinicSchema.methods.getFullAddress = function(): string {
-  if (!this.address) return '';
+  if (!this.address) {return '';}
   const parts = [
     this.address.street,
     this.address.city,

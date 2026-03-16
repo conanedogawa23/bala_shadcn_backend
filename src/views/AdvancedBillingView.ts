@@ -63,9 +63,9 @@ export class AdvancedBillingView {
   static formatBilling(billing: IAdvancedBilling): AdvancedBillingResponse {
     // Helper to safely format dates
     const formatDate = (date: any): string => {
-      if (!date) return new Date().toISOString();
-      if (typeof date === 'string') return date;
-      if (date instanceof Date) return date.toISOString();
+      if (!date) {return new Date().toISOString();}
+      if (typeof date === 'string') {return date;}
+      if (date instanceof Date) {return date.toISOString();}
       return new Date(date).toISOString();
     };
 
@@ -185,9 +185,9 @@ export class AdvancedBillingView {
   static formatBillingForFrontend(billing: IAdvancedBilling): any {
     // Helper to safely format dates
     const formatDate = (date: any): string | undefined => {
-      if (!date) return new Date().toISOString().split('T')[0];
-      if (typeof date === 'string') return date.split('T')[0];
-      if (date instanceof Date) return date.toISOString().split('T')[0];
+      if (!date) {return new Date().toISOString().split('T')[0];}
+      if (typeof date === 'string') {return date.split('T')[0];}
+      if (date instanceof Date) {return date.toISOString().split('T')[0];}
       try {
         return new Date(date).toISOString().split('T')[0];
       } catch {

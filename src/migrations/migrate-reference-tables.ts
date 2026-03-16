@@ -156,8 +156,8 @@ async function migrateInsuranceFrequencies(mssqlConn: any, mongoConn: any): Prom
           frequencyKey: row.sb_1st_insurance_frequency_key,
           frequencyName: name,
           frequencyType: name.toLowerCase().includes('year') ? 'yearly' :
-                         name.toLowerCase().includes('roll') ? 'rolling' :
-                         name.toLowerCase() === 'select' ? 'select' : 'numeric',
+            name.toLowerCase().includes('roll') ? 'rolling' :
+              name.toLowerCase() === 'select' ? 'select' : 'numeric',
           isSelectable: true,
           displayOrder: row.sb_1st_insurance_frequency_key,
           dateCreated: new Date(),
@@ -189,11 +189,11 @@ async function migrateInsurancePolicyHolders(mssqlConn: any, mongoConn: any): Pr
     try {
       const name = trimString(row.sb_1st_insurance_policy_holder_name).toUpperCase();
       let policyHolderType = 'OTHER';
-      if (name === 'SELF') policyHolderType = 'SELF';
-      else if (name === 'SPOUSE') policyHolderType = 'SPOUSE';
-      else if (name === 'PARENT') policyHolderType = 'PARENT';
-      else if (name === 'CHILD') policyHolderType = 'CHILD';
-      else if (name === 'NONE' || name === 'SELECT' || name === '') policyHolderType = 'NONE';
+      if (name === 'SELF') {policyHolderType = 'SELF';}
+      else if (name === 'SPOUSE') {policyHolderType = 'SPOUSE';}
+      else if (name === 'PARENT') {policyHolderType = 'PARENT';}
+      else if (name === 'CHILD') {policyHolderType = 'CHILD';}
+      else if (name === 'NONE' || name === 'SELECT' || name === '') {policyHolderType = 'NONE';}
 
       await Model.findOneAndUpdate(
         { policyHolderKey: row.sb_1st_insurance_policy_holder_key },

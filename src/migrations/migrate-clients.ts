@@ -99,7 +99,7 @@ async function migrateClients(): Promise<void> {
               progress.recordError(offset + writeError.index, writeError.errmsg);
             }
           } else {
-            console.error(`  ❌ Batch insert failed:`, error);
+            console.error('  ❌ Batch insert failed:', error);
             failedCount += batch.length;
           }
         }

@@ -114,7 +114,7 @@ async function migratePayments(): Promise<void> {
               progress.recordError(offset + writeError.index, writeError.errmsg);
             }
           } else {
-            console.error(`  ❌ Batch insert failed:`, error);
+            console.error('  ❌ Batch insert failed:', error);
             failedCount += batch.length;
           }
         }
@@ -214,33 +214,33 @@ function mapPaymentMethod(method: string): PaymentMethod {
   const methodStr = trimString(method).toLowerCase();
 
   // Credit cards (VISA, MasterCard, American Express, Discover Card)
-  if (methodStr === 'visa' || methodStr === 'mastercard' || methodStr === 'master card') return PaymentMethod.CREDIT_CARD;
-  if (methodStr === 'american express' || methodStr === 'amex') return PaymentMethod.CREDIT_CARD;
-  if (methodStr === 'discover card' || methodStr === 'discover') return PaymentMethod.CREDIT_CARD;
-  if (methodStr.includes('credit')) return PaymentMethod.CREDIT_CARD;
+  if (methodStr === 'visa' || methodStr === 'mastercard' || methodStr === 'master card') {return PaymentMethod.CREDIT_CARD;}
+  if (methodStr === 'american express' || methodStr === 'amex') {return PaymentMethod.CREDIT_CARD;}
+  if (methodStr === 'discover card' || methodStr === 'discover') {return PaymentMethod.CREDIT_CARD;}
+  if (methodStr.includes('credit')) {return PaymentMethod.CREDIT_CARD;}
 
   // Debit (INTERACT is Interac debit in Canada)
-  if (methodStr === 'interact' || methodStr === 'interac') return PaymentMethod.DEBIT;
-  if (methodStr.includes('debit')) return PaymentMethod.DEBIT;
+  if (methodStr === 'interact' || methodStr === 'interac') {return PaymentMethod.DEBIT;}
+  if (methodStr.includes('debit')) {return PaymentMethod.DEBIT;}
 
   // Cash
-  if (methodStr === 'cash') return PaymentMethod.CASH;
+  if (methodStr === 'cash') {return PaymentMethod.CASH;}
 
   // Cheque variants
-  if (methodStr === 'cheque' || methodStr === 'check') return PaymentMethod.CHEQUE;
-  if (methodStr === 'cheque payment') return PaymentMethod.CHEQUE;
-  if (methodStr === 'security cheque') return PaymentMethod.CHEQUE;
+  if (methodStr === 'cheque' || methodStr === 'check') {return PaymentMethod.CHEQUE;}
+  if (methodStr === 'cheque payment') {return PaymentMethod.CHEQUE;}
+  if (methodStr === 'security cheque') {return PaymentMethod.CHEQUE;}
 
   // Insurance / DPA (Direct Payment Authorization)
-  if (methodStr === 'direct payment authorization' || methodStr === 'dpa') return PaymentMethod.INSURANCE;
-  if (methodStr === 'dpafp') return PaymentMethod.INSURANCE;
-  if (methodStr === 'popfp') return PaymentMethod.OTHER;
+  if (methodStr === 'direct payment authorization' || methodStr === 'dpa') {return PaymentMethod.INSURANCE;}
+  if (methodStr === 'dpafp') {return PaymentMethod.INSURANCE;}
+  if (methodStr === 'popfp') {return PaymentMethod.OTHER;}
 
   // Mailed payments (typically cheques sent by mail)
-  if (methodStr === 'mailed') return PaymentMethod.CHEQUE;
+  if (methodStr === 'mailed') {return PaymentMethod.CHEQUE;}
 
   // None / empty
-  if (methodStr === 'none' || methodStr === '') return PaymentMethod.OTHER;
+  if (methodStr === 'none' || methodStr === '') {return PaymentMethod.OTHER;}
 
   return PaymentMethod.OTHER;
 }
@@ -251,30 +251,30 @@ function mapPaymentType(type: string): PaymentType {
   const typeStr = trimString(type).toLowerCase();
 
   // Insurance Payment -> DPA (Direct Payment Authorization from insurance)
-  if (typeStr === 'insurance payment') return PaymentType.DPA;
+  if (typeStr === 'insurance payment') {return PaymentType.DPA;}
 
   // Make Payment -> POP (Patient Out of Pocket)
-  if (typeStr === 'make payment') return PaymentType.POP;
+  if (typeStr === 'make payment') {return PaymentType.POP;}
 
   // REFUND PAYMENT -> SALES_REFUND
-  if (typeStr === 'refund payment') return PaymentType.SALES_REFUND;
+  if (typeStr === 'refund payment') {return PaymentType.SALES_REFUND;}
 
   // Bad Debt -> WRITEOFF
-  if (typeStr === 'bad debt') return PaymentType.WRITEOFF;
+  if (typeStr === 'bad debt') {return PaymentType.WRITEOFF;}
 
   // Cheque (as a type) -> POP (patient paying by cheque is still out-of-pocket)
-  if (typeStr === 'cheque') return PaymentType.POP;
+  if (typeStr === 'cheque') {return PaymentType.POP;}
 
   // UNREFUND -> SALES_REFUND (reversal of a refund)
-  if (typeStr === 'unrefund') return PaymentType.SALES_REFUND;
+  if (typeStr === 'unrefund') {return PaymentType.SALES_REFUND;}
 
   // Technical code fallbacks (for any data that already uses codes)
   const upperStr = typeStr.toUpperCase();
-  if (upperStr === 'POPFP') return PaymentType.POPFP;
-  if (upperStr === 'DPAFP') return PaymentType.DPAFP;
-  if (upperStr === 'COB_1') return PaymentType.COB_1;
-  if (upperStr === 'COB_2') return PaymentType.COB_2;
-  if (upperStr.includes('WRITEOFF')) return PaymentType.WRITEOFF;
+  if (upperStr === 'POPFP') {return PaymentType.POPFP;}
+  if (upperStr === 'DPAFP') {return PaymentType.DPAFP;}
+  if (upperStr === 'COB_1') {return PaymentType.COB_1;}
+  if (upperStr === 'COB_2') {return PaymentType.COB_2;}
+  if (upperStr.includes('WRITEOFF')) {return PaymentType.WRITEOFF;}
 
   return PaymentType.POP;
 }
@@ -284,36 +284,36 @@ function mapPaymentType(type: string): PaymentType {
 function mapPaymentStatus(status: string): PaymentStatus {
   const statusStr = trimString(status).toLowerCase();
 
-  if (!statusStr) return PaymentStatus.PENDING;
+  if (!statusStr) {return PaymentStatus.PENDING;}
 
   // Check partial FIRST (before paid) -- "Partial Paid" must match partial, not paid
-  if (statusStr.includes('partial')) return PaymentStatus.PARTIAL;
+  if (statusStr.includes('partial')) {return PaymentStatus.PARTIAL;}
 
   // Final Paid -> COMPLETED
-  if (statusStr === 'final paid' || statusStr === 'finalpaid') return PaymentStatus.COMPLETED;
+  if (statusStr === 'final paid' || statusStr === 'finalpaid') {return PaymentStatus.COMPLETED;}
   // Generic "paid" only after partial is ruled out
-  if (statusStr === 'paid') return PaymentStatus.COMPLETED;
+  if (statusStr === 'paid') {return PaymentStatus.COMPLETED;}
 
   // Bad debt -> WRITEOFF (not PENDING)
-  if (statusStr.includes('bad debt')) return PaymentStatus.WRITEOFF;
+  if (statusStr.includes('bad debt')) {return PaymentStatus.WRITEOFF;}
 
   // Refund statuses
-  if (statusStr.includes('refund') && !statusStr.includes('writeoff')) return PaymentStatus.REFUNDED;
+  if (statusStr.includes('refund') && !statusStr.includes('writeoff')) {return PaymentStatus.REFUNDED;}
 
   // WriteOff statuses (Pending WriteOff, Pending WriteOff 1, etc.)
-  if (statusStr.includes('writeoff') || statusStr.includes('write off')) return PaymentStatus.WRITEOFF;
+  if (statusStr.includes('writeoff') || statusStr.includes('write off')) {return PaymentStatus.WRITEOFF;}
 
   // Completed
-  if (statusStr.includes('completed')) return PaymentStatus.COMPLETED;
+  if (statusStr.includes('completed')) {return PaymentStatus.COMPLETED;}
 
   // Failed
-  if (statusStr.includes('failed')) return PaymentStatus.FAILED;
+  if (statusStr.includes('failed')) {return PaymentStatus.FAILED;}
 
   // DPA to POP transitions and other complex statuses -> PENDING
-  if (statusStr.includes('from dpa') || statusStr.includes('to pop')) return PaymentStatus.PENDING;
+  if (statusStr.includes('from dpa') || statusStr.includes('to pop')) {return PaymentStatus.PENDING;}
 
   // Unpaid
-  if (statusStr.includes('unpaid')) return PaymentStatus.PENDING;
+  if (statusStr.includes('unpaid')) {return PaymentStatus.PENDING;}
 
   return PaymentStatus.PENDING;
 }

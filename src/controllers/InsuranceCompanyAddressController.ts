@@ -190,7 +190,7 @@ export class InsuranceCompanyAddressController {
    * PUT /api/insurance-addresses/:id
    */
   static updateAddress = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
+    const { id } = req.params;
     if (!id) {
       return res.status(400).json({ error: 'Address ID is required' });
     }
@@ -216,7 +216,7 @@ export class InsuranceCompanyAddressController {
    * DELETE /api/insurance-addresses/:id
    */
   static deleteAddress = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
+    const { id } = req.params;
     if (!id) {
       return res.status(400).json({ error: 'Address ID is required' });
     }

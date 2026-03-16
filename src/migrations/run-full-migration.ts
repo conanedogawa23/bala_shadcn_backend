@@ -126,11 +126,11 @@ async function runFullMigration(): Promise<void> {
       console.error(`Error: ${error}\n`);
 
       if (phase.critical) {
-        console.error(`\n🚨 CRITICAL PHASE FAILED - Migration cannot continue\n`);
+        console.error('\n🚨 CRITICAL PHASE FAILED - Migration cannot continue\n');
         printMigrationSummary(results, Date.now() - startTime);
         process.exit(1);
       } else {
-        console.warn(`\n⚠️  Non-critical phase failed - continuing migration\n`);
+        console.warn('\n⚠️  Non-critical phase failed - continuing migration\n');
       }
     }
   }

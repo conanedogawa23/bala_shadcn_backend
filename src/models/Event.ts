@@ -318,11 +318,15 @@ EventSchema.statics.findByClinic = function(clinicName: string) {
   }).sort({ eventDate: -1 });
 };
 
-EventSchema.statics.findPublicEvents = function(startDate?: Date, endDate?: Date) {
+EventSchema.statics.findPublicEvents = function(startDate?: Date, endDate?: Date, clinicName?: string) {
   const query: any = {
     isPublic: true,
     isApproved: true
   };
+
+  if (clinicName) {
+    query.clientClinicName = new RegExp(clinicName, 'i');
+  }
   
   if (startDate && endDate) {
     query.eventDate = { $gte: startDate, $lte: endDate };
@@ -396,11 +400,17 @@ EventSchema.statics.findByClinic = function(clinicName: string) {
   return this.find({ clientClinicName: new RegExp(clinicName, 'i') }).sort({ eventDate: -1 });
 };
 
-EventSchema.statics.findPublicEvents = function(startDate?: Date, endDate?: Date) {
+EventSchema.statics.findPublicEvents = function(startDate?: Date, endDate?: Date, clinicName?: string) {
   const query: any = { isPublic: true, isApproved: true };
+
+  if (clinicName) {
+    query.clientClinicName = new RegExp(clinicName, 'i');
+  }
   
   if (startDate && endDate) {
     query.eventDate = { $gte: startDate, $lte: endDate };
+  } else if (startDate) {
+    query.eventDate = { $gte: startDate };
   }
   
   return this.find(query).sort({ eventDate: 1 });
@@ -417,7 +427,7 @@ interface IEventModel extends Model<IEvent> {
   findByClient(clientId: string): any;
   findByCategory(categoryId: number): any;
   findByClinic(clinicName: string): any;
-  findPublicEvents(startDate?: Date, endDate?: Date): any;
+  findPublicEvents(startDate?: Date, endDate?: Date, clinicName?: string): any;
   findPendingApproval(): any;
 }
 

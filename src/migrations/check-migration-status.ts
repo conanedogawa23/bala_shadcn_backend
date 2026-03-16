@@ -45,8 +45,8 @@ async function checkMigrationStatus(): Promise<void> {
 
       for (const progress of progressRecords) {
         const statusIcon = progress.status === 'completed' ? '✅' :
-                          progress.status === 'failed' ? '❌' :
-                          progress.status === 'in_progress' ? '⏳' : '⏸️';
+          progress.status === 'failed' ? '❌' :
+            progress.status === 'in_progress' ? '⏳' : '⏸️';
         
         const percentage = progress.totalRecords > 0
           ? ((progress.migratedRecords / progress.totalRecords) * 100).toFixed(1)

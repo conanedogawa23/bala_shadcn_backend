@@ -848,7 +848,7 @@ export class InvoiceService {
     yPos += 20;
     doc
       .fontSize(10)
-      .text(`Subtotal:`, 400, yPos, { width: 80, align: 'left' })
+      .text('Subtotal:', 400, yPos, { width: 80, align: 'left' })
       .text(`${template.currencySymbol}${subtotal.toFixed(2)}`, 480, yPos, { width: 50, align: 'right' });
     
     yPos += 20;
@@ -860,7 +860,7 @@ export class InvoiceService {
     doc
       .fontSize(14)
       .font('Helvetica-Bold')
-      .text(`Total:`, 400, yPos, { width: 80, align: 'left' })
+      .text('Total:', 400, yPos, { width: 80, align: 'left' })
       .text(`${template.currencySymbol}${total.toFixed(2)}`, 480, yPos, { width: 50, align: 'right' });
     
     // Footer

@@ -74,8 +74,8 @@ export class PaymentService {
 
       if (startDate || endDate) {
         matchCriteria.paymentDate = {};
-        if (startDate) matchCriteria.paymentDate.$gte = startDate;
-        if (endDate) matchCriteria.paymentDate.$lte = endDate;
+        if (startDate) {matchCriteria.paymentDate.$gte = startDate;}
+        if (endDate) {matchCriteria.paymentDate.$lte = endDate;}
       }
 
       const [paymentTypeSummary, dailySummary] = await Promise.all([
@@ -499,8 +499,8 @@ export class PaymentService {
       }
       if (startDate || endDate) {
         match.paymentDate = {};
-        if (startDate) match.paymentDate.$gte = startDate;
-        if (endDate) match.paymentDate.$lte = endDate;
+        if (startDate) {match.paymentDate.$gte = startDate;}
+        if (endDate) {match.paymentDate.$lte = endDate;}
       }
 
       return await PaymentModel.aggregate([

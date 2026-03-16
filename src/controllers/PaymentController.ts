@@ -23,7 +23,7 @@ export class PaymentController {
   /**
    * Helper method to find payment by ID (supports both ObjectId and paymentNumber)
    */
-    private static async findPaymentById(id: string): Promise<any> {
+  private static async findPaymentById(id: string): Promise<any> {
     logger.info(`Helper findPaymentById called with: ${id}`);
     
     let payment;
@@ -110,9 +110,9 @@ export class PaymentController {
       }
 
       // Apply filters
-      if (status) filter.status = status;
-      if (paymentMethod) filter.paymentMethod = paymentMethod;
-      if (paymentType) filter.paymentType = paymentType;
+      if (status) {filter.status = status;}
+      if (paymentMethod) {filter.paymentMethod = paymentMethod;}
+      if (paymentType) {filter.paymentType = paymentType;}
       if (clinicName) {
         // Use case-insensitive exact match for clinic name
         filter.clinicName = new RegExp(`^${(clinicName as string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
@@ -128,7 +128,7 @@ export class PaymentController {
         filter.$and = filter.$and || [];
         filter.$and.push({ $or: clientFilters });
       }
-      if (orderNumber && !search) filter.orderNumber = orderNumber as string;
+      if (orderNumber && !search) {filter.orderNumber = orderNumber as string;}
       if (orderId) {
         // Handle ObjectId filtering for orderId
         try {
@@ -138,13 +138,13 @@ export class PaymentController {
           filter.orderId = null;
         }
       }
-      if (outstanding === 'true') filter['amounts.totalOwed'] = { $gt: 0 };
+      if (outstanding === 'true') {filter['amounts.totalOwed'] = { $gt: 0 };}
 
       // Date range filter
       if (startDate || endDate) {
         filter.paymentDate = {};
-        if (startDate) filter.paymentDate.$gte = new Date(startDate as string);
-        if (endDate) filter.paymentDate.$lte = new Date(endDate as string);
+        if (startDate) {filter.paymentDate.$gte = new Date(startDate as string);}
+        if (endDate) {filter.paymentDate.$lte = new Date(endDate as string);}
       }
 
       const skip = (pageNum - 1) * limitNum;
@@ -380,15 +380,15 @@ export class PaymentController {
         ];
       }
 
-      if (status) filter.status = status;
-      if (paymentMethod) filter.paymentMethod = paymentMethod;
-      if (outstanding === 'true') filter['amounts.totalOwed'] = { $gt: 0 };
+      if (status) {filter.status = status;}
+      if (paymentMethod) {filter.paymentMethod = paymentMethod;}
+      if (outstanding === 'true') {filter['amounts.totalOwed'] = { $gt: 0 };}
 
       // Date range filter
       if (startDate || endDate) {
         filter.paymentDate = {};
-        if (startDate) filter.paymentDate.$gte = new Date(startDate as string);
-        if (endDate) filter.paymentDate.$lte = new Date(endDate as string);
+        if (startDate) {filter.paymentDate.$gte = new Date(startDate as string);}
+        if (endDate) {filter.paymentDate.$lte = new Date(endDate as string);}
       }
 
       const skip = (pageNum - 1) * limitNum;

@@ -60,7 +60,7 @@ async function verifyIndexes(connection: any): Promise<void> {
       if (missingIndexes.length > 0) {
         console.log(`   ⚠️  Missing indexes: ${missingIndexes.join(', ')}`);
       } else {
-        console.log(`   ✅ All expected indexes present`);
+        console.log('   ✅ All expected indexes present');
       }
       console.log('');
     } catch (error) {

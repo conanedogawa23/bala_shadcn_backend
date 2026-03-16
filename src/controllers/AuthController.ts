@@ -91,16 +91,16 @@ const parseExpiryToSeconds = (expiry: string): number => {
   const unit = rawUnit.toLowerCase();
 
   switch (unit) {
-    case 's':
-      return value;
-    case 'm':
-      return value * 60;
-    case 'h':
-      return value * 60 * 60;
-    case 'd':
-      return value * 60 * 60 * 24;
-    default:
-      return 3600;
+  case 's':
+    return value;
+  case 'm':
+    return value * 60;
+  case 'h':
+    return value * 60 * 60;
+  case 'd':
+    return value * 60 * 60 * 24;
+  default:
+    return 3600;
   }
 };
 
@@ -509,7 +509,7 @@ export class AuthController {
         { httpOnly: false, secure: false, sameSite: 'lax' as const, path: '/' },
         { httpOnly: false, secure: true, sameSite: 'lax' as const, path: '/' },
         { path: '/' },
-        { httpOnly: true, secure: true, sameSite: 'none' as const, path: '/' },
+        { httpOnly: true, secure: true, sameSite: 'none' as const, path: '/' }
       ];
 
       for (const cookieName of cookieNames) {

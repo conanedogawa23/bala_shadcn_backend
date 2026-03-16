@@ -83,7 +83,7 @@ async function runSmokeTest(): Promise<void> {
     { name: 'orders', model: OrderModel },
     { name: 'contact_history', model: ContactHistoryModel },
     { name: 'client_clinic_relationships', model: ClientClinicRelationshipModel },
-    { name: 'insurance_companies', model: InsuranceCompanyModel },
+    { name: 'insurance_companies', model: InsuranceCompanyModel }
   ];
 
   const results: TestResult[] = [];
@@ -104,8 +104,8 @@ async function runSmokeTest(): Promise<void> {
     const status = r.findOne === 'PASS' && (r.validate === 'PASS' || r.validate === 'SKIP')
       ? 'PASS'
       : 'FAIL';
-    if (status === 'PASS') passCount++;
-    else failCount++;
+    if (status === 'PASS') {passCount++;}
+    else {failCount++;}
     console.log(`  ${status === 'PASS' ? '[PASS]' : '[FAIL]'} ${r.collection}`);
     if (r.error) {
       console.log(`         ${r.error}`);

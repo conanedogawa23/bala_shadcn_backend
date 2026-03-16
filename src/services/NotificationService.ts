@@ -366,58 +366,58 @@ class NotificationServiceClass {
     const { clientName, orderNumber, paymentNumber, amount, status, oldStatus, newStatus } = metadata;
 
     switch (category) {
-      case NotificationCategory.PAYMENT:
-        switch (action) {
-          case NotificationAction.CREATED:
-            return `Payment${paymentNumber ? ` ${paymentNumber}` : ''} of $${amount?.toFixed(2) || '0.00'} received${clientName ? ` from ${clientName}` : ''}`;
-          case NotificationAction.UPDATED:
-            return `Payment${paymentNumber ? ` ${paymentNumber}` : ''} has been updated`;
-          case NotificationAction.DELETED:
-            return `Payment${paymentNumber ? ` ${paymentNumber}` : ''} has been deleted`;
-          case NotificationAction.REFUNDED:
-            return `Payment${paymentNumber ? ` ${paymentNumber}` : ''} of $${amount?.toFixed(2) || '0.00'} has been refunded`;
-          default:
-            return `Payment ${action}`;
-        }
-
-      case NotificationCategory.ORDER:
-        switch (action) {
-          case NotificationAction.CREATED:
-            return `New order${orderNumber ? ` ${orderNumber}` : ''} created${clientName ? ` for ${clientName}` : ''}`;
-          case NotificationAction.UPDATED:
-            return `Order${orderNumber ? ` ${orderNumber}` : ''} has been updated`;
-          case NotificationAction.DELETED:
-            return `Order${orderNumber ? ` ${orderNumber}` : ''} has been deleted`;
-          case NotificationAction.STATUS_CHANGED:
-            return `Order${orderNumber ? ` ${orderNumber}` : ''} status changed${oldStatus && newStatus ? ` from ${oldStatus} to ${newStatus}` : newStatus ? ` to ${newStatus}` : ''}`;
-          case NotificationAction.COMPLETED:
-            return `Order${orderNumber ? ` ${orderNumber}` : ''} has been completed`;
-          case NotificationAction.CANCELLED:
-            return `Order${orderNumber ? ` ${orderNumber}` : ''} has been cancelled`;
-          default:
-            return `Order ${action}`;
-        }
-
-      case NotificationCategory.APPOINTMENT:
-        switch (action) {
-          case NotificationAction.CREATED:
-            return `New appointment scheduled${clientName ? ` for ${clientName}` : ''}`;
-          case NotificationAction.UPDATED:
-            return `Appointment${clientName ? ` for ${clientName}` : ''} has been updated`;
-          case NotificationAction.DELETED:
-            return `Appointment${clientName ? ` for ${clientName}` : ''} has been deleted`;
-          case NotificationAction.STATUS_CHANGED:
-            return `Appointment status changed${oldStatus && newStatus ? ` from ${oldStatus} to ${newStatus}` : newStatus ? ` to ${newStatus}` : ''}`;
-          case NotificationAction.COMPLETED:
-            return `Appointment${clientName ? ` for ${clientName}` : ''} has been completed`;
-          case NotificationAction.CANCELLED:
-            return `Appointment${clientName ? ` for ${clientName}` : ''} has been cancelled`;
-          default:
-            return `Appointment ${action}`;
-        }
-
+    case NotificationCategory.PAYMENT:
+      switch (action) {
+      case NotificationAction.CREATED:
+        return `Payment${paymentNumber ? ` ${paymentNumber}` : ''} of $${amount?.toFixed(2) || '0.00'} received${clientName ? ` from ${clientName}` : ''}`;
+      case NotificationAction.UPDATED:
+        return `Payment${paymentNumber ? ` ${paymentNumber}` : ''} has been updated`;
+      case NotificationAction.DELETED:
+        return `Payment${paymentNumber ? ` ${paymentNumber}` : ''} has been deleted`;
+      case NotificationAction.REFUNDED:
+        return `Payment${paymentNumber ? ` ${paymentNumber}` : ''} of $${amount?.toFixed(2) || '0.00'} has been refunded`;
       default:
-        return `${category} ${action}`;
+        return `Payment ${action}`;
+      }
+
+    case NotificationCategory.ORDER:
+      switch (action) {
+      case NotificationAction.CREATED:
+        return `New order${orderNumber ? ` ${orderNumber}` : ''} created${clientName ? ` for ${clientName}` : ''}`;
+      case NotificationAction.UPDATED:
+        return `Order${orderNumber ? ` ${orderNumber}` : ''} has been updated`;
+      case NotificationAction.DELETED:
+        return `Order${orderNumber ? ` ${orderNumber}` : ''} has been deleted`;
+      case NotificationAction.STATUS_CHANGED:
+        return `Order${orderNumber ? ` ${orderNumber}` : ''} status changed${oldStatus && newStatus ? ` from ${oldStatus} to ${newStatus}` : newStatus ? ` to ${newStatus}` : ''}`;
+      case NotificationAction.COMPLETED:
+        return `Order${orderNumber ? ` ${orderNumber}` : ''} has been completed`;
+      case NotificationAction.CANCELLED:
+        return `Order${orderNumber ? ` ${orderNumber}` : ''} has been cancelled`;
+      default:
+        return `Order ${action}`;
+      }
+
+    case NotificationCategory.APPOINTMENT:
+      switch (action) {
+      case NotificationAction.CREATED:
+        return `New appointment scheduled${clientName ? ` for ${clientName}` : ''}`;
+      case NotificationAction.UPDATED:
+        return `Appointment${clientName ? ` for ${clientName}` : ''} has been updated`;
+      case NotificationAction.DELETED:
+        return `Appointment${clientName ? ` for ${clientName}` : ''} has been deleted`;
+      case NotificationAction.STATUS_CHANGED:
+        return `Appointment status changed${oldStatus && newStatus ? ` from ${oldStatus} to ${newStatus}` : newStatus ? ` to ${newStatus}` : ''}`;
+      case NotificationAction.COMPLETED:
+        return `Appointment${clientName ? ` for ${clientName}` : ''} has been completed`;
+      case NotificationAction.CANCELLED:
+        return `Appointment${clientName ? ` for ${clientName}` : ''} has been cancelled`;
+      default:
+        return `Appointment ${action}`;
+      }
+
+    default:
+      return `${category} ${action}`;
     }
   }
 
@@ -426,18 +426,18 @@ class NotificationServiceClass {
    */
   determineNotificationType(action: NotificationAction): NotificationType {
     switch (action) {
-      case NotificationAction.CREATED:
-      case NotificationAction.COMPLETED:
-        return NotificationType.SUCCESS;
-      case NotificationAction.DELETED:
-      case NotificationAction.CANCELLED:
-      case NotificationAction.REFUNDED:
-        return NotificationType.WARNING;
-      case NotificationAction.UPDATED:
-      case NotificationAction.STATUS_CHANGED:
-        return NotificationType.INFO;
-      default:
-        return NotificationType.INFO;
+    case NotificationAction.CREATED:
+    case NotificationAction.COMPLETED:
+      return NotificationType.SUCCESS;
+    case NotificationAction.DELETED:
+    case NotificationAction.CANCELLED:
+    case NotificationAction.REFUNDED:
+      return NotificationType.WARNING;
+    case NotificationAction.UPDATED:
+    case NotificationAction.STATUS_CHANGED:
+      return NotificationType.INFO;
+    default:
+      return NotificationType.INFO;
     }
   }
 }

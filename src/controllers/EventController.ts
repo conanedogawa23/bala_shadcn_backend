@@ -241,11 +241,12 @@ export class EventController {
    * GET /api/events/public
    */
   static getPublicEvents = asyncHandler(async (req: Request, res: Response) => {
-    const { startDate, endDate } = req.query as any;
+    const { startDate, endDate, clinicName } = req.query as any;
 
     const events = await EventService.getPublicEvents(
       startDate ? new Date(startDate) : undefined,
-      endDate ? new Date(endDate) : undefined
+      endDate ? new Date(endDate) : undefined,
+      clinicName
     );
     const response = EventView.formatEvents(events);
 
@@ -367,7 +368,7 @@ export class EventController {
    * PUT /api/events/:id
    */
   static updateEvent = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
+    const { id } = req.params;
     if (!id) {
       return res.status(400).json({ error: 'Event ID is required' });
     }
@@ -393,7 +394,7 @@ export class EventController {
    * DELETE /api/events/:id
    */
   static deleteEvent = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
+    const { id } = req.params;
     if (!id) {
       return res.status(400).json({ error: 'Event ID is required' });
     }
@@ -415,7 +416,7 @@ export class EventController {
    * PUT /api/events/:id/approve
    */
   static approveEvent = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
+    const { id } = req.params;
     if (!id) {
       return res.status(400).json({ error: 'Event ID is required' });
     }
@@ -439,7 +440,7 @@ export class EventController {
    * PUT /api/events/:id/toggle-visibility
    */
   static toggleEventVisibility = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
+    const { id } = req.params;
     if (!id) {
       return res.status(400).json({ error: 'Event ID is required' });
     }

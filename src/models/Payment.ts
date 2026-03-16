@@ -373,35 +373,35 @@ PaymentSchema.methods.addPaymentAmount = function(paymentType: PaymentType, amou
   const roundedAmount = Math.round(amount * 100) / 100;
   
   switch (paymentType) {
-    case PaymentType.POP:
-      this.amounts.popAmount += roundedAmount;
-      break;
-    case PaymentType.POPFP:
-      this.amounts.popfpAmount += roundedAmount;
-      break;
-    case PaymentType.DPA:
-      this.amounts.dpaAmount += roundedAmount;
-      break;
-    case PaymentType.DPAFP:
-      this.amounts.dpafpAmount += roundedAmount;
-      break;
-    case PaymentType.COB_1:
-      this.amounts.cob1Amount += roundedAmount;
-      break;
-    case PaymentType.COB_2:
-      this.amounts.cob2Amount += roundedAmount;
-      break;
-    case PaymentType.INSURANCE_1ST:
-      this.amounts.insurance1stAmount += roundedAmount;
-      break;
-    case PaymentType.INSURANCE_2ND:
-      this.amounts.insurance2ndAmount += roundedAmount;
-      break;
-    case PaymentType.NO_INSUR_FP:
-      this.amounts.noInsurFpAmount += roundedAmount;
-      break;
-    default:
-      throw new Error(`Unsupported payment type: ${paymentType}`);
+  case PaymentType.POP:
+    this.amounts.popAmount += roundedAmount;
+    break;
+  case PaymentType.POPFP:
+    this.amounts.popfpAmount += roundedAmount;
+    break;
+  case PaymentType.DPA:
+    this.amounts.dpaAmount += roundedAmount;
+    break;
+  case PaymentType.DPAFP:
+    this.amounts.dpafpAmount += roundedAmount;
+    break;
+  case PaymentType.COB_1:
+    this.amounts.cob1Amount += roundedAmount;
+    break;
+  case PaymentType.COB_2:
+    this.amounts.cob2Amount += roundedAmount;
+    break;
+  case PaymentType.INSURANCE_1ST:
+    this.amounts.insurance1stAmount += roundedAmount;
+    break;
+  case PaymentType.INSURANCE_2ND:
+    this.amounts.insurance2ndAmount += roundedAmount;
+    break;
+  case PaymentType.NO_INSUR_FP:
+    this.amounts.noInsurFpAmount += roundedAmount;
+    break;
+  default:
+    throw new Error(`Unsupported payment type: ${paymentType}`);
   }
   
   this.calculateTotal();
@@ -467,8 +467,8 @@ PaymentSchema.statics.getTotalRevenue = function(clinicName?: string, startDate?
   }
   if (startDate || endDate) {
     match.paymentDate = {};
-    if (startDate) match.paymentDate.$gte = startDate;
-    if (endDate) match.paymentDate.$lte = endDate;
+    if (startDate) {match.paymentDate.$gte = startDate;}
+    if (endDate) {match.paymentDate.$lte = endDate;}
   }
   
   return this.aggregate([

@@ -156,7 +156,7 @@ PaymentDeletedSchema.statics.findUnrestored = function() {
 // Static method to restore an archived payment
 PaymentDeletedSchema.statics.restore = async function(archiveId: Types.ObjectId, userId: Types.ObjectId) {
   const archived = await this.findById(archiveId);
-  if (!archived) return null;
+  if (!archived) {return null;}
   
   archived.isRestored = true;
   archived.restoredAt = new Date();
