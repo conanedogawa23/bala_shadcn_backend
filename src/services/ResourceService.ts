@@ -5,6 +5,10 @@ import { NotFoundError, ValidationError, DatabaseError, ConflictError } from '@/
 import { logger } from '@/utils/logger';
 
 export class ResourceService {
+  private static escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   /**
    * Get all resources with filtering and pagination
    */
@@ -36,7 +40,9 @@ export class ResourceService {
       }
 
       if (clinicName) {
-        query.clinics = clinicName;
+        query.clinics = {
+          $regex: new RegExp(`^${this.escapeRegex(clinicName)}$`, 'i')
+        };
       }
 
       if (specialty && type === 'practitioner') {

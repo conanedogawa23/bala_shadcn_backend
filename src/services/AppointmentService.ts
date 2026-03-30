@@ -3,11 +3,16 @@ import { AppointmentModel, IAppointment } from '@/models/Appointment';
 import { ResourceModel } from '@/models/Resource';
 import { ClientModel } from '@/models/Client';
 import { ClinicModel } from '@/models/Clinic';
+import ReferringDoctor from '@/models/ReferringDoctor';
 import { NotFoundError, ValidationError, DatabaseError, ConflictError } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 
 export class AppointmentService {
   private static readonly WEEKDAY_FORMATTER = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
+
+  private static escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
 
   private static toMinutes(time: string): number {
     const [hoursPart, minutesPart] = time.split(':');
@@ -67,6 +72,119 @@ export class AppointmentService {
    */
   private static getAppointmentClinicName(clinicName: string): string {
     return clinicName;
+  }
+
+  private static normalizeOptionalResourceId(resourceId: unknown): number | null {
+    if (resourceId === undefined || resourceId === null || resourceId === '') {
+      return null;
+    }
+
+    const normalizedResourceId = Number(resourceId);
+    if (!Number.isInteger(normalizedResourceId) || normalizedResourceId <= 0) {
+      return null;
+    }
+
+    return normalizedResourceId;
+  }
+
+  private static hasValidResourceId(resourceId: unknown): resourceId is number {
+    return this.normalizeOptionalResourceId(resourceId) !== null;
+  }
+
+  private static async resolveReferringDoctor(
+    referringDoctorId: unknown,
+    clinicName?: string
+  ): Promise<{ referringDoctorId?: string; referringDoctorName?: string }> {
+    if (referringDoctorId === undefined || referringDoctorId === null || referringDoctorId === '') {
+      return {};
+    }
+
+    const normalizedDoctorId = String(referringDoctorId).trim();
+    if (!mongoose.Types.ObjectId.isValid(normalizedDoctorId)) {
+      throw new ValidationError('Referring doctor ID must be a valid identifier');
+    }
+
+    const filter: Record<string, unknown> = {
+      _id: new mongoose.Types.ObjectId(normalizedDoctorId),
+      isActive: true
+    };
+
+    if (clinicName) {
+      const escapedClinicName = this.escapeRegex(clinicName);
+      filter.$or = [
+        { clinicName: new RegExp(`^${escapedClinicName}$`, 'i') },
+        { clinicName: { $exists: false } },
+        { clinicName: '' }
+      ];
+    }
+
+    const doctor = await ReferringDoctor.findOne(filter).lean();
+    if (!doctor) {
+      throw new NotFoundError('Referring doctor', normalizedDoctorId);
+    }
+
+    return {
+      referringDoctorId: normalizedDoctorId,
+      referringDoctorName: doctor.fullName || `${doctor.firstName} ${doctor.lastName}`.trim()
+    };
+  }
+
+  private static buildAppointmentUpdateDocument(
+    updateData: Record<string, unknown>,
+    options: {
+      clearReferringDoctor?: boolean;
+      clearResource?: boolean;
+      resolvedReferringDoctor?: { referringDoctorId?: string; referringDoctorName?: string };
+    } = {}
+  ) {
+    const {
+      clearReferringDoctor = false,
+      clearResource = false,
+      resolvedReferringDoctor = {}
+    } = options;
+
+    const setData: Record<string, unknown> = {
+      ...updateData,
+      ...resolvedReferringDoctor,
+      dateModified: new Date()
+    };
+
+    if (clearResource) {
+      delete setData.resourceId;
+    }
+
+    if (clearReferringDoctor) {
+      delete setData.referringDoctorId;
+      delete setData.referringDoctorName;
+    }
+
+    Object.keys(setData).forEach((key) => {
+      if (setData[key] === undefined) {
+        delete setData[key];
+      }
+    });
+
+    const updateDocument: {
+      $set: Record<string, unknown>;
+      $unset?: Record<string, ''>;
+    } = {
+      $set: setData
+    };
+
+    const unsetData: Record<string, ''> = {};
+    if (clearResource) {
+      unsetData.resourceId = '';
+    }
+    if (clearReferringDoctor) {
+      unsetData.referringDoctorId = '';
+      unsetData.referringDoctorName = '';
+    }
+
+    if (Object.keys(unsetData).length > 0) {
+      updateDocument.$unset = unsetData;
+    }
+
+    return updateDocument;
   }
 
   /**
@@ -137,12 +255,40 @@ export class AppointmentService {
     ];
   }
 
+  private static getReferringDoctorLookupStages(): PipelineStage[] {
+    return [
+      {
+        $lookup: {
+          from: 'referringdoctors',
+          let: {
+            appointmentReferringDoctorId: '$referringDoctorId'
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $ne: ['$$appointmentReferringDoctorId', null] },
+                    { $eq: [{ $toString: '$_id' }, '$$appointmentReferringDoctorId'] }
+                  ]
+                }
+              }
+            },
+            { $limit: 1 }
+          ],
+          as: 'referringDoctorDetails'
+        }
+      },
+      { $unwind: { path: '$referringDoctorDetails', preserveNullAndEmptyArrays: true } }
+    ];
+  }
+
   /**
    * Derive resourceName from a plain resource object (mirrors Resource.getFullName()).
    */
   private static deriveResourceName(resource: any): string {
     if (!resource) {
-      return 'Unknown Resource';
+      return '';
     }
 
     if (resource.type === 'practitioner' && resource.practitioner) {
@@ -155,6 +301,12 @@ export class AppointmentService {
       }
     }
     return resource.resourceName || 'Unknown Resource';
+  }
+
+  private static deriveReferringDoctorName(appointment: any): string | undefined {
+    return appointment?.referringDoctorDetails?.fullName
+      || appointment?.referringDoctorName
+      || undefined;
   }
   /**
    * Get appointments by clinic with filtering, pagination, and client/resource lookups.
@@ -232,7 +384,8 @@ export class AppointmentService {
           { $skip: skip },
           { $limit: limit },
           ...this.getClientLookupStages(),
-          ...this.getResourceLookupStages()
+          ...this.getResourceLookupStages(),
+          ...this.getReferringDoctorLookupStages()
         ])
       ]);
 
@@ -240,7 +393,8 @@ export class AppointmentService {
 
       const enriched = appointments.map((apt: any) => ({
         ...apt,
-        resourceName: this.deriveResourceName(apt.resourceDetails)
+        resourceName: this.deriveResourceName(apt.resourceDetails),
+        referringDoctorName: this.deriveReferringDoctorName(apt)
       }));
 
       return { appointments: enriched, page, limit, total };
@@ -261,7 +415,8 @@ export class AppointmentService {
       const results = await AppointmentModel.aggregate([
         { $match: { _id: new mongoose.Types.ObjectId(appointmentId) } },
         ...this.getClientLookupStages(),
-        ...this.getResourceLookupStages()
+        ...this.getResourceLookupStages(),
+        ...this.getReferringDoctorLookupStages()
       ]);
 
       if (!results || results.length === 0) {
@@ -270,6 +425,7 @@ export class AppointmentService {
 
       const appointment = results[0];
       appointment.resourceName = this.deriveResourceName(appointment.resourceDetails);
+      appointment.referringDoctorName = this.deriveReferringDoctorName(appointment);
 
       return appointment;
     } catch (error) {
@@ -296,7 +452,8 @@ export class AppointmentService {
           }
         },
         ...this.getClientLookupStages(),
-        ...this.getResourceLookupStages()
+        ...this.getResourceLookupStages(),
+        ...this.getReferringDoctorLookupStages()
       ]);
 
       if (!results || results.length === 0) {
@@ -305,6 +462,7 @@ export class AppointmentService {
 
       const appointment = results[0];
       appointment.resourceName = this.deriveResourceName(appointment.resourceDetails);
+      appointment.referringDoctorName = this.deriveReferringDoctorName(appointment);
 
       return appointment;
     } catch (error) {
@@ -323,12 +481,21 @@ export class AppointmentService {
     try {
       // Find appointment by business ID
       const existingAppointment = await this.getAppointmentByBusinessId(appointmentId);
+      const hasIncomingResourceId = Object.prototype.hasOwnProperty.call(updateData, 'resourceId');
+      const shouldClearResource = hasIncomingResourceId && (updateData.resourceId === null || updateData.resourceId === '');
+      const hasIncomingReferringDoctorId = Object.prototype.hasOwnProperty.call(updateData, 'referringDoctorId');
+      const shouldClearReferringDoctor = hasIncomingReferringDoctorId
+        && (updateData.referringDoctorId === null || updateData.referringDoctorId === '');
+      const resourceId = shouldClearResource
+        ? null
+        : this.normalizeOptionalResourceId(
+          hasIncomingResourceId ? updateData.resourceId : existingAppointment.resourceId
+        );
 
       // If time or resource is being changed, check for conflicts
-      if (updateData.startDate || updateData.endDate || updateData.resourceId) {
+      if (updateData.startDate || updateData.endDate || hasIncomingResourceId) {
         const startDate = updateData.startDate ? new Date(updateData.startDate) : new Date(existingAppointment.startDate);
         const endDate = updateData.endDate ? new Date(updateData.endDate) : new Date(existingAppointment.endDate);
-        const resourceId = Number(updateData.resourceId ?? existingAppointment.resourceId);
 
         if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
           throw new ValidationError('Invalid appointment start/end date');
@@ -336,35 +503,45 @@ export class AppointmentService {
         if (endDate <= startDate) {
           throw new ValidationError('End date must be after start date');
         }
-        if (Number.isNaN(resourceId) || resourceId <= 0) {
+        if (!shouldClearResource && hasIncomingResourceId && resourceId === null) {
           throw new ValidationError('Resource ID must be a positive integer');
         }
 
-        const resource = await ResourceModel.findOne({ resourceId });
-        if (!resource) {
-          throw new NotFoundError('Resource', resourceId.toString());
+        if (resourceId !== null) {
+          const resource = await ResourceModel.findOne({ resourceId });
+          if (!resource) {
+            throw new NotFoundError('Resource', resourceId.toString());
+          }
+
+          const conflicts = await AppointmentModel.checkTimeSlotConflict(
+            resourceId,
+            startDate,
+            endDate,
+            String(existingAppointment._id)
+          );
+
+          if (conflicts.length > 0) {
+            throw new ConflictError('Time slot conflict: Resource is already booked during this time');
+          }
+
+          this.validateResourceOperationalTiming(resource, startDate, endDate);
         }
-
-        const conflicts = await AppointmentModel.checkTimeSlotConflict(
-          resourceId,
-          startDate,
-          endDate,
-          String(existingAppointment._id)
-        );
-
-        if (conflicts.length > 0) {
-          throw new ConflictError('Time slot conflict: Resource is already booked during this time');
-        }
-
-        this.validateResourceOperationalTiming(resource, startDate, endDate);
       }
+
+      const resolvedReferringDoctor = hasIncomingReferringDoctorId && !shouldClearReferringDoctor
+        ? await this.resolveReferringDoctor(
+          updateData.referringDoctorId,
+          String(updateData.clinicName || existingAppointment.clinicName || '')
+        )
+        : {};
 
       const updatedAppointment = await AppointmentModel.findByIdAndUpdate(
         existingAppointment._id,
-        {
-          ...updateData,
-          dateModified: new Date()
-        },
+        this.buildAppointmentUpdateDocument(updateData, {
+          clearReferringDoctor: shouldClearReferringDoctor,
+          clearResource: shouldClearResource,
+          resolvedReferringDoctor
+        }),
         { new: true, runValidators: true }
       );
 
@@ -452,6 +629,11 @@ export class AppointmentService {
         throw new NotFoundError('Clinic', appointmentData.clinicName);
       }
 
+      const resolvedReferringDoctor = await this.resolveReferringDoctor(
+        appointmentData.referringDoctorId,
+        appointmentData.clinicName
+      );
+
       // Check for time slot conflicts
       const conflicts = await AppointmentModel.checkTimeSlotConflict(
         normalizedResourceId,
@@ -470,6 +652,7 @@ export class AppointmentService {
       const appointment = new AppointmentModel({
         ...appointmentData,
         resourceId: normalizedResourceId,
+        ...resolvedReferringDoctor,
         clientId: normalizedAppointmentClientId,
         clientKey: normalizedAppointmentClientKey,
         subject: appointmentData.subject || client.getFullName(),
@@ -505,12 +688,21 @@ export class AppointmentService {
     try {
       // Check if appointment exists
       const existingAppointment = await this.getAppointmentById(appointmentId);
+      const hasIncomingResourceId = Object.prototype.hasOwnProperty.call(updateData, 'resourceId');
+      const shouldClearResource = hasIncomingResourceId && (updateData.resourceId === null || updateData.resourceId === '');
+      const hasIncomingReferringDoctorId = Object.prototype.hasOwnProperty.call(updateData, 'referringDoctorId');
+      const shouldClearReferringDoctor = hasIncomingReferringDoctorId
+        && (updateData.referringDoctorId === null || updateData.referringDoctorId === '');
+      const resourceId = shouldClearResource
+        ? null
+        : this.normalizeOptionalResourceId(
+          hasIncomingResourceId ? updateData.resourceId : existingAppointment.resourceId
+        );
 
       // If time or resource is being changed, check for conflicts
-      if (updateData.startDate || updateData.endDate || updateData.resourceId) {
+      if (updateData.startDate || updateData.endDate || hasIncomingResourceId) {
         const startDate = updateData.startDate ? new Date(updateData.startDate) : new Date(existingAppointment.startDate);
         const endDate = updateData.endDate ? new Date(updateData.endDate) : new Date(existingAppointment.endDate);
-        const resourceId = Number(updateData.resourceId ?? existingAppointment.resourceId);
 
         if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
           throw new ValidationError('Invalid appointment start/end date');
@@ -518,35 +710,45 @@ export class AppointmentService {
         if (endDate <= startDate) {
           throw new ValidationError('End date must be after start date');
         }
-        if (Number.isNaN(resourceId) || resourceId <= 0) {
+        if (!shouldClearResource && hasIncomingResourceId && resourceId === null) {
           throw new ValidationError('Resource ID must be a positive integer');
         }
 
-        const resource = await ResourceModel.findOne({ resourceId });
-        if (!resource) {
-          throw new NotFoundError('Resource', resourceId.toString());
+        if (resourceId !== null) {
+          const resource = await ResourceModel.findOne({ resourceId });
+          if (!resource) {
+            throw new NotFoundError('Resource', resourceId.toString());
+          }
+
+          const conflicts = await AppointmentModel.checkTimeSlotConflict(
+            resourceId,
+            startDate,
+            endDate,
+            appointmentId
+          );
+
+          if (conflicts.length > 0) {
+            throw new ConflictError('Time slot conflict: Resource is already booked during this time');
+          }
+
+          this.validateResourceOperationalTiming(resource, startDate, endDate);
         }
-
-        const conflicts = await AppointmentModel.checkTimeSlotConflict(
-          resourceId,
-          startDate,
-          endDate,
-          appointmentId
-        );
-
-        if (conflicts.length > 0) {
-          throw new ConflictError('Time slot conflict: Resource is already booked during this time');
-        }
-
-        this.validateResourceOperationalTiming(resource, startDate, endDate);
       }
+
+      const resolvedReferringDoctor = hasIncomingReferringDoctorId && !shouldClearReferringDoctor
+        ? await this.resolveReferringDoctor(
+          updateData.referringDoctorId,
+          String(updateData.clinicName || existingAppointment.clinicName || '')
+        )
+        : {};
 
       const updatedAppointment = await AppointmentModel.findByIdAndUpdate(
         appointmentId,
-        {
-          ...updateData,
-          dateModified: new Date()
-        },
+        this.buildAppointmentUpdateDocument(updateData, {
+          clearReferringDoctor: shouldClearReferringDoctor,
+          clearResource: shouldClearResource,
+          resolvedReferringDoctor
+        }),
         { new: true, runValidators: true }
       );
 
@@ -727,12 +929,14 @@ export class AppointmentService {
         { $match: matchStage },
         { $sort: { billDate: 1 } },
         ...this.getClientLookupStages(),
-        ...this.getResourceLookupStages()
+        ...this.getResourceLookupStages(),
+        ...this.getReferringDoctorLookupStages()
       ]);
 
       return appointments.map((apt: any) => ({
         ...apt,
-        resourceName: this.deriveResourceName(apt.resourceDetails)
+        resourceName: this.deriveResourceName(apt.resourceDetails),
+        referringDoctorName: this.deriveReferringDoctorName(apt)
       }));
     } catch (error) {
       logger.error('Error in getAppointmentsReadyToBill:', error);
@@ -840,12 +1044,14 @@ export class AppointmentService {
           }
         },
         { $sort: { startDate: -1 } },
-        ...this.getResourceLookupStages()
+        ...this.getResourceLookupStages(),
+        ...this.getReferringDoctorLookupStages()
       ]);
 
       const enriched = appointments.map((apt: any) => ({
         ...apt,
-        resourceName: this.deriveResourceName(apt.resourceDetails)
+        resourceName: this.deriveResourceName(apt.resourceDetails),
+        referringDoctorName: this.deriveReferringDoctorName(apt)
       }));
 
       return {
@@ -948,6 +1154,10 @@ export class AppointmentService {
    */
   private static async updateResourceStats(resourceId: number): Promise<void> {
     try {
+      if (!this.hasValidResourceId(resourceId)) {
+        return;
+      }
+
       const [totalAppointments, avgDurationResult] = await Promise.all([
         AppointmentModel.countDocuments({ resourceId, isActive: true }),
         AppointmentModel.aggregate([

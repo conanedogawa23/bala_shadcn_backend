@@ -32,6 +32,150 @@ export enum UserStatus {
   PENDING = 'pending',
 }
 
+type UserPermissionOverride = Partial<Omit<IUserPermissions, 'allowedClinics'>> & {
+  allowedClinics?: string[];
+};
+
+interface BuildUserPermissionsOptions {
+  basePermissions?: UserPermissionOverride | null;
+  overrides?: UserPermissionOverride | null;
+  clinics?: unknown;
+}
+
+const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+export const normalizeAllowedClinics = (clinics: unknown): string[] => {
+  if (!Array.isArray(clinics)) {
+    return [];
+  }
+
+  const normalizedClinics = new Set<string>();
+
+  clinics.forEach((clinic) => {
+    if (typeof clinic !== 'string') {
+      return;
+    }
+
+    const normalizedClinic = clinic.trim();
+    if (normalizedClinic) {
+      normalizedClinics.add(normalizedClinic);
+    }
+  });
+
+  return Array.from(normalizedClinics);
+};
+
+export const getDefaultPermissionsForRole = (role: UserRole): IUserPermissions => {
+  const basePermissions: IUserPermissions = {
+    canManageUsers: false,
+    canManageClinic: false,
+    canViewReports: false,
+    canManageAppointments: false,
+    canManageOrders: false,
+    canManagePayments: false,
+    canViewPayments: false,
+    canCreatePayments: false,
+    canEditPayments: false,
+    canDeletePayments: false,
+    canProcessRefunds: false,
+    canAccessAllClinics: false,
+    allowedClinics: []
+  };
+
+  switch (role) {
+  case UserRole.ADMIN:
+    return {
+      ...basePermissions,
+      canManageUsers: true,
+      canManageClinic: true,
+      canViewReports: true,
+      canManageAppointments: true,
+      canManageOrders: true,
+      canManagePayments: true,
+      canViewPayments: true,
+      canCreatePayments: true,
+      canEditPayments: true,
+      canDeletePayments: true,
+      canProcessRefunds: true,
+      canAccessAllClinics: true
+    };
+
+  case UserRole.MANAGER:
+    return {
+      ...basePermissions,
+      canManageClinic: true,
+      canViewReports: true,
+      canManageAppointments: true,
+      canManageOrders: true,
+      canManagePayments: true,
+      canViewPayments: true,
+      canCreatePayments: true,
+      canEditPayments: true,
+      canDeletePayments: false,
+      canProcessRefunds: true,
+      canAccessAllClinics: true
+    };
+
+  case UserRole.PRACTITIONER:
+    return {
+      ...basePermissions,
+      canViewReports: true,
+      canManageAppointments: true,
+      canManageOrders: true,
+      canViewPayments: true,
+      canCreatePayments: true,
+      canEditPayments: false,
+      canDeletePayments: false,
+      canProcessRefunds: false
+    };
+
+  case UserRole.STAFF:
+    return {
+      ...basePermissions,
+      canManageAppointments: true,
+      canManageOrders: true,
+      canViewPayments: true,
+      canCreatePayments: false,
+      canEditPayments: false,
+      canDeletePayments: false,
+      canProcessRefunds: false
+    };
+
+  case UserRole.CLIENT:
+    return basePermissions;
+
+  default:
+    return basePermissions;
+  }
+};
+
+export const buildUserPermissions = (
+  role: UserRole,
+  options: BuildUserPermissionsOptions = {}
+): IUserPermissions => {
+  const defaultPermissions = getDefaultPermissionsForRole(role);
+  const basePermissions = options.basePermissions ?? {};
+  const overrides = options.overrides ?? {};
+  const mergedPermissions: IUserPermissions = {
+    ...defaultPermissions,
+    ...basePermissions,
+    ...overrides,
+    allowedClinics: []
+  };
+
+  const hasExplicitClinics = Object.prototype.hasOwnProperty.call(options, 'clinics');
+  const resolvedAllowedClinics = hasExplicitClinics
+    ? normalizeAllowedClinics(options.clinics)
+    : overrides.allowedClinics !== undefined
+      ? normalizeAllowedClinics(overrides.allowedClinics)
+      : normalizeAllowedClinics(basePermissions.allowedClinics);
+
+  return {
+    ...mergedPermissions,
+    allowedClinics: mergedPermissions.canAccessAllClinics ? [] : resolvedAllowedClinics
+  };
+};
+
 // Interfaces
 export interface IUserProfile {
   firstName: string;
@@ -289,8 +433,10 @@ UserSchema.pre<IUser>('save', async function (next) {
   }
 
   // Set default permissions based on role
-  if (this.isModified('role') || this.isNew) {
-    this.permissions = this.getDefaultPermissions(this.role);
+  if (this.isModified('role') || this.isModified('permissions') || this.isNew) {
+    this.permissions = buildUserPermissions(this.role, {
+      basePermissions: this.permissions
+    });
   }
 
   next();
@@ -451,7 +597,15 @@ UserSchema.methods.canAccessClinic = function (clinicName: string): boolean {
   if (this.permissions.canAccessAllClinics) {
     return true;
   }
-  return this.permissions.allowedClinics.includes(clinicName);
+
+  const normalizedClinicName = clinicName.trim().toLowerCase();
+  if (!normalizedClinicName) {
+    return false;
+  }
+
+  return this.permissions.allowedClinics.some(
+    (clinic: string) => clinic.trim().toLowerCase() === normalizedClinicName
+  );
 };
 
 UserSchema.methods.getFullName = function (): string {
@@ -474,92 +628,7 @@ UserSchema.methods.toSafeObject = function (): Partial<IUser> {
 UserSchema.methods.getDefaultPermissions = function (
   role: UserRole
 ): IUserPermissions {
-  const basePermissions: IUserPermissions = {
-    canManageUsers: false,
-    canManageClinic: false,
-    canViewReports: false,
-    canManageAppointments: false,
-    canManageOrders: false,
-    canManagePayments: false,
-    // Granular Payment Permissions
-    canViewPayments: false,
-    canCreatePayments: false,
-    canEditPayments: false,
-    canDeletePayments: false,
-    canProcessRefunds: false,
-    canAccessAllClinics: false,
-    allowedClinics: []
-  };
-
-  switch (role) {
-  case UserRole.ADMIN:
-    return {
-      ...basePermissions,
-      canManageUsers: true,
-      canManageClinic: true,
-      canViewReports: true,
-      canManageAppointments: true,
-      canManageOrders: true,
-      canManagePayments: true,
-      // Full payment permissions for Admin
-      canViewPayments: true,
-      canCreatePayments: true,
-      canEditPayments: true,
-      canDeletePayments: true,
-      canProcessRefunds: true,
-      canAccessAllClinics: true
-    };
-
-  case UserRole.MANAGER:
-    return {
-      ...basePermissions,
-      canManageClinic: true,
-      canViewReports: true,
-      canManageAppointments: true,
-      canManageOrders: true,
-      canManagePayments: true,
-      // Most payment permissions for Manager (except delete)
-      canViewPayments: true,
-      canCreatePayments: true,
-      canEditPayments: true,
-      canDeletePayments: false,
-      canProcessRefunds: true,
-      canAccessAllClinics: true
-    };
-
-  case UserRole.PRACTITIONER:
-    return {
-      ...basePermissions,
-      canViewReports: true,
-      canManageAppointments: true,
-      canManageOrders: true,
-      // Limited payment permissions for Practitioner
-      canViewPayments: true,
-      canCreatePayments: true,
-      canEditPayments: false,
-      canDeletePayments: false,
-      canProcessRefunds: false
-    };
-
-  case UserRole.STAFF:
-    return {
-      ...basePermissions,
-      canManageAppointments: true,
-      canManageOrders: true,
-      // Basic payment permissions for Staff
-      canViewPayments: true,
-      canCreatePayments: false,
-      canEditPayments: false,
-      canDeletePayments: false,
-      canProcessRefunds: false
-    };
-
-  case UserRole.CLIENT:
-    return basePermissions;
-
-  default:
-    return basePermissions;
-  }
+  return getDefaultPermissionsForRole(role);
 };
 
 // Interface for static methods
@@ -592,7 +661,7 @@ UserSchema.statics.findByClinic = function (clinicName: string) {
   return this.find({
     $or: [
       { 'permissions.canAccessAllClinics': true },
-      { 'permissions.allowedClinics': clinicName }
+      { 'permissions.allowedClinics': { $regex: new RegExp(`^${escapeRegex(clinicName)}$`, 'i') } }
     ]
   });
 };

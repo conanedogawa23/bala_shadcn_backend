@@ -90,6 +90,10 @@ const createAppointmentValidation = [
   body('resourceId')
     .isInt({ min: 1 })
     .withMessage('Resource ID is required and must be a positive integer'),
+  body('referringDoctorId')
+    .optional({ values: 'falsy' })
+    .isMongoId()
+    .withMessage('Referring doctor ID must be a valid identifier'),
   body('clinicName')
     .notEmpty()
     .trim()
@@ -163,6 +167,14 @@ const updateAppointmentValidation = [
     .trim()
     .isLength({ max: 200 })
     .withMessage('Location must be less than 200 characters'),
+  body('resourceId')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('Resource ID must be a positive integer'),
+  body('referringDoctorId')
+    .optional({ values: 'falsy' })
+    .isMongoId()
+    .withMessage('Referring doctor ID must be a valid identifier'),
   body('status')
     .optional()
     .isInt({ min: 0, max: 4 })

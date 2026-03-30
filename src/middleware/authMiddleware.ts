@@ -349,6 +349,45 @@ export const requireSelfOrAdmin = (userIdParam: string = 'userId') => {
 };
 
 /**
+ * Self or Permission Authorization Middleware
+ * Allows users to access their own data or users with a specific permission.
+ */
+export const requireSelfOrPermission = (
+  userIdParam: string = 'userId',
+  ...requiredPermissions: (keyof IUserPermissions)[]
+) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void | Response<AuthErrorResponse> => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: 'Authentication required',
+          code: 'AUTHENTICATION_REQUIRED',
+          statusCode: 401
+        }
+      });
+    }
+
+    const targetUserId = req.params[userIdParam] || req.body.userId || req.query.userId as string;
+    const isSelf = (req.user._id as Types.ObjectId).toString() === targetUserId;
+    const hasRequiredPermission = requiredPermissions.some((permission) => req.user!.hasPermission(permission));
+
+    if (!isSelf && !hasRequiredPermission) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          message: 'Access denied',
+          code: 'ACCESS_DENIED',
+          statusCode: 403
+        }
+      });
+    }
+
+    next();
+  };
+};
+
+/**
  * Activity Tracking Middleware
  * Updates user's last activity timestamp
  */
@@ -435,6 +474,7 @@ export default {
   requireManager,
   requireStaff,
   requireSelfOrAdmin,
+  requireSelfOrPermission,
   trackActivity,
   verifyClinicExists
 };

@@ -324,7 +324,7 @@ ResourceSchema.methods.hasSpecialty = function(specialty: string): boolean {
 };
 
 ResourceSchema.methods.isWorkingAtClinic = function(clinicName: string): boolean {
-  return this.clinics.includes(clinicName);
+  return this.clinics.some((clinic: string) => clinic.toLowerCase() === clinicName.toLowerCase());
 };
 
 // Static methods
@@ -335,7 +335,7 @@ ResourceSchema.statics.findByType = function(type: string, clinicName?: string) 
   };
   
   if (clinicName) {
-    query.clinics = clinicName;
+    query.clinics = { $regex: new RegExp(`^${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
   }
   
   return this.find(query).sort({ resourceName: 1 });
@@ -348,7 +348,7 @@ ResourceSchema.statics.findPractitioners = function(clinicName?: string, special
   };
   
   if (clinicName) {
-    query.clinics = clinicName;
+    query.clinics = { $regex: new RegExp(`^${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
   }
   
   if (specialty) {
@@ -378,7 +378,7 @@ ResourceSchema.statics.findBookableResources = function(clinicName?: string) {
   };
   
   if (clinicName) {
-    query.clinics = clinicName;
+    query.clinics = { $regex: new RegExp(`^${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
   }
   
   return this.find(query).sort({ type: 1, resourceName: 1 });

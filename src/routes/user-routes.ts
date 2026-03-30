@@ -2,9 +2,7 @@ import { Router } from 'express';
 import { UserController } from '../controllers/UserController';
 import { 
   authenticate, 
-  requireAdmin, 
-  requireManager,
-  requireSelfOrAdmin,
+  requireSelfOrPermission,
   requirePermission
 } from '../middleware/authMiddleware';
 
@@ -25,49 +23,49 @@ router.get('/',
 // Get user statistics and analytics
 router.get('/stats', 
   authenticate,
-  requireManager,
+  requirePermission('canManageUsers'),
   UserController.getUserStats
 );
 
 // Get user by ID
 router.get('/:id', 
   authenticate,
-  requireSelfOrAdmin('id'),
+  requireSelfOrPermission('id', 'canManageUsers'),
   UserController.getUserById
 );
 
 // Create new user (Admin only)
 router.post('/', 
   authenticate,
-  requireAdmin,
+  requirePermission('canManageUsers'),
   UserController.createUser
 );
 
 // Update user (Admin or self)
 router.put('/:id', 
   authenticate,
-  requireSelfOrAdmin('id'),
+  requireSelfOrPermission('id', 'canManageUsers'),
   UserController.updateUser
 );
 
 // Delete user (Admin only)
 router.delete('/:id', 
   authenticate,
-  requireAdmin,
+  requirePermission('canManageUsers'),
   UserController.deleteUser
 );
 
 // Update user status (Admin only)
 router.put('/:id/status', 
   authenticate,
-  requireAdmin,
+  requirePermission('canManageUsers'),
   UserController.updateUserStatus
 );
 
 // Unlock user account (Admin only)
 router.put('/:id/unlock', 
   authenticate,
-  requireAdmin,
+  requirePermission('canManageUsers'),
   UserController.unlockUser
 );
 

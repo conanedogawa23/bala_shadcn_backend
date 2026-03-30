@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import User, { IUser, UserRole, UserStatus } from '../models/User';
+import User, { IUser, UserRole, UserStatus, buildUserPermissions } from '../models/User';
 import { EmailService } from '../services/EmailService';
 import { logger } from '../utils/logger';
 
@@ -192,16 +192,7 @@ export class AuthController {
         },
         role,
         status: UserStatus.PENDING,
-        permissions: {
-          canManageUsers: false,
-          canManageClinic: false,
-          canViewReports: false,
-          canManageAppointments: false,
-          canManageOrders: false,
-          canManagePayments: false,
-          canAccessAllClinics: role === UserRole.ADMIN || role === UserRole.MANAGER,
-          allowedClinics: role === UserRole.ADMIN || role === UserRole.MANAGER ? [] : clinics
-        }
+        permissions: buildUserPermissions(role, { clinics })
       };
 
       const user = new User(userData);

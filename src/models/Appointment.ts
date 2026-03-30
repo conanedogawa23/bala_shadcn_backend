@@ -12,7 +12,9 @@ export interface IAppointment extends Document {
   description?: string; // Description from MSSQL
   status: number; // Status from MSSQL (0 = scheduled, 1 = completed, 2 = cancelled, etc.)
   label: number; // Label from MSSQL (color/category label)
-  resourceId: number; // ResourceID from MSSQL (links to practitioner/service)
+  resourceId?: number; // ResourceID from MSSQL (links to practitioner/service)
+  referringDoctorId?: string; // MongoDB ObjectId string for referring doctor directory
+  referringDoctorName?: string; // Snapshot label for display and historical accuracy
   duration?: number; // Duration from MSSQL (in minutes)
 
   // Client and billing information
@@ -119,8 +121,18 @@ const AppointmentSchema = new Schema<IAppointment>({
   },
   resourceId: {
     type: Number,
-    required: true
+    required: false
     // Note: Index covered by compound index { resourceId: 1, startDate: 1 }
+  },
+  referringDoctorId: {
+    type: String,
+    trim: true,
+    index: true
+  },
+  referringDoctorName: {
+    type: String,
+    trim: true,
+    maxlength: 200
   },
   duration: {
     type: Number,

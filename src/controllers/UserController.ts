@@ -1,8 +1,14 @@
 import { Request, Response } from 'express';
-import User, { IUser, UserRole, UserStatus } from '../models/User';
+import User, { IUser, IUserPermissions, UserRole, UserStatus, buildUserPermissions } from '../models/User';
 import { AuthRequest } from './AuthController';
 import { Types } from 'mongoose';
 import { logger } from '../utils/logger';
+
+type UserPermissionInput = Partial<Omit<IUserPermissions, 'allowedClinics'>> & {
+  allowedClinics?: string[];
+};
+
+const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Query interfaces
 interface UserQuery {
@@ -27,7 +33,7 @@ interface CreateUserRequest {
   role: UserRole;
   status?: UserStatus;
   clinics?: string[];
-  permissions?: Partial<any>;
+  permissions?: UserPermissionInput;
 }
 
 interface UpdateUserRequest {
@@ -44,7 +50,8 @@ interface UpdateUserRequest {
   };
   role?: UserRole;
   status?: UserStatus;
-  permissions?: any;
+  clinics?: string[];
+  permissions?: UserPermissionInput;
 }
 
 // Response interfaces
@@ -147,10 +154,19 @@ export class UserController {
 
       // Filter by clinic access
       if (clinicName) {
-        filter.$or = [
+        const clinicFilter = {
+          $or: [
           { 'permissions.canAccessAllClinics': true },
-          { 'permissions.allowedClinics': clinicName }
-        ];
+          { 'permissions.allowedClinics': { $regex: new RegExp(`^${escapeRegex(clinicName)}$`, 'i') } }
+          ]
+        };
+
+        if (filter.$or) {
+          filter.$and = [{ $or: filter.$or }, clinicFilter];
+          delete filter.$or;
+        } else {
+          Object.assign(filter, clinicFilter);
+        }
       }
 
       // Calculate pagination
@@ -310,20 +326,14 @@ export class UserController {
         },
         role,
         status,
-        permissions: permissions || {},
+        permissions: buildUserPermissions(role, {
+          overrides: permissions,
+          clinics
+        }),
         createdBy: req.user?._id
       };
 
       const user = new User(userData);
-      
-      // Set allowed clinics based on role
-      if (role === UserRole.ADMIN || role === UserRole.MANAGER) {
-        user.permissions.canAccessAllClinics = true;
-        user.permissions.allowedClinics = [];
-      } else {
-        user.permissions.allowedClinics = clinics;
-      }
-
       await user.save();
 
       return res.status(201).json({
@@ -388,18 +398,32 @@ export class UserController {
 
       // Update user fields
       if (updateData.username) {user.username = updateData.username;}
-      if (updateData.email) {user.email = updateData.email;}
-      if (updateData.role) {user.role = updateData.role;}
+      if (updateData.email) {
+        user.email = updateData.email;
+        user.profile.email = updateData.email;
+      }
       if (updateData.status) {user.status = updateData.status;}
+
+      const nextRole = updateData.role || user.role;
+      const roleChanged = updateData.role !== undefined && updateData.role !== user.role;
+      const clinicsProvided = Object.prototype.hasOwnProperty.call(updateData, 'clinics');
+      const permissionsUpdated = updateData.permissions !== undefined || clinicsProvided || roleChanged;
+
+      if (updateData.role) {user.role = updateData.role;}
 
       // Update profile
       if (updateData.profile) {
         Object.assign(user.profile, updateData.profile);
       }
 
-      // Update permissions
-      if (updateData.permissions) {
-        Object.assign(user.permissions, updateData.permissions);
+      if (permissionsUpdated) {
+        user.permissions = buildUserPermissions(nextRole, {
+          basePermissions: roleChanged
+            ? { allowedClinics: user.permissions.allowedClinics }
+            : user.permissions,
+          overrides: updateData.permissions,
+          ...(clinicsProvided ? { clinics: updateData.clinics } : {})
+        });
       }
 
       user.updatedBy = req.user?._id as Types.ObjectId;

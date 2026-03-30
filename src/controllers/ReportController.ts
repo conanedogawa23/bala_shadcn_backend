@@ -103,7 +103,7 @@ interface TimesheetData {
     endDate: string;
   };
   practitioners: Array<{
-    resourceId: number;
+    resourceId?: number;
     resourceName: string;
     totalHours: number;
     totalAppointments: number;
@@ -552,6 +552,10 @@ export class ReportController {
       for (const appointment of appointments) {
         const appt = appointment as any;
         const resourceId = appt.resourceId;
+        if (!resourceId) {
+          continue;
+        }
+
         const resourceName = appt.resourceName || `Resource ${resourceId}`;
         
         if (!resourceStats.has(resourceId)) {
