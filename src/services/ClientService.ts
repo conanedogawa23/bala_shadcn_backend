@@ -2,7 +2,7 @@ import { ClientModel, IClient } from '@/models/Client';
 import { AppointmentModel } from '@/models/Appointment';
 import Order from '@/models/Order';
 import ContactHistoryModel from '@/models/ContactHistory';
-import { NotFoundError, ValidationError, DatabaseError } from '@/utils/errors';
+import { ConflictError, NotFoundError, ValidationError, DatabaseError } from '@/utils/errors';
 import { logger } from '@/utils/logger';
 import { ClinicService } from './ClinicService';
 import mongoose from 'mongoose';
@@ -765,6 +765,22 @@ export class ClientService {
         });
         throw error;
       }
+      if (error instanceof mongoose.Error.ValidationError) {
+        const msg = Object.values(error.errors)
+          .map((e) => e.message)
+          .join('; ');
+        logger.error('Mongoose validation in createClient:', { msg, errors: error.errors });
+        throw new ValidationError(msg || 'Client validation failed');
+      }
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code: number }).code === 11000
+      ) {
+        logger.error('Duplicate clientId on create:', error);
+        throw new ConflictError('A client with this ID already exists');
+      }
       logger.error('Error in createClient:', { 
         error: error instanceof Error ? error.message : error,
         stack: error instanceof Error ? error.stack : undefined,
@@ -1090,30 +1106,35 @@ export class ClientService {
   }
 
   /**
-   * Generate unique client ID for a clinic
+   * Generate unique client ID.
+   * Must be globally unique (unique index on clientId). Do not scope only by defaultClinic:
+   * new clients often use URL slugs ("ortholine-duncan-mills") while migrated rows use
+   * display names, so a per-clinic query can miss all rows and repeatedly collide (e.g. "11000").
    */
-  private static async generateClientId(clinicName: string): Promise<string> {
+  private static async generateClientId(_clinicName: string): Promise<string> {
     try {
-      // Generate client ID - use simple incrementing ID
-      const clinicId = 1; // Simplified - no longer need clinic-based ID prefix
-
-      // Find the highest existing client ID for this clinic
-      const lastClient = await ClientModel.findOne({
-        defaultClinic: clinicName,
-        clientId: new RegExp(`^${clinicId}`)
-      }).sort({ clientId: -1 });
-
-      let nextNumber = 1000; // Starting number
-      
-      if (lastClient) {
-        const clientIdStr = lastClient.clientId.toString();
-        const lastNumber = parseInt(clientIdStr.substring(clinicId.toString().length));
-        if (!isNaN(lastNumber)) {
-          nextNumber = lastNumber + 1;
+      const result = await ClientModel.aggregate<{ maxNum: number | null }>([
+        { $match: { clientId: { $regex: /^\d+$/ } } },
+        {
+          $group: {
+            _id: null,
+            maxNum: { $max: { $toLong: '$clientId' } }
+          }
         }
+      ]);
+
+      let maxExisting = 0;
+      if (
+        result.length > 0 &&
+        result[0].maxNum != null &&
+        typeof result[0].maxNum === 'number' &&
+        !Number.isNaN(result[0].maxNum)
+      ) {
+        maxExisting = result[0].maxNum;
       }
 
-      return `${clinicId}${nextNumber.toString().padStart(4, '0')}`;
+      const nextId = Math.max(maxExisting + 1, 10000);
+      return String(nextId);
     } catch (error) {
       logger.error('Error generating client ID:', error);
       throw new DatabaseError('Failed to generate client ID', error as Error);
