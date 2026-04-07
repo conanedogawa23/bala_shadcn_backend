@@ -1124,13 +1124,13 @@ export class ClientService {
       ]);
 
       let maxExisting = 0;
+      const row = result.at(0);
       if (
-        result.length > 0 &&
-        result[0].maxNum != null &&
-        typeof result[0].maxNum === 'number' &&
-        !Number.isNaN(result[0].maxNum)
+        row != null &&
+        typeof row.maxNum === 'number' &&
+        !Number.isNaN(row.maxNum)
       ) {
-        maxExisting = result[0].maxNum;
+        maxExisting = row.maxNum;
       }
 
       const nextId = Math.max(maxExisting + 1, 10000);
